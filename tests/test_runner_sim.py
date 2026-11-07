@@ -6,8 +6,11 @@ import json
 import threading
 import urllib.request
 
+import pytest
+
 from sortering_pnp.cli import main
 from sortering_pnp.layout import Layout
+from sortering_pnp.printer.base import PrinterError
 from sortering_pnp.printer.sim import SimPrinter, SimVision, SimWorld
 from sortering_pnp.runner import Runner
 from sortering_pnp.transform import BedCalibration, Transform2D
@@ -91,6 +94,11 @@ def test_calibration_scan_and_goto(machine, layout):
         x, y = m["plate"]
         runner.motion.travel(x, y)
         runner.calib_record(m["marker"])
+    runner.motion.travel(0, 0)
+    back = runner.goto_point(markers[1]["marker"])  # Move tip here: to the recorded point
+    assert back[:2] == markers[1]["plate"]
+    with pytest.raises(PrinterError):
+        runner.goto_point(markers[-1]["marker"])  # nothing recorded for it
     fit = runner.calib_fit()
     assert max(fit["residuals_mm"]) < 1e-6
     cal = BedCalibration.load(runner.transform_path)

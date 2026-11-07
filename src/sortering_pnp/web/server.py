@@ -7,7 +7,8 @@ GET  /api/layout            layout + problems;  POST /api/layout  save a layout
 POST /api/scan              photo -> move bins to where their markers are
 POST /api/calib/photo       photo -> markers;   POST /api/calib/record {"marker": id}
 POST /api/calib/fit         fit + save;         POST /api/calib/clear
-POST /api/calib/goto        {"marker": id};     POST /api/jog {"dx","dy","dz"};  GET /api/tip
+POST /api/calib/goto        {"marker": id};     POST /api/calib/goto_point {"marker": id}
+                                                    POST /api/jog {"dx","dy","dz"};  GET /api/tip
 GET  /api/print/bin?marker=100&fmt=3mf|stl, /api/print/baseplate, /api/print/labels,
      /api/print/all          printable files
 GET  /runs/<file>           photos
@@ -288,6 +289,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json({"pairs": []})
         elif method == "POST" and path == "/api/calib/tip":
             self._json(r.tip_touches_plate())
+        elif method == "POST" and path == "/api/calib/goto_point":
+            self._json({"tip": r.goto_point(int(self._body()["marker"]))})
         elif method == "POST" and path == "/api/calib/goto":
             self._json({"tip": r.goto_marker(int(self._body()["marker"]))})
         elif method == "POST" and path == "/api/jog":
