@@ -206,7 +206,8 @@ def cmd_check(args: argparse.Namespace) -> int:
     cal = BedCalibration.load(tpath)
     line(
         cal is not None or m.printer.driver == "sim",
-        f"camera-to-printer calibration {tpath}" + ("" if cal else " (missing: Calibrate tab)"),
+        f"camera-to-printer calibration {tpath}"
+        + ("" if cal else " (missing: Setup tab, Camera to printer)"),
     )
     if cal is not None and cal.residuals_mm:
         worst = max(cal.residuals_mm)

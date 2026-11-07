@@ -29,7 +29,21 @@ camera:
   mask_colour: auto            # auto: the tray floor's colour | #RRGGBB, e.g. #FFFFFF
   mask_margin_mm: 0            # + keeps the wall's foot, - paints more of the floor's edge (Calibrate tab)
   hflip: true                  # the camera flips its picture left-right (both flips: turned 180 deg, a camera mounted the other way round)
-  vflip: true                  # ... and top-bottom (Calibrate tab: Turn 180 / Mirror)
+  vflip: true                  # ... and top-bottom (Camera Calibration tab: Rotate 90° / Mirror)
+  turn90: false                # then turned 90 deg clockwise (in software)
+  adjust:                      # Camera Calibration tab: focus, white balance, exposure, image
+    focus: auto                # auto | manual (lens_position, dioptres: 1 / metres)
+    lens_position: 2.0
+    white_balance: auto        # auto | manual (red_gain, blue_gain)
+    red_gain: 1.8
+    blue_gain: 1.6
+    exposure: auto             # auto | manual (exposure_us, gain)
+    exposure_us: 20000
+    gain: 1.0
+    brightness: 0.0            # -1 .. 1
+    contrast: 1.0              # 0 .. 2
+    sharpness: 1.0             # 0 .. 4
+    saturation: 1.0            # 0 .. 2
   height_mm: null              # lens above the tray floor without a camera calibration (null: vision.yaml's)
   head:                        # only for source: head
     fov_mm: [80, 60]           # what one photo covers at the photo height, X x Y

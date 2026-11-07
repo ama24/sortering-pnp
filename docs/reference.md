@@ -11,7 +11,7 @@ Settings are in [configs/machine.yaml](../configs/machine.yaml) (each has a comm
 - [The Setup tab, step by step](#the-setup-tab-step-by-step)
 - [Models: upload over WiFi, keep the old ones](#models-upload-over-wifi-keep-the-old-ones)
 - [Files tab: files from the other projects](#files-tab-files-from-the-other-projects)
-- [Camera calibration (Calibrate tab)](#camera-calibration-calibrate-tab)
+- [Camera Calibration tab](#camera-calibration-tab)
 - [Only the tray goes to the model](#only-the-tray-goes-to-the-model)
 - [Wild bins](#wild-bins)
 - [How full the bins are](#how-full-the-bins-are)
@@ -166,20 +166,20 @@ menu, until every step of the **Setup** tab is checked:
    over a bin. Then confirm.
 3. **Machine:** limits, travel height, photo position and picker-change position
    (`printer.change_position`), editable on the page. *Show me* buttons drive to each position
-   (at travel height). *All positions are right* confirms and sends the head to the
+   (at travel height). *Confirm* confirms and sends the head to the
    picker-change position.
 4. **Picker:** choose the type (the page draws its wiring to the Pi and says whether its pins
    are ready); *Grab* / *Release* and, for tweezers, *Turn to 0°* / *90°* and the offset try it
    without moving. Put it on the head, then **OK** (`TOOL_PICKER`: sorting needs it). Choosing
    another type un-checks the step.
-5. **Tip height:** in the step: *Above the plate*, the Z jog buttons and *The tip touches the
-   plate* on one row. Checks itself.
+5. **Tip height:** in the step: *Go to centre* (over the plate), the Z jog buttons and *Set
+   height* on one row. Checks itself.
 6. **Lights:** colour and intensity of the LEDs (see [Lights](#lights)), shown at once; *OK*.
    *No lights* when there are none. Before the camera: its photos are taken with them.
 7. **Camera to printer:** in the step: *Take photo* (the codes circled on it and listed with
    their bin size; no model needed), the jog pad, *Tip is here* per code, *Fit*. Checks itself
    when the worst error is under 1 mm.
-8. **Layout:** *Find the bins* (= Resync). Checks itself when the bins and a plate are found
+8. **Layout:** *Find bins* (= Resync). Checks itself when the bins and a plate are found
    without problems.
 
 Until then the machine moves only when you ask it to in these steps. Jogging and the calibration
@@ -203,7 +203,7 @@ The steps below are the same work in more detail.
 4. Put the picker on and press **OK** (Setup tab, Picker). Set `tool.offset` in
    [configs/machine.yaml](../configs/machine.yaml) if the picker tip is not where the nozzle was.
 5. Set `printer.photo_position`: where the head waits during photos, out of the picture.
-6. **Camera calibration** (Calibrate tab, *Camera calibration*): lay the ChArUco board **in the
+6. **Camera calibration** (Camera Calibration tab, *Camera calibration*): lay the ChArUco board **in the
    tray**, where the parts will lie. Its surface is the height everything is measured from.
    **Setup tab, Camera to printer**: take a photo, then jog the tip onto the centre of 3 or more markers
    (spread over the bed), pressing **Tip is here** on each. Then **Fit**. Errors under 0.5 mm
@@ -257,13 +257,13 @@ If the card has a recommended confidence, it is used for stage 1 (`models.use_re
 
 sortering-pnp keeps its own copy of every file it uses from the other projects, so it runs on its
 own and never reads their folders. It comes with working defaults for all of them except the
-calibration, which the Calibrate tab makes. The **Files** tab has a card for each one, saying where to
+calibration, which the Camera Calibration tab makes. The **Files** tab has a card for each one, saying where to
 find it, what it is for and what is done without it, and which copy is in use. Fetch the file,
 drop it on its card: it is checked, kept on the Pi (`paths.files`) and used at once.
 
 | File | Where to get it | Without it |
 |---|---|---|
-| `calibration.json` | made here: Calibrate tab | nominal camera |
+| `calibration.json` | made here: Camera Calibration tab | nominal camera |
 | `head_calibration.json` | the same, with a head camera | only needed with a head camera |
 | `vision.yaml` | comes with sortering-pnp (`src/sortering_pnp/defaults/`): change and drop it back | the built-in one |
 | `parts.json` | inside every model package; or screw-synth: `screwsynth-catalogue parts --out parts.json` | the built-in one (the whole screw-synth catalogue) |
@@ -274,7 +274,21 @@ drop it on its card: it is checked, kept on the Pi (`paths.files`) and used at o
 After that: a dropped file, then a path set in machine.yaml, then the copy that comes with
 sortering-pnp. Models, including ones from anywhere else, go in the Models tab.
 
-## Camera calibration (Calibrate tab)
+## Camera Calibration tab
+
+**Camera** (top card): the live picture, with
+- **Rotate 90°** (clockwise) and **Mirror** (left-right): the camera flips its own picture
+  (`camera.hflip`, `vflip`), a quarter turn is done in software (`camera.turn90`: the photo is
+  then taller than wide). Afterwards redo Camera to printer.
+- **Park bed:** the bed to the photo position, so the live picture shows the tray as the photos
+  will.
+- **Focus** (Auto, or Manual at a lens position; **Autofocus** focuses once on the tray and keeps
+  that), **White balance** (Auto, or Manual red and blue gains), **Exposure** (Auto, or Manual
+  shutter and gain) and **Image** (brightness, contrast, sharpness, saturation):
+  `camera.adjust`, kept in `paths.machine`, applied at once to the photos and the live picture.
+  Manual values go over the locked settings of a calibration's camera lock. **Now** shows what
+  the camera runs with.
+
 
 Everything on the Pi, from the page, with the camera's **live picture** at the top of the tab
 (`/api/camera/live.mjpg`, a 1280 x 720 second stream of the camera; it runs only while the tab is
@@ -322,8 +336,8 @@ the Device tab's camera shows what the model saw.
 The codes are always read from the photo itself, and the check after a bin change looks at it
 unpainted (it must see into the bins).
 
-**Set it once, in the Calibrate tab → Camera cropping**, after the camera calibration, Camera
-to printer and Find the bins (it follows the tray of the layout): the live picture and, next to
+**Set it once, in the Camera Calibration tab → Camera cropping**, after the camera calibration, Camera
+to printer and Find bins (it follows the tray of the layout): the live picture and, next to
 it, what the model gets, live. The painted edge should sit at the foot of the tray's walls. The
 edge buttons move it: + keeps a strip of the wall's foot (parts lying right against the wall
 stay whole), − paints more of the floor's edge. The colour is the tray floor's own (`auto`) or
@@ -649,7 +663,7 @@ Set it up:
    height its model was trained for (the camera's height sets the pixels per mm).
 2. `camera.head.offset`: roughly how far the image centre is from the tip (X, Y), and
    `fov_mm`: what one photo covers at that height.
-3. Calibrate tab, as for the fixed camera: the photo is taken at the photo position; jog the
+3. Camera Calibration tab, as for the fixed camera: the photo is taken at the photo position; jog the
    tip onto three markers. Every other photo is shifted by how far the head moved, so this one
    calibration places all of them.
 4. Models tab: **Use on head camera** on a stage-1 model trained at the head camera's scale.
@@ -721,7 +735,7 @@ buttons never need a login: they come from Klipper on the Pi itself.
   on the full calibrated image, at the scale it was trained on. sortering-pnp then ignores
   everything outside the working area, including the parts already in bins.
 - **Plate mm → printer X/Y:** one 2D transform (rotation, scale, shift) fitted from the marker
-  points you record in the Calibrate tab. The plate is fixed to the bed, so this works for
+  points you record in the Camera Calibration tab. The plate is fixed to the bed, so this works for
   moving-bed printers too. Bed markers are read at their real height (parallax-correct).
 - **Bin markers:** ArUco 4x4 codes, ids 100–249, so they can't be confused with the calibration
   board. Each code's top edge points to the back of its bin, which gives both the bin's position

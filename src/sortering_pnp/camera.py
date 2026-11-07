@@ -71,6 +71,113 @@ def settings_mismatch(locked: dict[str, Any], metadata: dict[str, Any]) -> list[
     return problems
 
 
+IMAGE_KEYS = {
+    "brightness": "Brightness",
+    "contrast": "Contrast",
+    "sharpness": "Sharpness",
+    "saturation": "Saturation",
+}
+
+
+def _adj(adjust: Any) -> dict[str, Any]:
+    if adjust is None:
+        return {}
+    return dict(adjust) if isinstance(adjust, dict) else dict(vars(adjust))
+
+
+def merged_settings(settings: dict[str, Any] | None, adjust: Any) -> dict[str, Any]:
+    """The locked settings with the page's manual adjustments over them (what the camera must
+    then report: settings_mismatch)."""
+    s, a = dict(settings or {}), _adj(adjust)
+    if not s:
+        return s
+    if a.get("focus") == "manual":
+        s["LensPosition"] = float(a["lens_position"])
+    if a.get("white_balance") == "manual":
+        s["ColourGains"] = [float(a["red_gain"]), float(a["blue_gain"])]
+    if a.get("exposure") == "manual":
+        s["ExposureTime"] = int(a["exposure_us"])
+        s["AnalogueGain"] = float(a["gain"])
+    for key, ctl in IMAGE_KEYS.items():
+        if key in a:
+            s[ctl] = float(a[key])
+    return s
+
+
+def controls_for(settings: dict[str, Any] | None, adjust: Any, has_af: bool = True) -> dict:
+    """Picamera2 controls: the locked settings (with the manual adjustments over them), or,
+    before a lock, the camera's automatic ones where the adjustment says auto."""
+    a = _adj(adjust)
+    if settings:
+        return controls_from_settings(merged_settings(settings, a))
+    c: dict[str, Any] = {}
+    if a.get("exposure") == "manual":
+        c |= {
+            "AeEnable": False,
+            "ExposureTime": int(a["exposure_us"]),
+            "AnalogueGain": float(a["gain"]),
+        }
+    else:
+        c["AeEnable"] = True
+    if a.get("white_balance") == "manual":
+        c |= {"AwbEnable": False, "ColourGains": (float(a["red_gain"]), float(a["blue_gain"]))}
+    else:
+        c["AwbEnable"] = True
+    if has_af:
+        if a.get("focus") == "manual":
+            c |= {"AfMode": 0, "LensPosition": float(a["lens_position"])}
+        else:
+            c["AfMode"] = 2  # controls.AfModeEnum.Continuous: sharp while not locked
+    for key, ctl in IMAGE_KEYS.items():
+        if key in a:
+            c[ctl] = float(a[key])
+    return c
+
+
+def turn_image(img: np.ndarray, turn90: bool) -> np.ndarray:
+    """The software part of the picture's orientation: 90 degrees clockwise."""
+    return np.ascontiguousarray(np.rot90(img, k=-1)) if turn90 else img
+
+
+def orientation(hflip: bool, vflip: bool, turn90: bool) -> dict[str, Any]:
+    """How the picture is turned, for the page: degrees clockwise and mirrored or not (the
+    mirror is applied to the camera's own picture, before the turn)."""
+    mirror = hflip != vflip
+    base = 180 if vflip else 0  # H: mirrored | V = H then 180 | H+V = 180
+    return {"turn": (base + (90 if turn90 else 0)) % 360, "mirror": mirror}
+
+
+def rotated(hflip: bool, vflip: bool, turn90: bool) -> tuple[bool, bool, bool]:
+    """The orientation turned a further 90 degrees clockwise."""
+    if not turn90:
+        return hflip, vflip, True
+    return not hflip, not vflip, False  # two quarter turns = both flips
+
+
+def mirrored(hflip: bool, vflip: bool, turn90: bool) -> tuple[bool, bool, bool]:
+    """The orientation mirrored left-right (in the final picture)."""
+    if turn90:  # mirroring after a quarter turn = mirroring top-bottom before it
+        return hflip, not vflip, turn90
+    return not hflip, vflip, turn90
+
+
+def rpicam_adjust(adjust: Any) -> list[str]:
+    """rpicam-still options for the page's adjustments (no Picamera2)."""
+    a, out = _adj(adjust), []
+    if not a:
+        return out
+    if a.get("focus") == "manual":
+        out += ["--autofocus-mode", "manual", "--lens-position", f"{float(a['lens_position']):g}"]
+    if a.get("white_balance") == "manual":
+        out += ["--awbgains", f"{float(a['red_gain']):g},{float(a['blue_gain']):g}"]
+    if a.get("exposure") == "manual":
+        out += ["--shutter", str(int(a["exposure_us"])), "--gain", f"{float(a['gain']):g}"]
+    for key in IMAGE_KEYS:
+        if key in a:
+            out += [f"--{key}", f"{float(a[key]):g}"]
+    return out
+
+
 def controls_from_settings(s: dict[str, Any]) -> dict[str, Any]:
     """Picamera2 controls that freeze exposure, gain, white balance and focus."""
     c = {
@@ -152,11 +259,12 @@ def _jsonable(v: Any) -> Any:
     return str(v)
 
 
-def rpicam_still(hflip: bool = False, vflip: bool = False) -> list[str]:
+def rpicam_still(hflip: bool = False, vflip: bool = False, adjust: Any = None) -> list[str]:
     """The rpicam-still command for one full-resolution photo (without Picamera2)."""
     cmd = ["rpicam-still", "-n", "-t", "500", "--width", str(FULL_RES[0])]
     cmd += ["--height", str(FULL_RES[1])]
-    return cmd + (["--hflip"] if hflip else []) + (["--vflip"] if vflip else [])
+    cmd += (["--hflip"] if hflip else []) + (["--vflip"] if vflip else [])
+    return cmd + rpicam_adjust(adjust)
 
 
 class CameraError(RuntimeError):
@@ -170,11 +278,19 @@ class Camera:
     full resolution for photos, "lores" (LIVE_SIZE) for the live picture on the page."""
 
     def __init__(
-        self, settings: dict | None = None, hflip: bool = False, vflip: bool = False
+        self,
+        settings: dict | None = None,
+        hflip: bool = False,
+        vflip: bool = False,
+        turn90: bool = False,
+        adjust: Any = None,
     ) -> None:
         from picamera2 import Picamera2
 
-        self.settings = dict(settings or {})
+        self.locked_settings = dict(settings or {})
+        self.adjust = _adj(adjust)
+        self.settings = merged_settings(self.locked_settings, self.adjust)
+        self.turn90 = bool(turn90)
         extra: dict[str, Any] = {}
         if hflip or vflip:  # done by the camera: every stream comes out turned
             from libcamera import Transform
@@ -195,13 +311,7 @@ class Camera:
                 **extra,
             )
             self.picam2.configure(cfg)
-            if self.locked:
-                self.picam2.set_controls(controls_from_settings(self.settings))
-            else:
-                auto: dict[str, Any] = {"AeEnable": True, "AwbEnable": True}
-                if "AfMode" in self.picam2.camera_controls:
-                    auto["AfMode"] = 2  # controls.AfModeEnum.Continuous: sharp while unlocked
-                self.picam2.set_controls(auto)
+            self.picam2.set_controls(self._controls())
             self.picam2.start()
             time.sleep(1.5)
             if self.locked:
@@ -209,6 +319,36 @@ class Camera:
         except Exception:
             self.close()
             raise
+
+    def _controls(self) -> dict[str, Any]:
+        has_af = "AfMode" in self.picam2.camera_controls
+        c = controls_for(self.locked_settings, self.adjust, has_af)
+        if not has_af:
+            c = {k: v for k, v in c.items() if k not in ("AfMode", "LensPosition")}
+        return c
+
+    def set_adjust(self, adjust: Any) -> None:
+        """New adjustments from the page, applied at once (no reopening)."""
+        self.adjust = _adj(adjust)
+        self.settings = merged_settings(self.locked_settings, self.adjust)
+        self.picam2.set_controls(self._controls())
+        time.sleep(0.5)  # a few frames with the new settings
+
+    def focus_once(self) -> float | None:
+        """Autofocus once on what is under the camera; the lens position found (dioptres), or
+        None without autofocus."""
+        if "AfMode" not in self.picam2.camera_controls:
+            return None
+        self.picam2.set_controls({"AfMode": 1})  # controls.AfModeEnum.Auto
+        self.picam2.autofocus_cycle()
+        pos = self.picam2.capture_metadata().get("LensPosition")
+        return None if pos is None else float(pos)
+
+    def now(self) -> dict[str, Any]:
+        """What the camera runs with right now (exposure, gain, colours, focus)."""
+        md = self.picam2.capture_metadata()
+        keys = ("ExposureTime", "AnalogueGain", "ColourGains", "LensPosition", "ColourTemperature")
+        return {k: _jsonable(md[k]) for k in keys if k in md}
 
     def verify(self) -> None:
         md = dict(self.picam2.capture_metadata())
@@ -232,7 +372,7 @@ class Camera:
         problems = settings_mismatch(self.settings, md)
         if problems:
             raise CameraError("settings drifted during capture: " + "; ".join(problems))
-        return img, md
+        return turn_image(img, self.turn90), md
 
     def preview(self) -> np.ndarray:
         """One frame of the live picture (LIVE_SIZE, BGR)."""
@@ -240,7 +380,8 @@ class Camera:
 
         yuv = self.picam2.capture_array("lores")
         w, h = LIVE_SIZE
-        return cv2.cvtColor(np.ascontiguousarray(yuv[: h * 3 // 2, :w]), cv2.COLOR_YUV2BGR_I420)
+        img = cv2.cvtColor(np.ascontiguousarray(yuv[: h * 3 // 2, :w]), cv2.COLOR_YUV2BGR_I420)
+        return turn_image(img, self.turn90)
 
     def close(self) -> None:
         """Stop and release the camera, so another Picamera2 (the lock) can open it."""

@@ -98,14 +98,14 @@ class BedCalibration:
         if spread < MIN_SPREAD_MM:
             raise ValueError(
                 f"the tip was within {spread:.0f} mm for every code: jog it onto each code "
-                "before its 'Tip is here' (Forget points, then again)"
+                "before its 'Tip is here' (Clear points, then again)"
             )
         T, res = fit_similarity([p["plate"] for p in pairs], [p["bed"] for p in pairs], allow_scale)
         if not MIN_SCALE <= T.scale <= MAX_SCALE:
             raise ValueError(
                 f"the camera's millimetres are {T.scale:.2f} x the printer's: the tip was not on "
                 "the codes it was recorded for, or the camera's height is far off "
-                "(Forget points, then again)"
+                "(Clear points, then again)"
             )
         return cls(T, pairs, [round(float(r), 3) for r in res])
 

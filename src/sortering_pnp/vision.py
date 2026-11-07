@@ -208,6 +208,10 @@ class CameraVision:
         if m.camera.height_mm:  # set in the Calibrate tab (Skip for now): over vision.yaml's
             nc = {**(cfg.get("nominal_camera") or {}), "height_mm": float(m.camera.height_mm)}
             cfg = {**cfg, "nominal_camera": nc}
+        if m.camera.turn90:  # the picture turned a quarter: taller than wide
+            nc = dict(cfg.get("nominal_camera") or {})
+            w, h = (int(v) for v in nc.get("resolution", (4608, 2592)))
+            cfg = {**cfg, "nominal_camera": {**nc, "resolution": [h, w]}}
         self.nominal_height_mm = float((cfg.get("nominal_camera") or {}).get("height_mm", 300.0))
         self.nominal = nominal_from_config(cfg)
         self.cam_full = (
@@ -312,16 +316,43 @@ class CameraVision:
             path = self.m.path(self.m.camera.settings)
             settings = read_json(path) if path is not None and path.is_file() else None
             try:
-                self.cam = RigCamera(settings, self.m.camera.hflip, self.m.camera.vflip)
+                self.cam = self._open(RigCamera, settings)
             except ImportError:
                 self._no_picamera = True
                 log.warning("no Picamera2: photos with rpicam-still, no live picture")
         return self.cam
 
+    def _open(self, rig: Any, settings: dict | None) -> Any:
+        c = self.m.camera
+        return rig(settings, c.hflip, c.vflip, c.turn90, c.adjust)
+
     def _rpicam(self) -> list[str]:
         from sortering_pnp.camera import rpicam_still
 
-        return rpicam_still(self.m.camera.hflip, self.m.camera.vflip)
+        c = self.m.camera
+        return rpicam_still(c.hflip, c.vflip, c.adjust)
+
+    def adjust_camera(self) -> dict[str, Any]:
+        """The page changed the adjustments (m.camera.adjust): applied to the open camera at
+        once; what it runs with now (empty without Picamera2: rpicam-still uses them)."""
+        with self._cam_lock:
+            cam = self._camera()
+            if cam is None:
+                return {}
+            cam.set_adjust(self.m.camera.adjust)
+            return cam.now()
+
+    def focus_once(self) -> float | None:
+        """Autofocus once (the lens position found, dioptres), or None (no Picamera2 or no
+        autofocus)."""
+        with self._cam_lock:
+            cam = self._camera()
+            return cam.focus_once() if cam is not None else None
+
+    def camera_now(self) -> dict[str, Any]:
+        with self._cam_lock:
+            cam = self.cam  # not opened just for this
+            return cam.now() if cam is not None else {}
 
     def reopen_camera(self) -> None:
         """Close the camera; it opens again with the current settings (e.g. a new flip)."""
@@ -380,7 +411,9 @@ class CameraVision:
             img = cv2.imread(str(p), cv2.IMREAD_COLOR)
         if img is None:
             raise OSError("rpicam-still gave no picture")
-        return img, {}
+        from sortering_pnp.camera import turn_image
+
+        return turn_image(img, self.m.camera.turn90), {}
 
     def lock_camera(self, out: Path, distance_mm: float) -> dict[str, Any]:
         """The camera lock (camlock.py: exposure, gain, white balance, focus sweep) written to `out`; the
@@ -401,7 +434,7 @@ class CameraVision:
                 )
             )
             settings = read_json(out)
-            self.cam = RigCamera(settings, self.m.camera.hflip, self.m.camera.vflip)
+            self.cam = self._open(RigCamera, settings)
         return settings
 
     def _snap(self, path: Path) -> None:
@@ -416,6 +449,11 @@ class CameraVision:
             return
         cmd = self._rpicam()
         subprocess.run([*cmd, "-q", "95", "-o", str(path)], check=True, capture_output=True)
+        if self.m.camera.turn90:  # the quarter turn is done here, not by the camera
+            from sortering_pnp.camera import turn_image
+
+            img = cv2.imread(str(path), cv2.IMREAD_COLOR)
+            cv2.imwrite(str(path), turn_image(img, True), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
     def capture(
         self, name: str, marker_height: Callable[[int], float], work: WorkArea | None = None

@@ -15,7 +15,7 @@ sessions are pages of sortering-pnp (`photos.py`: Calibrate and Photos tabs), wi
 `camera.py`/`camlock.py`, the one-button calibration in `calibjob.py`, the calibration maths in
 `calib/` and the session format in `session.py`. The camera stays open (`CameraVision._camera`,
 automatic settings until locked) with a second 1280x720 stream for the live picture
-(`/api/camera/live.mjpg`, only while the Calibrate tab is open).
+(`/api/camera/live.mjpg`, only while the Camera Calibration tab is open).
 Never add another program or path that sends G-code.
 
 **sortering-pnp runs on its own.** It never reads the other repositories' folders for data: files
