@@ -585,6 +585,7 @@ class Runner:
         q = c.turn90 if turn90 is None else bool(turn90)
         if (c.hflip, c.vflip, c.turn90) == (bool(hflip), bool(vflip), q):
             return self.photos.state()
+        turned = c.turn90 != q
         c.hflip, c.vflip, c.turn90 = bool(hflip), bool(vflip), q
         self.remember_machine(
             {"camera_hflip": c.hflip, "camera_vflip": c.vflip, "camera_turn90": c.turn90}
@@ -593,7 +594,7 @@ class Runner:
         if reopen is not None:
             reopen()
         reload = getattr(self.vision, "reload_setup", None)
-        if reload is not None and q:  # the nominal camera's picture is taller now
+        if reload is not None and turned:  # the nominal camera's picture: taller, or wide again
             reload()
         self.calib_clear()
         self.setup.reset("camera")

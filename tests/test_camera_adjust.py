@@ -178,3 +178,17 @@ def test_the_nominal_camera_is_taller_after_a_quarter_turn(machine, tmp_path):
     machine.camera.turn90 = True
     v.reload_setup()
     assert tuple(v.nominal.image_size) == (h, w)
+
+
+def test_turning_back_reloads_the_nominal_camera_too(machine):
+    """Rotate twice (0 -> 90 -> 180): the quarter turn goes off again, and the picture size the
+    photos are checked against must follow both times, not only the first."""
+    runner = _runner(machine)
+    machine.camera.hflip = machine.camera.vflip = machine.camera.turn90 = False
+    seen = []
+    runner.vision.reload_setup = lambda: seen.append(machine.camera.turn90)
+    runner.camera_orient("rotate")
+    runner.camera_orient("rotate")
+    assert seen == [True, False]
+    runner.camera_orient("mirror")  # no quarter turn changes: nothing to reload
+    assert seen == [True, False]
