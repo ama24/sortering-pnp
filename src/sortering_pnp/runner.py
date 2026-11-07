@@ -14,6 +14,7 @@ import math
 import threading
 import time
 from collections import Counter, deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -90,6 +91,7 @@ class Runner:
         self._now = threading.Event()  # automatic mode: Resume / Start, look and sort now
         self._in_auto = False
         self._next_look: float | None = None  # automatic mode: when it looks again (time.time)
+        self._shot_t: float | None = None  # when the photo on the page was taken
         self.startup = Checklist()  # the start-up check (startup.py), shown on the Device tab
         self._started_up = False  # done since the program started
         self._shot_no = 0
@@ -258,6 +260,9 @@ class Runner:
                 else None
             ),
             "startup": self.startup.to_dict(),
+            "shot_age_s": (
+                round(time.time() - self._shot_t, 1) if self._shot_t is not None else None
+            ),
             "setup": {
                 "required": self.require_setup,
                 "complete": not self.setup.missing(),
@@ -327,28 +332,32 @@ class Runner:
             self._thread.start()
             return f"automatic: {strat}"
         if cmd == "startup":
-            if running:
-                return "already running: stop first"
             if self.require_setup and self.setup.missing():
                 return "finish the Setup tab first: " + ", ".join(self.setup.missing())
-            self._stop.clear()
-            self._set(status="running", message="start-up check")
-            self._thread = threading.Thread(target=self._startup_run, name="sorter", daemon=True)
-            self._thread.start()
-            return "start-up check: homing, layout, bins"
+            return self._take_over("start-up check", self._startup_now)
         if cmd in ("change", "change_bin"):
             cmd = "ok"
         if cmd == "ok":  # Change bin: the first press parks; the second checks the bins
-            if self.swap_phase != "parked":
-                self.swap_phase = "parked"
+            if self.swap_phase == "parking":
                 if running:
+                    return "parking: wait until it stands still"
+                self.swap_phase = ""  # stopped before it parked
+            if self.swap_phase != "parked":
+                if running:  # sorting or standing by: it parks after the move in progress
+                    self.swap_phase = "parking"
                     self._park.set()
-                    return "parking after this move; change the bins, then Change bin again"
+                    self._now.set()  # standby: at once
+                    self._set(message="parking for a bin change")
+                    return "parking"
+                self.swap_phase = "parked"
+                self._park_idle()
                 self.note("parked for a bin change")
-                return "change the bins, then press Change bin again"
+                return "parked: change the bins, then Done"
             if running:
                 self._ok.set()
-                return "checking the bins, then sorting on"
+                self._now.set()
+                self._set(message="checking the bins")
+                return "checking the bins"
             self.swap_phase = ""
             res = self.bins_ok()
             return "; ".join(res["resolved"]) or "the bins were checked: nothing was asked for"
@@ -389,8 +398,62 @@ class Runner:
         return f"unknown command {cmd!r}"
 
     def wait(self, timeout: float | None = None) -> None:
-        if self._thread is not None:
-            self._thread.join(timeout)
+        """Until the sorter thread ends (a take-over's thread too)."""
+        end = None if timeout is None else time.monotonic() + timeout
+        while self._thread is not None:
+            t = self._thread
+            t.join(None if end is None else max(0.0, end - time.monotonic()))
+            if t is self._thread or (end is not None and time.monotonic() >= end):
+                return
+
+    def _take_over(self, label: str, fn: Callable[[], str | None]) -> str:
+        """Run `fn` now in the sorter thread: whatever runs (a run, automatic mode, a check)
+        stops first, after the move in progress (a part in the picker is dropped first, the
+        picker is off). Automatic mode carries on afterwards if it was on."""
+        old = self._thread if self._thread is not None and self._thread.is_alive() else None
+        resume = old is not None and (self._in_auto or self.saved_mode()[0])
+        strategy = self.state.strategy
+        if old is not None:
+            self._stop.set()
+            self._pause.clear()
+            self._set(status="stopping", message=f"{label}: stopping the current move")
+        else:
+            self._set(status="running", message=label)
+
+        def run() -> None:
+            if old is not None:
+                old.join()
+            if self.swap_phase == "parking":  # stopped before it parked
+                self.swap_phase = ""
+            self._stop.clear()
+            self._pause.clear()
+            self._set(status="running", message=label)
+            try:
+                done = fn()
+            except Exception as exc:  # noqa: BLE001 - shown on the page
+                self.pins.off()
+                log.exception(label)
+                self.note(f"{label} failed: {exc}")
+                self._set(status="error", message=f"{label} failed: {exc}")
+                return
+            if resume and not self._stop.is_set():
+                self._auto(strategy)
+            else:
+                self._set(status="idle", message=done or f"{label}: done")
+
+        self._thread = threading.Thread(target=run, name="sorter", daemon=True)
+        self._thread.start()
+        return f"{label}: stopping the current move first" if old is not None else label
+
+    def _park_idle(self) -> None:
+        """Change bin while idle: the bed out to the photo position, if it can move."""
+        try:
+            with self._lock:
+                self.motion.preflight(home=False)
+                self.motion.photo_position()
+                self.motion.message("Swap bins, Change bin")
+        except Exception as exc:  # noqa: BLE001 - not homed or no printer: the bins can still be changed
+            log.info("not parked for the bin change: %s", exc)
 
     # ------------------------------------------------------------------ one photo
     def _photo_name(self) -> str:
@@ -423,6 +486,7 @@ class Runner:
                 self.phase("taking a photo")
                 with self.lights.for_photo():
                     photo = self.vision.snap(name)
+                self._show_photo(photo, name)
                 self.phase("running the model")
                 shot = (
                     self.vision.analyse(photo, name, heights, work)
@@ -686,8 +750,26 @@ class Runner:
         )
         return self._finish_shot(shot, layout, T)
 
+    def _show_photo(self, photo: Any, name: str) -> None:
+        """The photo on the page at once, before the model has looked at it (its parts and codes
+        follow when it has)."""
+        preview = getattr(self.vision, "preview", None)
+        if preview is None:
+            return
+        try:
+            shown = preview(photo, name)
+        except Exception:  # noqa: BLE001 - only the early picture is missing
+            log.exception("preview of %s", name)
+            return
+        if shown is None:
+            return
+        view, view_h = shown
+        self._shot_t = time.time()
+        self._set(view=Path(view).name, view_h=view_h, shot=None, parts=[], markers=[], target=None)
+
     def _finish_shot(self, shot: Shot, layout: Layout, T: Transform2D | None) -> Shot:
         self.markers_seen |= {mk.marker for mk in shot.markers}
+        self._shot_t = time.time()
         if T is not None:
             to_bed(shot.parts, T)
         compute_gaps(shot.parts)
@@ -714,7 +796,11 @@ class Runner:
                 for p in shot.parts
             ],
             markers=[
-                {"marker": mk.marker, "plate": [round(v, 2) for v in mk.centre]}
+                {
+                    "marker": mk.marker,
+                    "plate": [round(v, 2) for v in mk.centre],
+                    "cell": _cell_of(layout, mk.marker),
+                }
                 for mk in shot.markers
             ],
         )
@@ -878,11 +964,11 @@ class Runner:
             self._update_ready(planner, layout, shot.parts)
             planner.full = {mk for mk, f in self.bin_fill(layout).items() if f["full"]}
             self._say_seen(shot.parts, layout)
-            if steps is not None and done_steps >= steps:
-                return "steps"
             here = tuple(self.motion.current_tip()[:2])
             plan = planner.next(shot.parts, here)  # type: ignore[arg-type]
             self._set(plan=_describe(plan), target=self._target(plan, layout))
+            if steps is not None and done_steps >= steps:  # the next part is shown, not taken
+                return "steps"
             if plan.note:
                 self.note(plan.note)
                 self.say(plan.note)
@@ -955,10 +1041,31 @@ class Runner:
         end = time.monotonic() + max(0.0, seconds)
         while not self._stop.is_set():
             left = end - time.monotonic()
-            if left <= 0 or (wake and self._now.is_set()):
+            if left <= 0 or (wake and (self._now.is_set() or self._park.is_set())):
                 return False
             self._stop.wait(min(left, 0.2))
         return True
+
+    def _bin_change_standby(self) -> bool:
+        """Change bin pressed while automatic mode stands by: park, wait for the second press,
+        then a photo of the bins checks them. True when stopped."""
+        if self._park.is_set():
+            self._park.clear()
+            st = self.printer.status(None)
+            homed = st.ready and all(a in st.homed for a in "xyz")
+            if self._parked_for_bins(move=homed):  # not homed: standby left it parked
+                return True
+        if self._ok.is_set():
+            self._ok.clear()
+            self._now.clear()
+            layout, T = self._prepare()
+            st = self.printer.status(None)
+            homed = st.ready and all(a in st.homed for a in "xyz")
+            shot = self.take_shot(layout, T, move=homed, area="bins", paint=False)
+            for text in self._resolve_requests(layout, shot, T):
+                self.say(text)
+            self._add_seen_bins(layout, shot, T)
+        return False
 
     def _look(self) -> tuple[Shot, list[Any], Layout]:
         """A standby photo. With the motors off nothing moves: the bed is still parked out."""
@@ -1004,6 +1111,10 @@ class Runner:
                     while self._pause.is_set() and not self._stop.is_set():
                         time.sleep(0.2)
                     tried = None
+                    continue
+                if self._park.is_set() or self._ok.is_set():  # Change bin while standing by
+                    if self._bin_change_standby():
+                        break
                     continue
                 now = self._now.is_set()  # Resume / Start: sort what is there, at once
                 self._now.clear()
@@ -1248,13 +1359,30 @@ class Runner:
         return [round(x, 2), round(y, 2), round(z, 2)]
 
     def scan_bins(self) -> dict[str, Any]:
-        """Photo, then put every bin whose marker is seen where it really is."""
-        self._idle()
+        """Photo, then put every bin whose marker is seen where it really is. While the sorter
+        runs it stops first (after the move in progress) and carries on afterwards."""
+        if self._thread is not None and self._thread.is_alive():
+            parked = self._in_auto and self.state.status in ("standby", "stuck")
+            return {"queued": self._take_over("resync", lambda: self._scan_in_thread(parked))}
+        return self._scan_now()
+
+    def _scan_in_thread(self, parked: bool) -> str:
+        """`parked`: automatic mode stood by, the bed parked out (maybe with the motors off)."""
+        st = self.printer.status(None)
+        homed = st.ready and all(a in st.homed for a in "xyz")
+        r = self._scan_now(parked and not homed)
+        return f"resync: {len(r['found'])} bin(s)" + (
+            f", not seen: {', '.join(map(str, r['removed']))}" if r["removed"] else ""
+        )
+
+    def _scan_now(self, parked: bool = False) -> dict[str, Any]:
+        """`parked`: photograph where the bed stands (standby parked it), no move."""
         layout = self.layout()
         T = self.transform()
-        with self._lock:
-            self.motion.preflight(home=False)
-        shot = self.take_shot(layout, T, area="bins")
+        if not parked:
+            with self._lock:
+                self.motion.preflight(home=False)
+        shot = self.take_shot(layout, T, move=not parked, area="bins")
         report = layout.resync(self._seen_bins(layout, shot, T))
         layout.save(self.layout_path)
         wb = layout.work_bin()
@@ -1649,16 +1777,10 @@ class Runner:
         return moved
 
     # ------------------------------------------------------------------ the start-up check
-    def _startup_run(self) -> None:
-        """The Device tab's button: the start-up check alone, then idle."""
-        try:
-            self._start_up()
-            self._set(status="idle", message="start-up check done: ready")
-        except Exception as exc:  # noqa: BLE001 - shown on the page
-            self.pins.off()
-            log.exception("start-up check")
-            self.note(f"start-up check failed: {exc}")
-            self._set(status="error", message=f"start-up check failed: {exc}")
+    def _startup_now(self) -> str:
+        """Recheck (the page): the start-up check alone."""
+        self._start_up()
+        return "start-up check done: ready"
 
     def _start_up(self) -> None:
         """Homing, layout check (resync), bins check (what each bin holds), ready: startup.py.
@@ -1969,12 +2091,15 @@ class Runner:
         self.note("layout changes saved" + (": used from the next pick" if running else ""))
         return {"layout": lay.to_dict(), "problems": problems}
 
-    def _parked_for_bins(self) -> bool:
-        """After the first OK: park (bed out, hands safe) until the second OK; True = stopped."""
+    def _parked_for_bins(self, move: bool = True) -> bool:
+        """After the first OK: park (bed out, hands safe) until the second OK; True = stopped.
+        `move` False: it already stands at the photo position (standby, motors off)."""
         with self._lock:
-            self.motion.photo_position()
-            self.printer.gcode("M400")
+            if move:
+                self.motion.photo_position()
+                self.printer.gcode("M400")
             self.motion.message("Swap bins, Change bin")
+        self.swap_phase = "parked"
         asked = "; ".join(r.text() for r in self.requests)
         self.note("parked for a bin change")
         self.phase("parked: change the bins, then press Change bin again")
@@ -2313,3 +2438,9 @@ def same_parts(a: list[Any], b: list[Any], tol_mm: float = 4.0, share: float = 0
             matched += 1
     unmatched = len(a) + len(b) - 2 * matched
     return matched >= share * max(len(a), len(b)) and unmatched <= max(2, round(0.2 * len(a)))
+
+
+def _cell_of(layout: Layout, marker: int) -> str | None:
+    """The cell of the bin carrying this code (e.g. B2), None when it is not in the layout."""
+    b = layout.bin_by_marker(marker)
+    return layout.bin_name(b) if b is not None else None

@@ -61,7 +61,7 @@ def test_change_bin_asked_from_the_page(machine):
     (req,) = runner.requests
     assert req.why == "asked" and req.cell == "E1" and "to be changed" in req.text()
     assert req.short() == "Change bin E1"
-    assert runner.command("change_bin").startswith("change the bins")  # the page's button
+    assert runner.command("change_bin").startswith("parked: change the bins")  # the page's button
     assert state["claims"] is not None
 
 
