@@ -83,16 +83,48 @@ def wild_key(p: Part, wild_by: str) -> str | None:
     return p.cls
 
 
+_LENGTH_SUFFIX = re.compile(r"x\d+(?:\.\d+)?$")
+
+
+def claim_class(claim: str) -> str:
+    """The class of what a wild bin collects: DIN912_M3x8 -> DIN912_M3 (a class or a family
+    stays as it is)."""
+    return _LENGTH_SUFFIX.sub("", claim)
+
+
+def _shared(
+    p: Part, wild: list[Bin], claims: Mapping[int, str], full: Collection[int], share: str
+) -> tuple[Bin, str] | None:
+    """A wild bin collecting a kind like this part's (`share`: class = another length,
+    family = any size; the same class first), and what it collects."""
+    if share == "none" or p.unknown:
+        return None
+    best: tuple[int, Bin, str] | None = None
+    for b in wild:
+        claim = claims.get(b.marker)
+        if claim is None or claim == UNKNOWN or b.marker in full:
+            continue
+        cls = claim_class(claim)
+        rank = (
+            0 if cls == p.cls else 1 if share == "family" and family(cls) == family(p.cls) else None
+        )
+        if rank is not None and (best is None or rank < best[0]):
+            best = (rank, b, claim)
+    return (best[1], best[2]) if best else None
+
+
 def _wild(
     p: Part,
     layout: Layout,
     claims: Mapping[int, str],
     full: Collection[int] = (),
     ask: bool = False,
+    share: str = "none",
 ) -> Decision | None:
     """A wild bin for the part: the one collecting its kind, else a free one. A full bin is
-    skipped (a free one carries on with the same kind); `ask`: with none left, the part waits
-    for a bin change instead of going to overflow."""
+    skipped (a free one carries on with the same kind). With none free, a bin collecting a
+    kind like it (`share`: class or family). `ask`: with none left, the part waits for a bin
+    change instead of going to overflow."""
     wild = [b for b in layout.bins if b.role == "wild"]
     if not wild:
         return None
@@ -111,6 +143,10 @@ def _wild(
     if free is not None:
         more = " (the other one is full)" if full_one else ""
         return Decision(free, f"new kind {key}: wild bin {free.marker}{more}", claim=key)
+    shared = _shared(p, wild, claims, full, share)
+    if shared is not None:
+        b, claim = shared
+        return Decision(b, f"no free bin for {key}: in with {claim} (wild bin {b.marker})")
     if full_one is not None:
         return Decision(None, f"bin {full_one.marker} is full", needs=("full", full_one.marker))
     if ask:
@@ -125,11 +161,13 @@ def destination(
     claims: Mapping[int, str] | None = None,
     full: Collection[int] = (),
     ask: bool = False,
+    share: str = "none",
 ) -> Decision:
     """Where the part goes. `full`: bins too full to take more; `ask`: a new kind without a
-    free wild bin waits for a bin change (else it goes to overflow)."""
+    free wild bin waits for a bin change (else it goes to overflow); `share`: before that, a
+    wild bin collecting the same class (or family) takes it."""
     claims = claims or {}
-    dec = _destination(p, layout, min_score, claims, full, ask)
+    dec = _destination(p, layout, min_score, claims, full, ask, share)
     if dec.bin is not None and dec.bin.marker in full:
         return Decision(None, f"bin {dec.bin.marker} is full", needs=("full", dec.bin.marker))
     return dec
@@ -142,12 +180,13 @@ def _destination(
     claims: Mapping[int, str],
     full: Collection[int],
     ask: bool,
+    share: str = "none",
 ) -> Decision:
     if p.unknown:
         b = _role(layout, "unknown") or _best_rule(p, layout)[0]
         if b is not None:
             return Decision(b, "unknown part")
-        return _wild(p, layout, claims, full, ask) or _last_resort(
+        return _wild(p, layout, claims, full, ask, share) or _last_resort(
             layout, "no bin for unknown parts"
         )
     if p.score < min_score:
@@ -159,7 +198,7 @@ def _destination(
         return Decision(None, "waiting for a length measurement", waiting=True)
     if best is not None:
         return Decision(best, f"rule of bin {best.marker}")
-    return _wild(p, layout, claims, full, ask) or _last_resort(layout, "no bin holds it")
+    return _wild(p, layout, claims, full, ask, share) or _last_resort(layout, "no bin holds it")
 
 
 def _last_resort(layout: Layout, why: str) -> Decision:

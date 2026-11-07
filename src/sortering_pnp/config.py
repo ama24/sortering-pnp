@@ -200,6 +200,9 @@ class Run:
     fill: Fill = field(default_factory=Fill)  # how full the bins are (estimated, see fill.py)
     # a new kind and no free wild bin: ask (a bin change, chosen by binswap.py) | overflow
     when_no_bin: str = "ask"
+    # a new kind and no free wild bin, before asking: share a wild bin with the same class
+    # (another length: DIN912_M3x10 in with DIN912_M3x8) | family (any size) | none
+    share_wild: str = "class"
     check_emptied: bool = True  # after a bin change: parts still seen in a bin are counted
 
 
@@ -274,6 +277,8 @@ class Machine:
             raise ConfigError("camera.source must be overview or head")
         if self.run.when_no_bin not in ("ask", "overflow"):
             raise ConfigError("run.when_no_bin must be ask or overflow")
+        if self.run.share_wild not in ("class", "family", "none"):
+            raise ConfigError("run.share_wild must be class, family or none")
         if self.run.order not in ("census", "largest_group", "nearest"):
             raise ConfigError("run.order must be census, largest_group or nearest")
         if self.run.shake.axis.upper() not in ("X", "Y"):
