@@ -284,7 +284,19 @@ class CameraVision:
     def _scene(self, photo: Path) -> Any:
         from sortering_pnp.measure.infer import load_scene
 
+        pre = getattr(self, "_pre", None)
+        if pre is not None and pre[0] == photo:
+            return pre[1]
         return load_scene(photo, self.calibration, self.nominal)
+
+    def preview(self, photo: Path, name: str) -> tuple[Path, list]:
+        """The photo for the page before the model looks at it: (view file, plate mm -> view
+        pixels). analyse() then reuses the scene and the view."""
+        self._pre = None
+        scene = self._scene(photo)
+        view = self._view(scene, name)
+        self._pre = (photo, scene, name, view)
+        return view[0], view[1]
 
     # ------------------------------------------------------------------ the camera
     def _camera(self) -> Any:
@@ -449,7 +461,12 @@ class CameraVision:
             )
         full = cv2.imread(str(photo), cv2.IMREAD_GRAYSCALE)
         found = detect(full)
-        view, view_h, k = self._view(seen, name)
+        pre = getattr(self, "_pre", None)
+        if pre is not None and pre[0] == photo and pre[2] == name:
+            view, view_h, k = pre[3]
+        else:
+            view, view_h, k = self._view(seen, name)
+        self._pre = None
         # the view is the ROI (cropped from a full frame, or the photo itself), scaled by k
         cropped = full.shape[:2] != seen.image.shape[:2]
         ox, oy = (seen.roi["x0"], seen.roi["y0"]) if cropped else (0, 0)

@@ -388,19 +388,27 @@ machine never stops for it: it keeps sorting everything else. When only the wait
 left, it waits, and still looks at the tray every `standby.interval_s`: parts thrown in
 meanwhile are sorted. The requests are kept across a restart.
 
-**Change bin** takes two presses, next to the bed on the page or with **Change bin** in the printer menu:
-1. **Change bin E1:** the machine finishes its move and parks (bed out, safe for
-   your hands);
-2. empty the bin, or put another (empty) bin in its place, then **Bin E1 changed**. The next
-   photo checks what stands there now, and sorting goes on:
+All bin changes are in one banner at the top of the Device tab, with one button that steps
+through them (or **Change bin** in the printer menu):
+1. **Park:** the machine finishes its move and parks (bed out, safe for your hands); also
+   while automatic mode stands by;
+2. empty the bins, or put other (empty) bins in their place;
+3. **Done:** a photo checks what stands there now, and sorting goes on:
 - **the same code:** the bin was emptied; its count starts again, a wild bin is free again;
 - **another code:** a different bin stands there; it becomes a wild bin (or takes up its old
   rules, if it was used before). The old bin is kept aside with what it holds: put it back
   later and its count and contents come back with it;
 - **no code:** the cell is empty; the old bin is kept aside the same way.
 
-Change bin also works when the machine is not sorting: the first press only confirms, the second
-takes a photo and does the same check.
+Change bin also works when the machine is not sorting: Park moves the bed out (when it is
+homed), Done takes a photo and does the same check. A bin's menu on the bed has **Change**
+(ask for it), **Full** and **Emptied**.
+
+**Buttons that act at once:** Recheck, Resync and Change bin don't wait for the run to end:
+the run (or automatic mode) stops after the move in progress, the action is done, and
+automatic mode carries on if it was on. Every photo shows on the Device tab as soon as it is
+taken, before the model has looked at it, with the bins' codes and their cells; in automatic
+mode the camera counts down to the next photo.
 
 ## Strategies and picking order
 
@@ -542,8 +550,8 @@ off, camera unplugged…) it switches itself off and says why on the page.
 ## The start-up check
 
 The first run after sortering-pnp starts (Automatic, Sort once or One pick; also automatic
-mode carrying on after a restart) begins with a check, shown with a tick per step at the top
-of the Device tab (**Check again** runs it alone). It is `run.startup_check`:
+mode carrying on after a restart) begins with a check, shown with a tick per step
+in the left menu, under Device (**Recheck** runs it alone, also while sorting). It is `run.startup_check`:
 1. **Homing**, with the usual checks before moving.
 2. **Layout check:** one photo of the bins, then a resync: where the grid and every bin stand.
    The tray stays the bin it was.

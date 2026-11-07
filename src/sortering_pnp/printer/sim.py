@@ -251,6 +251,7 @@ class SimVision:
         self.head_ref: tuple[float, float] = (0.0, 0.0)  # tip X/Y of the calibration photo
         self.painted: list[bool] = []  # per photo: was everything outside the tray painted over
         self._px: np.ndarray | None = None  # bed mm -> picture pixels of the last drawing
+        self.previews: list[str] = []  # photos shown before their analysis
 
     delay_s: float = 0.0  # pretend the analysis takes this long (time to act while it sorts)
 
@@ -261,6 +262,19 @@ class SimVision:
         """The plate as it is now (the part in the picker is not on it)."""
         self.snaps.append(self.world.held)  # what the picker holds at the moment of the photo
         return [copy.copy(sp) for sp in self.world.parts]
+
+    def preview(self, plate: list[SimPart], name: str) -> tuple[Path, list] | None:
+        """The whole picture, before the analysis (the page shows it at once)."""
+        self.previews.append(name)
+        if self.out is None:
+            return None
+        view = self._draw(name, self.layout(), plate, None, "view")
+        if view is None or self._px is None:
+            return None
+        T = self.transform()
+        Tm = np.eye(3)
+        Tm[:2, :2], Tm[:2, 2] = T.A, T.t
+        return view, (self._px @ Tm).tolist()
 
     def analyse(
         self,
