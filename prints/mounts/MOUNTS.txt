@@ -19,7 +19,7 @@ camera_arm.stl: the plate goes on the bar's front face, at the bar's centre: 2 x
   7 (heads up to 7 mm) from the front into T-nuts in the front slot,
   40 mm apart; the holes are counterbored and open to the front for the screwdriver.
   A slim T-section beam (20 mm deep at the bar, 12 mm at its end) reaches
-  148 mm forward: the lens is then over the bed's centre with the bed all the way out
+  135 mm forward: the lens is then over the bed's centre with the bed all the way out
   (where a print ends, the photo position), 16 mm below the bar's top (straight: as high as it goes, it sees the most). The
   Camera Module 3 screws on under its end with 4 x M2 x 6 (they cut their own thread), lens
   down, the flat cable towards the front (away from the bar), then up over the arm.

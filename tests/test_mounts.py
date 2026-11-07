@@ -119,7 +119,7 @@ def test_mount_files():
         "MOUNTS.txt",
     }
     notes = " ".join(files["MOUNTS.txt"].decode().split())
-    assert "155 x 92" in notes and "reaches 148 mm forward" in notes
+    assert "155 x 92" in notes and "reaches 135 mm forward" in notes
     assert "4 x M3 x 12 (M3 x 16 with the diffuser)" in notes
 
 
@@ -150,7 +150,7 @@ def test_screen_screws_have_a_full_seat_for_their_heads():
 
 
 @pytest.mark.parametrize("ring", [False, True])
-@pytest.mark.parametrize("reach", [148.0, 100.0])
+@pytest.mark.parametrize("reach", [135.0, 100.0])
 def test_camera_arm_screws_go_in_from_the_front(reach, ring):
     """M4 x 7 with a 7 mm head: a through hole, nothing in front of the head (it goes in and the
     screwdriver reaches it straight on), a full seat under it, and enough left for the T-nut."""
@@ -184,7 +184,7 @@ def test_camera_arm_is_straight_by_default():
     """No post: nothing goes lower than the camera's bosses under the arm, so the camera is as
     high as it can be and sees the most of the bed; one solid that prints flat."""
     p = CameraArm()
-    assert p.reach == 148.0
+    assert p.reach == 135.0
     v, _ = _to_mesh(_camera_arm_installed(p))
     assert v[:, 2].min() == pytest.approx(-p.bar, abs=0.01)  # the plate on the bar
     v = v[v[:, 1] < -p.reach / 2]  # out over the bed: the bosses are the lowest

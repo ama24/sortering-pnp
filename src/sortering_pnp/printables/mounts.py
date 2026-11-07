@@ -209,7 +209,7 @@ class CameraArm:
     LumenPnP top ring light; `ring_*` sizes from its KiCad board, src/PCB/ringLight): camera ->
     bracket -> ring -> clamp ring or diffuser, all four held by the same 4 x M3 screws."""
 
-    reach: float = 148.0  # bar front face -> lens, horizontally (measure with the bed out)
+    reach: float = 135.0  # bar front face -> lens, horizontally (measure with the bed out)
     drop: float = 0.0  # 0: the camera right under the arm (sees the most); > 0: a post down
     ring: bool = False  # legs for the ring-light bracket (camera_arm_ring.stl)
     bar: float = 20.0  # 2020 profile: front face height

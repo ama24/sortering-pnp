@@ -96,7 +96,7 @@ board lying in the tray, at the height the parts will lie.
     room for it and its cables. A leg at each end stands on the bar, with one M5 in each foot
     (180 mm apart). Put it on one side of the bar.
   - [camera_arm.stl](mounts/camera_arm.stl): a slim straight arm at the bar's centre (a T
-    section, 20 mm deep at the bar, 12 mm at its end), reaching 148 mm forward, with the Camera
+    section, 20 mm deep at the bar, 12 mm at its end), reaching 135 mm forward, with the Camera
     Module 3 right under its end (4 x M2 x 6; its cable towards the front, then up over the
     arm), as high as it goes, looking straight down at the
     bed's centre with the bed all the way out (where a print ends). 2 x M4 x 7 (heads up to
