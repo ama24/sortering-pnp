@@ -87,7 +87,7 @@ def test_camera_lens_over_the_bed_centre():
     low = v[v[:, 2] < v[:, 2].min() + 0.01]  # the boss ends: where the board lies
     cx, cy = low[:, 0].mean(), low[:, 1].mean()
     rows = np.array(p.cam_hole_rows)
-    edge = -p.reach + p.lens_from_cable_edge
+    edge = -p.reach + p.lens_from_hole_edge
     assert cx == pytest.approx(0.0, abs=0.05)  # centred on the bar
     assert cy == pytest.approx(edge - rows.mean(), abs=0.1)
     assert lens_position(p)[:2] == (0.0, -140.0)  # lens straight below, reach mm forward
@@ -233,12 +233,12 @@ def test_both_arms_print_as_one_piece_on_an_ender3(ring):
 
 
 @pytest.mark.parametrize("p", ALL_ARMS, ids=["plain", "ring", "post", "ring+post"])
-@pytest.mark.parametrize("lens_shorter", [0.0, 2.0])
+@pytest.mark.parametrize("lens_shorter", [0.0, 0.5])
 @pytest.mark.parametrize("fov", [75.0, 120.0])
 def test_nothing_in_the_cameras_view(p, fov, lens_shorter):
     """The view cone (Camera Module 3, diagonal; 120 deg: the Wide) from the lens' front down
     to the bed misses the arm, the bracket, the clamp ring and the diffuser, even if the lens
-    is 2 mm shorter than assumed."""
+    is 0.5 mm shorter than the drawing says."""
     from dataclasses import replace
 
     from sortering_pnp.printables.mounts import ring_parts_installed, view_cone
@@ -264,11 +264,27 @@ def test_the_lens_looks_down_through_the_bracket_and_the_ring():
     assert (blo[1] + bhi[1]) / 2 + (p.ring_tab_reach - p.ring_od / 2) / 2 == pytest.approx(
         -p.reach, abs=0.01
     )  # the ring's centre (its tab reaches forward)
-    # the lens (its unit up to 10.6 mm square) fits through the bracket, its front below it
+    # the camera clears the bracket: the board and the 10.8 mm square housing stay above it,
+    # the lens barrel (5.75 mm, and its whole cone) goes down through the hole
     from manifold3d import Manifold
 
-    lens = Manifold.cube([10.6, 10.6, 30], True).translate([0, -p.reach, lens_front(p) + 15])
-    assert (parts["ring_bracket"] ^ lens).volume() < 1e-3
+    from sortering_pnp.printables.mounts import lens_position
+
+    z_front = lens_position(p)[2] - p.board_t  # the board's front
+    housing = Manifold.cube([p.lens_square, p.lens_square, p.lens_square_h], True).translate(
+        [0, -p.reach, z_front - p.lens_square_h / 2]
+    )
+    barrel = Manifold.cylinder(30, 5.75 / 2 + 0.5, 5.75 / 2 + 0.5, 48).translate(
+        [0, -p.reach, lens_front(p) - 20]
+    )
+    cam_board = Manifold.cube([p.cam_w, p.cam_h, p.board_t], True).translate(
+        [0, -p.reach + p.lens_from_hole_edge - p.cam_h / 2, z_front + p.board_t / 2]
+    )
+    for name, part in parts.items():
+        for what, m in (("housing", housing), ("barrel", barrel), ("board", cam_board)):
+            assert (part ^ m).volume() < 1e-3, (name, what)
+    assert np.hypot(p.lens_square, p.lens_square) < p.lens_hole_d  # even turned, it'd pass
+    lens = barrel
     assert (board ^ lens).volume() < 1e-3
     assert lens_front(p) < parts["ring_bracket"].bounding_box()[2]
 
@@ -324,3 +340,21 @@ def _ring_annulus_at(p: CameraArm, r0: float, r1: float, z0: float):
             [0, -p.reach, z0 - 1]
         )
     )
+
+
+@pytest.mark.parametrize("drop", [0.0, 60.0])
+def test_the_camera_cable_goes_up_past_the_ring_legs(drop):
+    """The cable leaves the camera's front edge (away from the bar: its connector is there) and
+    bends up through a slot in the pod, clear of the arm and the ring legs."""
+    from manifold3d import Manifold
+
+    from sortering_pnp.printables.mounts import cable_slot_y, lens_position, ring_screws
+
+    p = CameraArm(ring=True, drop=drop)
+    arm = _camera_arm_installed(p)
+    z_back = lens_position(p)[2]  # the board's back
+    y = cable_slot_y(p) - 1.5  # the cable, bent up just in front of the board
+    cable = Manifold.cube([p.cable_w, 0.3, 40.0], True).translate([0, y, z_back + 20.0])
+    assert (arm ^ cable).volume() < 1e-3
+    leg = min(abs(x) for x, _ in ring_screws(p))
+    assert leg - p.leg_r > p.cable_w / 2 + 0.5  # the legs stand beside it

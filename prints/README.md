@@ -97,7 +97,8 @@ board lying in the tray, at the height the parts will lie.
     (180 mm apart). Put it on one side of the bar.
   - [camera_arm.stl](mounts/camera_arm.stl): a slim straight arm at the bar's centre (a T
     section, 20 mm deep at the bar, 12 mm at its end), reaching 148 mm forward, with the Camera
-    Module 3 right under its end (4 x M2 x 6), as high as it goes, looking straight down at the
+    Module 3 right under its end (4 x M2 x 6; its cable towards the front, then up over the
+    arm), as high as it goes, looking straight down at the
     bed's centre with the bed all the way out (where a print ends). 2 x M4 x 7 (heads up to
     7 mm) from the front into T-nuts, 40 mm apart, in counterbored holes the screwdriver
     reaches straight on. Printed upside down, no supports.
@@ -105,8 +106,9 @@ board lying in the tray, at the height the parts will lie.
     four legs beside the camera), [ring_bracket.stl](mounts/ring_bracket.stl),
     [ring_clamp.stl](mounts/ring_clamp.stl) and/or [ring_diffuser.stl](mounts/ring_diffuser.stl)
     for the Opulo LumenPnP top ring light (40 mm disc, 19.9 mm hole, 8 WS2812B, a 12 mm tab
-    with a 3-pin JST XH; it has no mounting holes). From the top down: arm, camera, bracket (the
-    lens through its 15 mm hole), the ring, then the clamp ring or the diffuser: the ring is
+    with a 3-pin JST XH; it has no mounting holes). From the top down: arm, camera (its cable
+    goes up through the slot just in front of it), bracket (the lens through its 16.4 mm
+    hole), the ring, then the clamp ring or the diffuser: the ring is
     sandwiched between them (a spigot under the bracket centres it in its hole, a recess in the
     clamp or diffuser takes the board and its tab; LEDs down, the tab forward: a vertical plug
     goes up through the bracket's slot in front of the camera). The diffuser (white or clear
