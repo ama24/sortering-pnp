@@ -7,7 +7,7 @@ sortering-pnp check              is everything there? (config, layout, calibrati
 sortering-pnp user add NAME      page account (new user or new password); user remove / list
 sortering-pnp print bin|baseplate|labels|all    write printable files
 sortering-pnp print catalogue --out prints      every bin size as full build plates, baseplates, labels
-sortering-pnp print mounts --reach 148 --bar-height 364   screen holder + camera arms (+ ring light) for the top bar
+sortering-pnp print mounts --reach 135 --bar-height 364   screen holder + camera arms (+ ring light) for the top bar
 """
 
 from __future__ import annotations
@@ -318,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("print", help="write printable bins, baseplate or labels")
     p.add_argument("what", choices=["bin", "baseplate", "labels", "all", "catalogue", "mounts"])
     p.add_argument(
-        "--reach", type=float, default=148.0, help="mounts: bar front face to plate centre, bed out"
+        "--reach", type=float, default=135.0, help="mounts: bar front face to plate centre, bed out"
     )
     p.add_argument(
         "--bar-height", type=float, default=None, help="mounts: bar underside above the plate"

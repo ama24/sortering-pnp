@@ -209,7 +209,7 @@ class CameraArm:
     LumenPnP top ring light; `ring_*` sizes from its KiCad board, src/PCB/ringLight): camera ->
     bracket -> ring -> clamp ring or diffuser, all four held by the same 4 x M3 screws."""
 
-    reach: float = 148.0  # bar front face -> lens, horizontally (measure with the bed out)
+    reach: float = 135.0  # bar front face -> lens, horizontally (measure with the bed out)
     drop: float = 0.0  # 0: the camera right under the arm (sees the most); > 0: a post down
     ring: bool = False  # legs for the ring-light bracket (camera_arm_ring.stl)
     bar: float = 20.0  # 2020 profile: front face height
@@ -228,17 +228,22 @@ class CameraArm:
     head_h: float = 12.0  # the beam's depth at its end and the camera pod's (`bar` at the bar)
     chamfer: float = 1.5  # on the beam's lower edges
     flare: float = 18.0  # the beam widens into the plate over this length
-    cam_w: float = 25.0  # Camera Module 3 board (same as Camera Module 2)
-    cam_h: float = 23.86
+    # Camera Module 3 (Raspberry Pi mechanical drawing RP-008153-DS-1; board as Camera Module 2)
+    cam_w: float = 25.0
+    cam_h: float = 23.862
     cam_hole_dx: float = 21.0
-    cam_hole_rows: tuple[float, float] = (2.0, 14.5)  # from the cable edge
-    lens_from_cable_edge: float = 14.5  # the lens is about on the second row
-    cable_gap: float = 4.0  # room for the flat cable to bend up along the post
+    cam_hole_rows: tuple[float, float] = (2.0, 14.5)  # from the board's edge by the holes
+    lens_from_hole_edge: float = 14.4  # the lens is about on the second row; the cable's
+    # connector is on the far edge, so the cable leaves towards the front (away from the bar)
+    lens_square: float = 10.8  # the lens housing: 10.8 mm square ...
+    lens_square_h: float = 3.875  # ... standing this far out of the board's front
+    cable_w: float = 16.0  # the flat cable (15-pin, 16 mm wide)
+    cable_slot: float = 3.0  # ring arm: a slot up through the pod at the board's cable edge
     boss_h: float = 4.0  # room for the parts on the board's back
     boss_d: float = 5.0
     pilot_d: float = 1.8  # M2 screws cut their own thread
-    board_t: float = 1.0  # the camera's board
-    lens_depth: float = 10.0  # the board's back to the lens' front (the module is 11.5 mm deep)
+    board_t: float = 1.12  # the camera's board
+    lens_depth: float = 8.1  # the board's back to the lens' front (1.12 + 6.98)
     lens_front_r: float = 2.5  # the lens' front opening: the field of view starts there
     # ring light: Opulo LumenPnP top ring light (PCB-0002, opulo-inc/lumenpnp src/PCB/ringLight)
     ring_od: float = 40.0  # a 40 mm disc, 1.6 mm FR4, no mounting holes (measured)
@@ -256,10 +261,11 @@ class CameraArm:
     ring_pilot_d: float = 2.5  # M3 screws cut their own thread in the legs
     leg_r: float = 3.4  # 2.1 mm of wall round the M3 pilot (more would be in the screwdriver's way)
     leg_pilot: float = 10.0  # pilot depth in each leg
-    bracket_gap: float = 3.0  # the board's front (lens side) to the bracket: its parts, screw heads
+    bracket_gap: float = 3.0  # the board's front to the bracket: the lens' square housing
+    # (3.875 mm) reaches a little into the bracket's hole, clear of its edge
     bracket_t: float = 2.6  # the bracket over the ring (flat underneath, the ring against it)
     bracket_r: float = 27.0
-    lens_hole_d: float = 15.0  # the lens unit goes through (up to 10.6 mm square)
+    lens_hole_d: float = 16.4  # round the lens barrel, and clear of the housing's corners
     plug_slot: tuple[float, float, float] = (5.5, 24.6, 31.5)  # vertical JST XH: half width, radii
     clamp_t: float = 1.6
     clamp_lip: float = 1.2  # how far the clamp reaches over the ring's edge
@@ -313,7 +319,13 @@ def _beam_section(
 
 
 def _cable_edge(p: CameraArm) -> float:
-    return -p.reach + p.lens_from_cable_edge
+    """y of the board's edge by its holes (towards the bar); the cable leaves the far edge."""
+    return -p.reach + p.lens_from_hole_edge
+
+
+def cable_slot_y(p: CameraArm) -> float:
+    """y of the camera board's cable edge (the front one, away from the bar), plus 0.5 mm."""
+    return _cable_edge(p) - p.cam_h + 0.5
 
 
 def ring_screws(p: CameraArm) -> list[tuple[float, float]]:
@@ -411,6 +423,9 @@ def _camera_arm_installed(p: CameraArm) -> Manifold:
     edge = _cable_edge(p)
     parts += _camera_bosses(p, edge, z_cam)
     cuts = _camera_pilots(p, edge, z_cam)
+    if p.ring:  # the pod reaches the front legs: the cable goes straight up through a slot
+        w, y_front = p.cable_w / 2 + 0.75, cable_slot_y(p)
+        cuts.append(_box(-w, w, y_front - p.cable_slot, y_front, z_cam - 1.0, 1.0))
     if p.ring:  # legs down beside the camera to the bracket, a pilot hole up each
         zb = bracket_top(p)
         parts += [_cyl_z(p.leg_r, zb, z_cam + 0.01, x, y) for x, y in ring_screws(p)]
@@ -618,13 +633,14 @@ camera_arm.stl: the plate goes on the bar's front face, at the bar's centre: 2 x
   {reach:g} mm forward: the lens is then over the bed's centre with the bed all the way out
   (where a print ends, the photo position), {lens:g} mm below the bar's top{post}. The
   Camera Module 3 screws on under its end with 4 x M2 x 6 (they cut their own thread), lens
-  down, the flat cable towards the bar.
+  down, the flat cable towards the front (away from the bar), then up over the arm.
 
 camera_arm_ring.stl, ring_bracket.stl, ring_clamp.stl, ring_diffuser.stl: the same arm with a
   ring light round the lens, the Opulo LumenPnP top ring light (a 40 mm disc with a 19.9 mm
   hole, 8 WS2812B LEDs, 1.6 mm thick, a 12 mm tab with a 3-pin JST XH; no mounting holes). From
-  the top down: the arm, the camera (screwed on as above), the bracket (lens through its
-  {lens_hole:g} mm hole), the ring, and the clamp ring or the diffuser: the ring is sandwiched
+  the top down: the arm, the camera (screwed on as above; its cable goes straight up through
+  the slot in the arm just in front of it, between the front legs), the bracket (the lens
+  through its {lens_hole:g} mm hole), the ring, and the clamp ring or the diffuser: the ring is sandwiched
   between the bracket (flat; a short spigot fits the ring's hole and centres it) and the clamp
   or diffuser (a recess in its top takes the board and its tab). LEDs down, the tab forward,
   away from the bar: a vertical plug goes up through the slot in front of the camera. All held
