@@ -25,7 +25,8 @@ class Step:
 
 # The order the machine is set up in: the printer answers, it homes, its limits are right, then
 # the head waits at the change position while the picker is put on (OK = TOOL_PICKER), then the
-# tip height, the camera and the bins. Only sorting needs the picker on; these moves do not.
+# tip height, the lights (before the camera: the photos are taken with them), the camera and
+# the bins. Only sorting needs the picker on; these moves do not.
 STEPS = (
     Step(
         "printer",
@@ -40,6 +41,7 @@ STEPS = (
     ),
     Step("picker", "Picker", "The kind of picker, wired to the Pi and put on the head"),
     Step("tip", "Tip height", "Where the picker tip touches the plate"),
+    Step("lights", "Lights", "The LED colour and brightness for the photos (or no lights)"),
     Step(
         "camera", "Camera to printer", "The camera's millimetres match the printer's (error < 1 mm)"
     ),

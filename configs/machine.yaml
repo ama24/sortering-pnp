@@ -37,6 +37,17 @@ camera:
     overlap: 0.25
     margin_cells: 1            # Resync looks this many cells beyond the grid, for new bins
 
+lights:                        # addressable LEDs (WS2812B ring) on GPIO10 / pin 19 (Setup tab: Lights)
+  enabled: false               # there are lights; DIN -> pin 19, 5V -> pin 2, GND -> pin 6
+  count: 8                     # LEDs in the chain (LumenPnP ring: 8)
+  colour: "#ffffff"            # #RRGGBB
+  brightness: 0.5              # 0..1
+  always_on: true              # lit while sortering-pnp runs (false: only for photos)
+  settle_s: 0.3                # photos only: lit this long before the photo
+  order: GRB                   # colour order of the LEDs (WS2812B: GRB)
+  spi_bus: 0                   # /dev/spidev0.0 (SPI0 MOSI = GPIO10)
+  spi_device: 0
+
 printer:
   driver: moonraker            # moonraker (Klipper on this Pi) | sim (simulated, nothing moves)
   url: http://localhost:7125   # Moonraker

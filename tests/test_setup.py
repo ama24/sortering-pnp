@@ -79,7 +79,10 @@ def test_the_whole_setup_then_sorting(machine):
     # 5 tip height: checks itself
     printer.gcode("G1 X100 Y100 Z3")
     runner.tip_touches_plate()
-    # 6 camera: the codes are read without any model, the calibration checks itself
+    # 6 lights: a colour, shown at once, then OK
+    runner.setup_lights({"enabled": True, "colour": "#ffffff", "brightness": 0.8})
+    runner.setup_confirm("lights")
+    # 7 camera: the codes are read without any model, the calibration checks itself
     with pytest.raises(PrinterError, match="checked by the machine"):
         runner.setup_confirm("camera")
     markers = runner.calib_photo()
@@ -91,7 +94,7 @@ def test_the_whole_setup_then_sorting(machine):
         runner.calib_record(m["marker"])
     runner.calib_fit()
     assert runner.setup_state()["camera"]["fit"]["worst_mm"] < 1.0
-    # 7 layout: bins found
+    # 8 layout: bins found
     assert runner.scan_bins()["problems"] == []
     state = runner.setup_state()
     assert state["complete"], [s["title"] for s in state["steps"] if not s["done"]]
@@ -180,10 +183,19 @@ def test_setup_web_api(machine):
     try:
         with urllib.request.urlopen(base + "/api/setup", timeout=10) as r:
             state = json.loads(r.read())
-        assert state["required"] and not state["complete"] and len(state["steps"]) == 7
+        assert state["required"] and not state["complete"] and len(state["steps"]) == 8
         assert post("/api/setup/printer", {})["ok"] is True
         keys = [s["key"] for s in state["steps"]]
-        assert keys == ["printer", "homing", "machine", "picker", "tip", "camera", "layout"]
+        assert keys == [
+            "printer",
+            "homing",
+            "machine",
+            "picker",
+            "tip",
+            "lights",
+            "camera",
+            "layout",
+        ]
         assert post("/api/setup/home", {})["homed_now"] is True
         assert post("/api/setup/confirm", {"step": "homing"})["steps"][1]["done"] is True
         assert post("/api/setup/reset", {"step": "homing"})["steps"][1]["done"] is False
