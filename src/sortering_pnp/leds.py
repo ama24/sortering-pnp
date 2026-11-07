@@ -4,9 +4,10 @@ sortering-pnp drives them itself, like the picker's pins: no Klipper set-up and 
 Python package. The data line goes to SPI0 MOSI (GPIO10, header pin 19); every WS2812 bit is
 sent as 3 SPI bits at 2.4 MHz (1 = 110, 0 = 100), so the SPI hardware makes the timing.
 
-Wiring (the ring's JST XH: 5V, DIN, GND):
-  5V  -> pin 2 or 4 (5 V)       8 LEDs at full white take about 0.5 A
-  GND -> pin 6 (ground)
+Wiring (the ring's JST XH: 5V, DIN, GND; drawn in the Setup tab's Lights step):
+  5V  -> a 5 V buck converter on the printer's 24 V supply (not the Pi's 5 V pins);
+         8 LEDs at full white take about 0.5 A
+  GND -> pin 20 (ground), joined with the converter's minus
   DIN -> pin 19 (GPIO10, SPI0 MOSI)
 The Pi's 3.3 V data line drives a short lead to WS2812B at 5 V in practice; if the LEDs
 flicker or show wrong colours, put a 74AHCT125 level shifter (or one 1N4001 diode in the

@@ -658,17 +658,25 @@ async function loadSetup(){try{SU=await api("api/setup");renderSetup();loadTodo(
 async function setupCall(path,body,msg,key){const box=()=>key&&$("msg_"+key)?"msg_"+key:"setupsum";try{if(msg)flash(box(),msg);const j=await api(path,body||{});if(j.checks)CHECKS=j.checks;SU=j.steps?j:await api("api/setup");renderSetup();flash(box(),j.tip?`tip at ${j.tip.map(v=>(+v).toFixed(2)).join(", ")}`:"");poll();}catch(e){flash(box(),e.message,1);}}
 function mval(id){return +$(id).value;}
 function saveMachine(){setupCall("api/setup/machine",{values:{limits_x:[mval("mx0"),mval("mx1")],limits_y:[mval("my0"),mval("my1")],limits_z:[mval("mz0"),mval("mz1")],travel_z:mval("mtz"),photo_position:[mval("mpx"),mval("mpy"),mval("mpz")],change_position:[mval("mcx"),mval("mcy"),mval("mcz")]}},"saving…","machine");}
-const WC={sig:"#e8590c",sig2:"#7048e8",v5:"#d6336c",v24:"#a61e1e",gnd:"#343a40"};
+const WC={sig:"#e8590c",sig2:"#7048e8",v5:"#d6336c",v33:"#0c8599",v24:"#a61e1e",gnd:"#343a40"};
+const PIREF={1:"3V3",17:"3V3",2:"5V",4:"5V",6:"GND",9:"GND",14:"GND",20:"GND",25:"GND",30:"GND",34:"GND",39:"GND"},REFC={"3V3":WC.v33,"5V":WC.v5,GND:WC.gnd};
+// the Pi's 2x20 header, odd pins on the left, pin 1 at the top: `hot` pins (number: colour) are
+// the wired ones (outlined); 5V, 3V3 and GND are coloured and named only to find your way
+function piHeader(hot){const T=(x,y,v,o)=>`<text x="${x}" y="${y}" ${o}>${v}</text>`,sm=(px,c)=>`style="font-size:${px}px;fill:${c}"`;
+ let s=T(68,14,"Raspberry Pi",'text-anchor="middle" font-weight="600"')+`<rect x="22" y="24" width="92" height="334" rx="8" fill="#1d6b45"/>`;
+ for(let r=1;r<=20;r++)for(let c=0;c<2;c++){const n=2*r-1+c,x=c?88:48,y=40+(r-1)*16,h=hot[n],f=PIREF[n];
+  s+=`<rect x="${x-5}" y="${y-5}" width="10" height="10" rx="2" fill="${h||(f?REFC[f]:"#d9c06a")}" ${h?'stroke="#fff" stroke-width="2"':""}/>`;
+  if(f&&!h)s+=T(c?95:41,y+3,f,(c?"":'text-anchor="end" ')+sm(7.5,"#cfe8da"));}
+ s+=T(48,32,"1",'text-anchor="middle" '+sm(8,"#cfe8da"))+T(88,32,"2",'text-anchor="middle" '+sm(8,"#cfe8da"));
+ let x=22;for(const[l,c]of[["5 V",WC.v5],["3.3 V",WC.v33],["GND",WC.gnd]]){s+=`<rect x="${x}" y="366" width="8" height="8" rx="2" fill="${c}"/>`+T(x+11,374,l,sm(10,"#5c6360"));x+=20+l.length*6;}
+ return s+T(x+4,374,"on the header: a guide only; just the outlined pins are wired",sm(10,"#5c6360"));}
 function wiring(t){let s="";
  const ln=(pts,c,w=2.6)=>`<polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;
  const dot=(x,y,c)=>`<circle cx="${x}" cy="${y}" r="3.6" fill="${c}"/>`,tx=(x,y,v,o="")=>`<text x="${x}" y="${y}" ${o}>${v}</text>`;
  const box=(x,y,w,h,ti,sub,fill="#fff",ink="#1c2024",st="#c9cec6")=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${fill}" stroke="${st}"/>`+tx(x+w/2,y+h/2+(sub?-3:4),ti,`text-anchor="middle" font-weight="600" style="fill:${ink}"`)+(sub?tx(x+w/2,y+h/2+13,sub,`text-anchor="middle" font-size="10.5" style="fill:${ink};opacity:.75"`):"");
  const servo=(y,ti)=>box(430,y,150,56,ti,"MG90S servo","#e7eefb","#1c3d73","#9fb4d9");
- // the Pi's header: odd pins on the left, pin 1 at the top
- s+=tx(68,14,"Raspberry Pi","text-anchor=\"middle\" font-weight=\"600\"")+`<rect x="22" y="24" width="92" height="334" rx="8" fill="#1d6b45"/>`;
- const py=r=>40+(r-1)*16,px=c=>c?88:48,hot={32:WC.sig,34:WC.gnd};if(t.rotates)hot[33]=WC.sig2;
- for(let r=1;r<=20;r++)for(let c=0;c<2;c++){const n=2*r-1+c,h=hot[n];s+=`<rect x="${px(c)-5}" y="${py(r)-5}" width="10" height="10" rx="2" fill="${h||"#d9c06a"}" ${h?'stroke="#fff" stroke-width="2"':""}/>`;}
- s+=tx(34,py(1)+4,"1",'font-size="9" style="fill:#cfe8da"')+tx(102,py(1)+4,"2",'font-size="9" style="fill:#cfe8da"');
+ const hot={32:WC.sig,34:WC.gnd};if(t.rotates)hot[33]=WC.sig2;
+ s+=piHeader(hot);
  s+=ln([[93,280],[130,280]],WC.sig,1.4)+ln([[93,296],[130,296]],WC.gnd,1.4)+(t.rotates?ln([[53,296],[60,312],[130,312]],WC.sig2,1.4):"");
  s+=tx(134,284,"32 · GPIO12",`font-weight="600" style="fill:${WC.sig}"`)+tx(134,300,"34 · GND",'font-weight="600"')+(t.rotates?tx(134,316,"33 · GPIO13",`font-weight="600" style="fill:${WC.sig2}"`):"");
  const servos=t.servos>0,bot=servos?354:296;
@@ -747,15 +755,51 @@ function stepBody(st){const m=SU.machine||{},k=st.key,redo=st.done?` <button cla
   (LASTSCAN?`<p class="note" style="margin:6px 0 0">${LASTSCAN.found.length} bin(s) found${(LASTSCAN.problems||[]).length?`: <span class="bad">${LASTSCAN.problems.map(esc).join("; ")}</span>`:""}</p>`:"")+redo;
  }return "";}
 // ---------------------------------------------------------------- setup: lights (leds.py)
+function ledWiring(n){let s="";
+ const ln=(pts,c,w=2.6)=>`<polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;
+ const dot=(x,y,c)=>`<circle cx="${x}" cy="${y}" r="3.6" fill="${c}"/>`,tx=(x,y,v,o="")=>`<text x="${x}" y="${y}" ${o}>${v}</text>`;
+ const box=(x,y,w,h,ti,sub,fill,ink,st)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${fill}" stroke="${st}"/>`+tx(x+w/2,y+h/2-3,ti,`text-anchor="middle" font-weight="600" style="fill:${ink}"`)+tx(x+w/2,y+h/2+13,sub,`text-anchor="middle" style="font-size:10.5px;fill:${ink};opacity:.75"`);
+ s+=piHeader({19:WC.sig,20:WC.gnd});
+ // pin 20 (GND) leads up between rows 9 and 10, pin 19 (DIN) down between rows 10 and 11
+ s+=ln([[93,184],[100,176],[130,176]],WC.gnd,1.4)+ln([[53,184],[60,192],[130,192]],WC.sig,1.4);
+ s+=tx(134,180,"20 · GND",'font-weight="600"')+tx(134,196,"19 · GPIO10",`font-weight="600" style="fill:${WC.sig}"`);
+ // power: the printer's 24 V supply into a 5 V buck converter (out on its left: GND above, +5 V below)
+ s+=box(430,24,150,56,"5 V buck converter","set to 5.0 V","#fff7e6","#7a4b00","#efd39b")+box(640,17,120,70,"Printer PSU","24 V","#f4f5f2","#1c2024","#c9cec6");
+ s+=ln([[580,38],[640,38]],WC.v24)+ln([[580,66],[640,66]],WC.gnd)+tx(588,33,"IN+",'style="font-size:9.5px"')+tx(588,82,"IN−",'style="font-size:9.5px"');
+ s+=tx(424,33,"OUT−",'text-anchor="end" style="font-size:9.5px"')+tx(424,82,"OUT+",'text-anchor="end" style="font-size:9.5px"');
+ // GND: one bus at x 392 (converter, Pi pin 20, ring); 5 V at x 408 (converter to the ring only)
+ s+=ln([[430,38],[392,38],[392,240],[470,240]],WC.gnd)+ln([[222,176],[392,176]],WC.gnd)+dot(392,176,WC.gnd);
+ s+=ln([[430,66],[408,66],[408,212],[470,212]],WC.v5);
+ s+=ln([[222,192],[300,192],[300,268],[470,268]],WC.sig);
+ // the ring's 3-pin JST XH, and the ring (OD 40, ID 19.9 mm) with its LEDs
+ s+=`<rect x="470" y="198" width="44" height="84" rx="5" fill="#f1f3ef" stroke="#c9cec6"/>`;
+ [["5V",212,WC.v5],["GND",240,WC.gnd],["DIN",268,WC.sig]].forEach(([l,y,c])=>{s+=`<rect x="470" y="${y-4}" width="8" height="8" fill="${c}"/>`+tx(482,y+4,l,'style="font-size:10px"');});
+ const cx=576,cy=240,R=62,r=31;s+=tx(492,192,"JST XH",'text-anchor="middle" style="font-size:9.5px;opacity:.75"');
+ s+=`<path d="M${cx-R},${cy}a${R},${R} 0 1,0 ${2*R},0a${R},${R} 0 1,0 ${-2*R},0ZM${cx-r},${cy}a${r},${r} 0 1,1 ${2*r},0a${r},${r} 0 1,1 ${-2*r},0Z" fill="#2b2f33" fill-rule="evenodd"/>`;
+ for(let i=0;i<n;i++){const a=2*Math.PI*i/n,x=cx+46.5*Math.cos(a),y=cy+46.5*Math.sin(a);s+=`<rect x="${(x-5).toFixed(1)}" y="${(y-5).toFixed(1)}" width="10" height="10" rx="1.5" fill="#f8f8f4" stroke="#ffd43b" stroke-width="1.4"/>`;}
+ s+=tx(cx,cy+R+20,"LED ring",'text-anchor="middle" font-weight="600"')+tx(cx,cy+R+35,`WS2812B × ${n} · OD 40 · ID 19.9 mm`,'text-anchor="middle" style="font-size:10.5px;opacity:.75"');
+ // legend
+ let lx=22;[["GPIO10: data (DIN)",WC.sig],["5 V",WC.v5],["24 V",WC.v24],["GND (all joined)",WC.gnd]].forEach(([l,c])=>{s+=`<rect x="${lx}" y="398" width="16" height="4" rx="2" fill="${c}"/>`+tx(lx+22,404,l,'font-size="11"');lx+=36+l.length*6.3;});
+ return `<svg viewBox="0 0 780 416" role="img" aria-label="Wiring of the LED ring">${s}</svg>`;}
+function ledWire(L){const n=L.count||8,rows=[[WC.sig,"19 · GPIO10","DIN of the ring (SPI0 MOSI)"],[WC.gnd,"20 · GND","GND of the ring and the buck converter's OUT−"]];
+ const notes=["5 V from a buck converter on the printer's 24 V supply, never the Pi's 5 V pins: the LEDs' current then doesn't load the Pi.",
+  "Set the converter to 5.0 V with a meter before the ring goes on.",
+  "Join every GND: the Pi's pin 20, the converter's minus and the ring's GND. Without it the data has no reference.",
+  "The Pi's data is 3.3 V: fine on a short lead. If the LEDs flicker or show wrong colours, put a 74AHCT125 level shifter between pin 19 and DIN.",
+  "SPI must be on: install-pi.sh turns it on (reboot once)."];
+ return `<div class="pkwire" style="margin-top:12px"><div class="wsvg">${ledWiring(n)}</div><div class="pkinfo"><div>
+  <h4>Pins on the Raspberry Pi</h4><table class="pins">${rows.map(([c,p,w])=>`<tr><td style="white-space:nowrap"><i style="background:${c}"></i><b>${p}</b></td><td>${w}</td></tr>`).join("")}</table>
+  <h4>You need</h4><ul><li>LED ring, WS2812B (${n} LEDs, 3-pin JST XH)</li><li>5 V buck converter (LM2596 or MP1584, 1 A or more)</li><li>3-wire lead, 24 V pair from the PSU</li></ul></div>
+  <div><h4>Good to know</h4><ul class="note" style="padding-left:16px">${notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div></div></div>`;}
 function lightsBody(st,redo){const L=SU.lights||{},c=L.colour||"#ffffff",[r,g,b]=hexRgb(c),pct=Math.round((L.brightness==null?0.5:L.brightness)*100);
  const sl=(id,lab,v,max)=>`<label class="lrow"><span>${lab}</span><input type="range" id="${id}" min="0" max="${max}" value="${v}" oninput="lightsInput('${id}')"><b id="${id}v">${v}</b></label>`;
- if(!L.enabled)return `<p class="note" style="margin:0 0 8px">WS2812B: DIN → pin 19 (GPIO10), 5V → pin 2, GND → pin 6.</p><div class="row"><button class="b p s" onclick="setupCall('api/setup/lights',{enabled:true},'','lights')">Use lights</button> ${st.done?"":`<button class="b s" onclick="noLights()">No lights</button>`}</div>`+redo;
+ if(!L.enabled)return `<div class="row"><button class="b p s" onclick="setupCall('api/setup/lights',{enabled:true},'','lights')">Use lights</button> ${st.done?"":`<button class="b s" onclick="noLights()">No lights</button>`}</div>`+redo+ledWire(L);
  return `<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex')"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
   <div class="lsl">${sl("lr","R",r,255)}${sl("lg","G",g,255)}${sl("lb","B",b,255)}${sl("lbr","Intensity",pct,100)}</div></div>
   <div class="row" style="margin-top:8px"><label class="row note"><input type="checkbox" ${L.always_on?"checked":""} onchange="setupCall('api/setup/lights',{always_on:this.checked},'','lights')"> Always on</label>
   <button class="b s" onclick="setupCall('api/setup/lights',{enabled:false},'','lights')">Off</button>
   <span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span></div>
-  <div class="row" style="margin-top:8px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'lights'},'','lights')">OK</button>`}</div>`+redo;}
+  <div class="row" style="margin-top:8px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'lights'},'','lights')">OK</button>`}</div>`+redo+ledWire(L);}
 function hexRgb(h){const s=(h||"#ffffff").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)||0);}
 function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>(+v).toString(16).padStart(2,"0")).join("");}
 let LSEND=null,LPEND={};
