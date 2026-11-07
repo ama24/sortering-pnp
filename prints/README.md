@@ -110,7 +110,7 @@ board lying in the tray, at the height the parts will lie.
     sandwiched between them (a spigot under the bracket centres it in its hole, a recess in the
     clamp or diffuser takes the board and its tab; LEDs down, the tab forward: a vertical plug
     goes up through the bracket's slot in front of the camera). The diffuser (white or clear
-    PETG, a 0.6 mm window) covers the LEDs and leaves the middle open. 4 x M2 x 10 (M2 x 12
+    PETG, a 0.6 mm window) covers the LEDs and leaves the middle open. 4 x M3 x 12 (M3 x 16
     with the diffuser) through all of them into the legs. Nothing is in the camera's view, also with the Camera Module 3 Wide.
 
   Your printer's sizes differ? Measure the reach (and, only for a lower camera on a post, the

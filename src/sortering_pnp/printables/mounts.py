@@ -16,7 +16,7 @@ and T-nuts (the screen holder M5, the camera arm M4 x 7):
   Opulo LumenPnP top ring light (a 40 mm disc, 19.9 mm hole, no mounting holes) is sandwiched
   between the bracket (flat, a spigot in the ring's hole centres it) and a clamp ring or a
   diffuser (a recess for the board's edge and tab), the lens looking down through all of them;
-  the same 4 M2 screws go through them into the legs.
+  the same 4 M3 screws go through them into the legs.
 
 Every size is a parameter: measure your printer and set them (prints/mounts/README.md).
 Both are built where they sit on the printer: x along the bar, y towards the back (the bar's
@@ -207,7 +207,7 @@ class CameraArm:
     """A slim T-section beam from the bar's front face to a small pod with the camera under it.
     With `ring`, four legs hang down beside the camera for the ring-light bracket (the Opulo
     LumenPnP top ring light; `ring_*` sizes from its KiCad board, src/PCB/ringLight): camera ->
-    bracket -> ring -> clamp ring or diffuser, all four held by the same 4 x M2 screws."""
+    bracket -> ring -> clamp ring or diffuser, all four held by the same 4 x M3 screws."""
 
     reach: float = 148.0  # bar front face -> lens, horizontally (measure with the bed out)
     drop: float = 0.0  # 0: the camera right under the arm (sees the most); > 0: a post down
@@ -250,11 +250,12 @@ class CameraArm:
     ring_led_h: float = 1.6  # WS2812B 5050: 1.6 mm high
     ring_fit: float = 0.2  # clearance all round: the recess round the board, the spigot in it
     ring_squeeze: float = 0.15  # the clamp's recess is this much shallower than the board
-    ring_screw_dx: float = 25.0  # the 4 M2 through clamp, bracket and into the legs (r = 24 mm)
+    ring_screw_dx: float = 24.4  # the 4 M3 through clamp, bracket and into the legs (r = 23.8 mm)
     ring_screw_dy: float = 41.0
-    ring_screw_d: float = 2.4  # M2 clearance
-    leg_r: float = 2.6
-    leg_pilot: float = 9.0  # pilot depth in each leg
+    ring_screw_d: float = 3.4  # M3 clearance
+    ring_pilot_d: float = 2.5  # M3 screws cut their own thread in the legs
+    leg_r: float = 3.4  # 2.1 mm of wall round the M3 pilot (more would be in the screwdriver's way)
+    leg_pilot: float = 10.0  # pilot depth in each leg
     bracket_gap: float = 3.0  # the board's front (lens side) to the bracket: its parts, screw heads
     bracket_t: float = 2.6  # the bracket over the ring (flat underneath, the ring against it)
     bracket_r: float = 27.0
@@ -316,7 +317,7 @@ def _cable_edge(p: CameraArm) -> float:
 
 
 def ring_screws(p: CameraArm) -> list[tuple[float, float]]:
-    """Installed (x, y) of the 4 M2 that hold the clamp, bracket and ring to the legs."""
+    """Installed (x, y) of the 4 M3 that hold the clamp, bracket and ring to the legs."""
     return [
         (sx * p.ring_screw_dx / 2, -p.reach + sy * p.ring_screw_dy / 2)
         for sx in (-1, 1)
@@ -413,7 +414,9 @@ def _camera_arm_installed(p: CameraArm) -> Manifold:
     if p.ring:  # legs down beside the camera to the bracket, a pilot hole up each
         zb = bracket_top(p)
         parts += [_cyl_z(p.leg_r, zb, z_cam + 0.01, x, y) for x, y in ring_screws(p)]
-        cuts += [_cyl_z(p.pilot_d / 2, zb - 1.0, zb + p.leg_pilot, x, y) for x, y in ring_screws(p)]
+        cuts += [
+            _cyl_z(p.ring_pilot_d / 2, zb - 1.0, zb + p.leg_pilot, x, y) for x, y in ring_screws(p)
+        ]
     return _union([mount, *beam, *parts]) - _union([*cuts, *holes])
 
 
@@ -625,7 +628,7 @@ camera_arm_ring.stl, ring_bracket.stl, ring_clamp.stl, ring_diffuser.stl: the sa
   between the bracket (flat; a short spigot fits the ring's hole and centres it) and the clamp
   or diffuser (a recess in its top takes the board and its tab). LEDs down, the tab forward,
   away from the bar: a vertical plug goes up through the slot in front of the camera. All held
-  by 4 x M2 x {clamp_screw:g} (M2 x {diffuser_screw:g} with the diffuser) through them and the
+  by 4 x M3 x {clamp_screw:g} (M3 x {diffuser_screw:g} with the diffuser) through them and the
   bracket into the arm's legs ({legs_x:g} x {legs_y:g} mm apart); the recess is a little
   shallower than the board, so the screws press it flat. The diffuser is optional: print
   it in white or clear PETG, its {dif_t:g} mm window lies under the LEDs, open in the middle
@@ -681,8 +684,8 @@ def mount_files(
         head=round(arm.head_d - 0.6, 1),
         screw_dx=arm.screw_dx,
         lens_hole=ringed.lens_hole_d,
-        clamp_screw=_m2_length(depth + ringed.clamp_t + bracket, ringed),
-        diffuser_screw=_m2_length(cup + bracket, ringed),
+        clamp_screw=_m3_length(depth + ringed.clamp_t + bracket, ringed),
+        diffuser_screw=_m3_length(cup + bracket, ringed),
         legs_x=ringed.ring_screw_dx,
         legs_y=ringed.ring_screw_dy,
         dif_t=ringed.diffuser_t,
@@ -705,10 +708,10 @@ def mount_files(
     ]
 
 
-def _m2_length(through: float, p: CameraArm) -> int:
-    """A stock M2 length that goes through `through` mm of parts and 4 mm or more into a leg
+def _m3_length(through: float, p: CameraArm) -> int:
+    """A stock M3 length that goes through `through` mm of parts and 5 mm or more into a leg
     (but not past its pilot)."""
-    for n in (6, 8, 10, 12, 14, 16, 20):
-        if through + 4.0 <= n <= through + p.leg_pilot - 0.5:
+    for n in (6, 8, 10, 12, 16, 20):  # the common ones
+        if through + 5.0 <= n <= through + p.leg_pilot - 0.5:
             return n
-    raise ValueError(f"no stock M2 screw fits {through:g} mm of parts and the legs")
+    raise ValueError(f"no stock M3 screw fits {through:g} mm of parts and the legs")

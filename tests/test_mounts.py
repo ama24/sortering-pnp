@@ -120,7 +120,7 @@ def test_mount_files():
     }
     notes = " ".join(files["MOUNTS.txt"].decode().split())
     assert "155 x 92" in notes and "reaches 148 mm forward" in notes
-    assert "4 x M2 x 10 (M2 x 12 with the diffuser)" in notes
+    assert "4 x M3 x 12 (M3 x 16 with the diffuser)" in notes
 
 
 def test_screen_screws_have_a_full_seat_for_their_heads():
@@ -276,7 +276,7 @@ def test_the_lens_looks_down_through_the_bracket_and_the_ring():
 def test_the_ring_is_sandwiched_between_the_bracket_and_the_clamp():
     """The LumenPnP ring (40 mm, 19.9 mm hole) has no mounting holes: its back lies flat on the
     bracket, a spigot in its hole centres it, and the clamp ring (or the diffuser) holds it in
-    a recess a little shallower than the board, pressing its edge, clear of the LEDs; 4 M2 go
+    a recess a little shallower than the board, pressing its edge, clear of the LEDs; 4 M3 go
     through clamp and bracket into the arm's legs."""
     from manifold3d import Manifold
 
@@ -309,7 +309,7 @@ def test_the_ring_is_sandwiched_between_the_bracket_and_the_clamp():
     assert p.diffuser_t <= 0.6
     v, _ = _to_mesh(_camera_arm_installed(p))
     spots = ring_screws(p)
-    assert all(_hole_centres(v, p.pilot_d / 2, spots, (0, 1)))  # a pilot in each leg
+    assert all(_hole_centres(v, p.ring_pilot_d / 2, spots, (0, 1)))  # an M3 pilot in each leg
     for name in ("ring_bracket", "ring_clamp", "ring_diffuser"):
         pv, _ = _to_mesh(parts[name])
         assert all(_hole_centres(pv, p.ring_screw_d / 2, spots, (0, 1))), name

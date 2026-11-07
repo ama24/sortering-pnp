@@ -32,8 +32,8 @@ camera_arm_ring.stl, ring_bracket.stl, ring_clamp.stl, ring_diffuser.stl: the sa
   between the bracket (flat; a short spigot fits the ring's hole and centres it) and the clamp
   or diffuser (a recess in its top takes the board and its tab). LEDs down, the tab forward,
   away from the bar: a vertical plug goes up through the slot in front of the camera. All held
-  by 4 x M2 x 10 (M2 x 12 with the diffuser) through them and the
-  bracket into the arm's legs (25 x 41 mm apart); the recess is a little
+  by 4 x M3 x 12 (M3 x 16 with the diffuser) through them and the
+  bracket into the arm's legs (24.4 x 41 mm apart); the recess is a little
   shallower than the board, so the screws press it flat. The diffuser is optional: print
   it in white or clear PETG, its 0.6 mm window lies under the LEDs, open in the middle
   so the camera sees past it. Nothing is in the camera's view (Camera Module 3, and the
