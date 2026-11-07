@@ -30,6 +30,7 @@ from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
 from .io import read_json, write_json
 from .layout import Layout, yaw_from_up
+from .leds import Lights, make_leds, parse_hex
 from .models import ModelError, ModelStore
 from .parts import compute_gaps, to_bed
 from .photos import Photos
@@ -75,6 +76,7 @@ class Runner:
         self.printer = printer
         self.motion = Motion(printer, m)
         self.pins = self.motion.pins  # the picker, switched by sortering-pnp itself (pins.py)
+        self._leds_driver = make_leds(m, printer)  # the LEDs, on the Pi's SPI (leds.py)
         self.vision = vision
         self.store = store
         self.state = State(strategy=m.run.strategy)
@@ -115,6 +117,8 @@ class Runner:
         self.markers_seen: set[int] = set()  # every code the camera has read
         self._load_tool()
         self._load_machine()
+        self.lights = Lights(m, self._leds_driver)
+        self.lights.apply()  # lit from the start when always on
         setup_path = self.m.path(self.m.paths.setup)
         assert setup_path is not None
         self.setup = Setup(setup_path)
@@ -417,7 +421,8 @@ class Runner:
             heights = lambda mid: _marker_plate_height(layout, mid)  # noqa: E731
             if hasattr(self.vision, "snap") and hasattr(self.vision, "analyse"):
                 self.phase("taking a photo")
-                photo = self.vision.snap(name)
+                with self.lights.for_photo():
+                    photo = self.vision.snap(name)
                 self.phase("running the model")
                 shot = (
                     self.vision.analyse(photo, name, heights, work)
@@ -426,11 +431,12 @@ class Runner:
                 )
             else:
                 self.phase("taking a photo")
-                shot = (
-                    self.vision.capture(name, heights, work)
-                    if work is not None
-                    else self.vision.capture(name, heights)
-                )
+                with self.lights.for_photo():
+                    shot = (
+                        self.vision.capture(name, heights, work)
+                        if work is not None
+                        else self.vision.capture(name, heights)
+                    )
         return self._finish_shot(shot, layout, T)
 
     def _work_area(self, layout: Layout, T: Transform2D | None) -> WorkArea | None:
@@ -658,7 +664,7 @@ class Runner:
                 self.motion.move(z=pc.photo_position[2])
                 self.printer.gcode("M400")
             d = Ai @ (np.array([x, y]) - ref)  # the view moved with the head
-            with self._lock:
+            with self._lock, self.lights.for_photo():
                 last = self.vision.capture(
                     f"{name}_{k:02d}",
                     lambda mid: _marker_plate_height(layout, mid),
@@ -1068,6 +1074,7 @@ class Runner:
         self._pause.clear()
         self.wait(30)
         self.pins.close()
+        self.lights.close()
 
     def _load_tool(self) -> None:
         p = self.m.path(self.m.paths.tool)
@@ -1296,6 +1303,10 @@ class Runner:
                 self.m.picker.rotate_offset_deg = float(v)
             elif k == "lower_to_drop":  # Setup tab, Picker step
                 self.m.picker.lower_to_drop = bool(v)
+            elif k == "lights" and isinstance(v, dict):  # Setup tab, Lights step
+                for name in self.LIGHT_KEYS:
+                    if name in v:
+                        setattr(self.m.lights, name, type(getattr(self.m.lights, name))(v[name]))
             elif k == "camera_settings":  # locked in the Calibrate tab
                 self.m.camera.settings = str(v)
             elif k == "calibration":
@@ -1363,6 +1374,7 @@ class Runner:
                 "view_h": self.state.view_h,
             },
             "rotation": self.m.picker.kind.rotates,
+            "lights": self.lights.state(),
             "picker": {
                 "mode": self.m.picker.kind.key,
                 "types": [pickers.as_dict(t) for t in pickers.PICKERS],
@@ -1401,6 +1413,38 @@ class Runner:
         self.m.picker.rotate_offset_deg = float(deg) % 180.0
         self.remember_machine({"rotate_offset_deg": self.m.picker.rotate_offset_deg})
         self._setup_picker.discard("rotate")
+        return self.setup_state()
+
+    LIGHT_KEYS = ("enabled", "colour", "brightness", "always_on")
+
+    def setup_lights(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Setup tab, Lights: colour (#RRGGBB), brightness (0..1), always on, enabled. Shown on
+        the LEDs at once (a preview) and kept in machine.json. Switching them off (no lights)
+        darkens them first."""
+        li = self.m.lights
+        new = {k: getattr(li, k) for k in self.LIGHT_KEYS}
+        for k, v in values.items():
+            if k not in self.LIGHT_KEYS:
+                raise ValueError(f"unknown light value {k!r}")
+            if k == "colour":
+                parse_hex(str(v))
+                new[k] = "#" + str(v).strip().lstrip("#").lower()
+            elif k == "brightness":
+                b = float(v)
+                if not 0 <= b <= 1:
+                    raise ValueError("brightness must be 0..1")
+                new[k] = b
+            else:
+                new[k] = bool(v)
+        if li.enabled and not new["enabled"]:
+            self.lights.off()
+        for k, v in new.items():
+            setattr(li, k, v)
+        self.remember_machine({"lights": new})
+        if li.enabled:
+            self.lights.preview()
+        if not li.enabled and "enabled" in values:
+            self.setup.reset("lights")
         return self.setup_state()
 
     def setup_picker_drop(self, lower: bool) -> dict[str, Any]:
@@ -1560,6 +1604,14 @@ class Runner:
             raise PrinterError("this step is checked by the machine, not by hand")
         if key == "picker":
             return self.setup_picker_ok()
+        if key == "lights":
+            st = self.lights.state()
+            if st["enabled"] and not st["ok"]:
+                raise PrinterError(f"the lights: {st['message']}")
+            self.lights.apply()
+            self.setup.mark("lights", "on" if st["enabled"] else "no lights")
+            self.note("setup: lights " + ("confirmed" if st["enabled"] else ": none"))
+            return self.setup_state()
         if key == "machine":  # the next step puts the picker on: the head goes where that is easy
             with self._lock:
                 self.motion.preflight(home=False)
