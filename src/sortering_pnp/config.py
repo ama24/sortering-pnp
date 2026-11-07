@@ -60,6 +60,25 @@ class Paths:
 
 
 @dataclass
+class CameraAdjust:
+    """Camera adjustments from the page (Camera Calibration tab), over the automatic or locked
+    settings; applied to photos and the live picture (camera.controls_for)."""
+
+    focus: str = "auto"  # auto (continuous, or the locked lens position) | manual
+    lens_position: float = 2.0  # dioptres (1 / metres): 2.0 = 500 mm, 3.3 = 300 mm
+    white_balance: str = "auto"  # auto (or locked) | manual
+    red_gain: float = 1.8
+    blue_gain: float = 1.6
+    exposure: str = "auto"  # auto (or locked) | manual
+    exposure_us: int = 20000  # shutter time
+    gain: float = 1.0  # analogue gain
+    brightness: float = 0.0  # -1 .. 1
+    contrast: float = 1.0  # 0 .. 2 (1: as the camera gives it)
+    sharpness: float = 1.0  # 0 .. 4
+    saturation: float = 1.0  # 0 .. 2
+
+
+@dataclass
 class Camera:
     settings: str | None = (
         None  # locked camera settings (camlock.py: focus/exposure); None = rpicam-still
@@ -80,6 +99,8 @@ class Camera:
     # (on by default: the camera on this machine is mounted the other way round)
     hflip: bool = True
     vflip: bool = True
+    turn90: bool = False  # then turned 90 degrees clockwise (in software: the photo is taller)
+    adjust: CameraAdjust = field(default_factory=CameraAdjust)
     # lens above the tray floor (TPU top), used while there is no camera calibration: the
     # camera is taken as straight down over the picture's centre (Calibrate tab: Skip for now)
     # None: vision.yaml's nominal_camera.height_mm
@@ -278,6 +299,10 @@ class Machine:
             raise ConfigError(str(exc)) from exc
         if self.camera.source not in ("overview", "head"):
             raise ConfigError("camera.source must be overview or head")
+        a = self.camera.adjust
+        for key in ("focus", "white_balance", "exposure"):
+            if getattr(a, key) not in ("auto", "manual"):
+                raise ConfigError(f"camera.adjust.{key} must be auto or manual")
         if self.run.when_no_bin not in ("ask", "overflow"):
             raise ConfigError("run.when_no_bin must be ask or overflow")
         if self.run.share_wild not in ("class", "family", "none"):

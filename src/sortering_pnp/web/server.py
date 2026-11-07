@@ -326,6 +326,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         elif method == "POST" and path == "/api/camera/flip":
             b = self._body()
             self._json(r.camera_flip(bool(b.get("hflip")), bool(b.get("vflip"))))
+        elif method == "POST" and path == "/api/camera/orient":
+            self._json(r.camera_orient(str(self._body().get("action", ""))))
+        elif method == "GET" and path == "/api/camera":
+            self._json(r.camera_state())
+        elif method == "POST" and path == "/api/camera/adjust":
+            self._json(r.camera_adjust(self._body()))
+        elif method == "POST" and path == "/api/camera/focus":
+            self._json(r.camera_focus())
         elif method == "POST" and path == "/api/calibration/settings":
             b = self._body()
             self._json(

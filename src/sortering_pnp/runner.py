@@ -9,6 +9,7 @@ part in the picker is always dropped first.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import logging
 import math
 import threading
@@ -24,6 +25,7 @@ from . import binspec, pickers
 from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
+from .camera import mirrored, orientation, rotated
 from .config import Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
 from .grip import jaw_angle
@@ -65,6 +67,19 @@ class State:
     target: dict[str, Any] | None = None  # the part it picks next (Device tab: boxed)
     view: str | None = None  # the latest photo without drawings (the page draws on it)
     view_h: list[list[float]] | None = None  # plate mm -> view pixels (3x3 homography)
+
+
+ADJUST_RANGE = {  # Camera Calibration tab: what the sliders may set
+    "lens_position": (0.0, 15.0),
+    "red_gain": (0.5, 8.0),
+    "blue_gain": (0.5, 8.0),
+    "exposure_us": (100, 200000),
+    "gain": (1.0, 16.0),
+    "brightness": (-1.0, 1.0),
+    "contrast": (0.0, 2.0),
+    "sharpness": (0.0, 4.0),
+    "saturation": (0.0, 2.0),
+}
 
 
 class Runner:
@@ -490,26 +505,84 @@ class Runner:
         self.note(f"camera calibration skipped: straight down, {h:g} mm above the tray floor")
         return self.photos.state()
 
-    def camera_flip(self, hflip: bool, vflip: bool) -> dict[str, Any]:
-        """The picture flipped by the camera (both: turned 180 degrees), for photos and the live
-        picture. What was fitted to the old picture no longer holds: Camera to printer (and a
-        camera calibration) must be done again."""
+    def camera_flip(self, hflip: bool, vflip: bool, turn90: bool | None = None) -> dict[str, Any]:
+        """The picture's orientation (the camera's flips, both = turned 180 degrees, and a
+        quarter turn in software), for photos and the live picture. What was fitted to the old
+        picture no longer holds: Camera to printer (and a camera calibration) must be done
+        again."""
         self._idle()
         c = self.m.camera
-        if (c.hflip, c.vflip) == (bool(hflip), bool(vflip)):
+        q = c.turn90 if turn90 is None else bool(turn90)
+        if (c.hflip, c.vflip, c.turn90) == (bool(hflip), bool(vflip), q):
             return self.photos.state()
-        c.hflip, c.vflip = bool(hflip), bool(vflip)
-        self.remember_machine({"camera_hflip": c.hflip, "camera_vflip": c.vflip})
+        c.hflip, c.vflip, c.turn90 = bool(hflip), bool(vflip), q
+        self.remember_machine(
+            {"camera_hflip": c.hflip, "camera_vflip": c.vflip, "camera_turn90": c.turn90}
+        )
         reopen = getattr(self.vision, "reopen_camera", None)
         if reopen is not None:
             reopen()
+        reload = getattr(self.vision, "reload_setup", None)
+        if reload is not None and q:  # the nominal camera's picture is taller now
+            reload()
         self.calib_clear()
         self.setup.reset("camera")
         self.last_shot = None
-        turn = {(True, True): "turned 180°", (True, False): "mirrored left-right"}
-        turn |= {(False, True): "mirrored top-bottom", (False, False): "as the camera gives it"}
-        self.note(f"camera picture {turn[(c.hflip, c.vflip)]}: do Camera to printer again")
+        o = orientation(c.hflip, c.vflip, c.turn90)
+        self.note(
+            f"camera picture turned {o['turn']}°{', mirrored' if o['mirror'] else ''}: "
+            "do Camera to printer again"
+        )
         return self.photos.state()
+
+    def camera_orient(self, action: str) -> dict[str, Any]:
+        """Rotate 90° (clockwise) or Mirror (left-right), from the Camera Calibration tab."""
+        c = self.m.camera
+        step = {"rotate": rotated, "mirror": mirrored}.get(action)
+        if step is None:
+            raise ValueError("rotate or mirror")
+        return self.camera_flip(*step(c.hflip, c.vflip, c.turn90))
+
+    def camera_adjust(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Focus, white balance, exposure and image adjustments from the page: kept, and
+        applied to the camera at once (photos and the live picture)."""
+        a = self.m.camera.adjust
+        new = {k: v for k, v in (values or {}).items() if hasattr(a, k)}
+        if values and not new:
+            raise ValueError("nothing to adjust")
+        for k, v in new.items():
+            old = getattr(a, k)
+            if isinstance(old, str):
+                if v not in ("auto", "manual"):
+                    raise ValueError(f"{k}: auto or manual")
+                setattr(a, k, v)
+            else:
+                lo, hi = ADJUST_RANGE[k]
+                setattr(a, k, type(old)(min(hi, max(lo, float(v)))))
+        self.remember_machine({"camera_adjust": dataclasses.asdict(a)})
+        apply = getattr(self.vision, "adjust_camera", None)
+        now = apply() if apply is not None else {}
+        return {"adjust": dataclasses.asdict(a), "now": now}
+
+    def camera_focus(self) -> dict[str, Any]:
+        """Autofocus once on the tray, then keep that lens position (focus: manual)."""
+        focus = getattr(self.vision, "focus_once", None)
+        pos = focus() if focus is not None else None
+        if pos is None:
+            raise ValueError("no autofocus on this camera")
+        out = self.camera_adjust({"focus": "manual", "lens_position": pos})
+        self.note(f"camera focused: lens position {pos:.2f} (about {1000 / max(pos, 0.01):.0f} mm)")
+        return out
+
+    def camera_state(self) -> dict[str, Any]:
+        c = self.m.camera
+        now = getattr(self.vision, "camera_now", lambda: {})()
+        return {
+            "adjust": dataclasses.asdict(c.adjust),
+            "now": now,
+            "orientation": orientation(c.hflip, c.vflip, c.turn90),
+            "locked": bool(c.settings),
+        }
 
     def calibration_settings(
         self, measured_square_mm: float | None, board_thickness_mm: float
@@ -537,7 +610,7 @@ class Runner:
             self.transform_path.replace(aside)
         self.calib_pairs = []
         self.setup.reset("camera")
-        self.note("new camera calibration: redo Camera to printer (Calibrate tab)")
+        self.note("new camera calibration: redo Camera to printer (Setup tab, step 6)")
 
     def mask_save(self, margin_mm: float) -> dict[str, Any]:
         self.remember_machine({"mask_margin_mm": float(margin_mm)})
@@ -600,7 +673,7 @@ class Runner:
         finally:
             c.mask, c.mask_margin_mm = old
         if work is None:
-            return placeholder("no working area: Setup tab, step 7 (Find the bins)")
+            return placeholder("no working area: Setup tab, step 7 (Find bins)")
         s = frame.shape[1] / float(cam.image_size[0])
 
         def px(poly: np.ndarray) -> np.ndarray:
@@ -1286,8 +1359,13 @@ class Runner:
                 self.mask_checked = True
             elif k == "mask_colour":  # Camera cropping, Calibrate tab
                 self.m.camera.mask_colour = str(v)
-            elif k in ("camera_hflip", "camera_vflip"):  # Calibrate tab: Turn 180 / Mirror
+            elif k in ("camera_hflip", "camera_vflip", "camera_turn90"):  # Rotate / Mirror
                 setattr(self.m.camera, k.removeprefix("camera_"), bool(v))
+            elif k == "camera_adjust":  # Camera Calibration tab: focus, colours, exposure
+                a = self.m.camera.adjust
+                for ak, av in (v or {}).items():
+                    if hasattr(a, ak):
+                        setattr(a, ak, type(getattr(a, ak))(av))
             elif k == "camera_height_mm":  # Calibrate tab, Skip for now
                 self.m.camera.height_mm = float(v)
             elif k == "picker_mode":  # chosen in the Setup tab

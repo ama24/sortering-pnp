@@ -85,10 +85,10 @@ SLOTS: tuple[Slot, ...] = (
         "Camera calibration",
         "calibration.json",
         "json",
-        "Made here: Calibrate tab, Camera calibration (it lands in this slot by itself).",
+        "Made here: Camera Calibration tab, Camera calibration (it lands in this slot by itself).",
         "Turns pixels into millimetres on the plate, without the lens' distortion: where the "
         "parts are, and their lengths.",
-        "The nominal camera: straight down from the height set in the Calibrate tab (Skip for "
+        "The nominal camera: straight down from the height set in the Camera Calibration tab (Skip for "
         "now) or vision.yaml's; positions and lengths less exact near the picture's edge.",
         _calibration,
     ),
@@ -97,7 +97,7 @@ SLOTS: tuple[Slot, ...] = (
         "Head camera calibration",
         "head_calibration.json",
         "json",
-        "Made here: Calibrate tab, Camera calibration, with camera.source: head.",
+        "Made here: Camera Calibration tab, Camera calibration, with camera.source: head.",
         "The same, for a camera on the tool head (camera.source: head).",
         "The nominal camera. Only needed with a head camera.",
         _calibration,

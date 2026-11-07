@@ -148,7 +148,7 @@ def write_board_pdf(spec: BoardSpec, path: str | os.PathLike[str], dpi: int = 60
         f"ChArUco {spec.squares_x} x {spec.squares_y} squares, {spec.square_mm} mm squares, "
         f"{spec.marker_mm} mm markers, {spec.dictionary}",
         "Print at 100% / actual size (no 'fit to page'), matte paper. Glue flat onto glass or aluminium.",
-        "Measure several squares with calipers and enter the mean in the Calibrate tab",
+        "Measure several squares with calipers and enter the mean in the Camera Calibration tab",
     ]
     font_px = round(3.2 * px_per_mm)
     try:

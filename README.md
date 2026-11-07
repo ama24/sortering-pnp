@@ -227,19 +227,19 @@ Go through the seven steps once, in order:
    middle of the tray, never over a bin.
 3. **Machine:** the bed limits, the travel height, the **photo position** (bed all the way out,
    head out of the picture) and the **picker-change position** (head high and in the middle).
-   *Show me* drives to each so you can check. *All positions are right* then sends the head to
+   *Show me* drives to each so you can check. *Confirm* then sends the head to
    the picker-change position, ready for the next step.
 4. **Picker:** choose yours and wire it as the page shows (sortering-pnp switches the Pi's pins
    itself, see [The picker](#the-picker)). *Grab* and *Release* try it if you like. Put it on the
    head and press **OK**: from then on sorting may move it.
-5. **Tip height:** *Above the plate*, then jog the tip down with the Z buttons on the same row
-   until a sheet of paper just drags, and press *The tip touches the plate*. Every height
+5. **Tip height:** *Go to centre*, then jog the tip down with the Z buttons on the same row
+   until a sheet of paper just drags, and press *Set height*. Every height
    sortering-pnp uses counts from here.
 6. **Camera to printer:** *Take photo* shows what the camera sees, with every code it reads
    circled and named (no model needed). Jog the tip onto the centre of three codes far apart,
-   press *Tip is here* on each, then *Fit*. Do the **Camera calibration** (Calibrate tab, step 3
+   press *Tip is here* on each, then *Fit*. Do the **Camera calibration** (Camera Calibration tab, step 3
    below) before it.
-7. **Layout:** *Find the bins*: one photo finds the grid, every bin and which way it faces (see
+7. **Layout:** *Find bins*: one photo finds the grid, every bin and which way it faces (see
    step 2 below).
 
 A step un-checks itself when something it depends on changes, so the setup can't silently go
@@ -322,13 +322,13 @@ Changes are **queued**: they show dashed, a bar lists them, and **Apply** saves 
 
 ### 3. The camera
 
-![The Calibrate tab](docs/images/calibrate.png)
+![The Camera Calibration tab](docs/images/calibrate.png)
 
-In the **Calibrate** tab:
+In the **Camera Calibration** tab:
 
-1. **Camera:** the live picture from the camera, at the top. Upside down or mirrored? **Turn 180°**
-   / **Mirror left-right** make the camera turn its own picture (photos too); then do Camera to
-   printer again. The picture starts turned 180° (`camera.hflip`/`vflip: true`), for a camera
+1. **Camera:** the live picture from the camera, at the top. **Rotate 90°** / **Mirror** turn
+   the picture (photos too); then do Camera to printer again. Focus, white balance, exposure and
+   the image's look are set below it (Auto or Manual; **Autofocus** focuses once). The picture starts turned 180° (`camera.hflip`/`vflip: true`), for a camera
    mounted the other way round.
 2. **Camera calibration** teaches the program how the camera sees. Download and print the small
    tray board, home the printer, empty the tray, then press **Calibrate**: one button. It parks
