@@ -89,11 +89,13 @@ sortering-pnp itself ([leds.py](../src/sortering_pnp/leds.py)), like the picker:
 Klipper and no extra package. The data goes out on the Pi's SPI0 MOSI, and the SPI hardware
 makes the LEDs' timing (each LED bit is 3 SPI bits at 2.4 MHz).
 
-| Ring | Pi header |
+| Ring | Goes to |
 |---|---|
-| 5V | pin 2 or 4 (5 V) |
-| GND | pin 6 (ground) |
-| DIN | pin 19 (GPIO10, SPI0 MOSI) |
+| 5V | a 5 V buck converter (set to 5.0 V) on the printer's 24 V supply, not the Pi's 5 V pins |
+| GND | Pi pin 20 (ground), joined with the converter's minus |
+| DIN | Pi pin 19 (GPIO10, SPI0 MOSI) |
+
+The Setup tab's Lights step draws it, like the picker's wiring.
 
 - **Set up:** `install-pi.sh` adds `dtparam=spi=on` and `core_freq_min=500` (a Pi 4's SPI clock
   follows the core clock: fixed, the timing holds) to `/boot/firmware/config.txt` and puts you
