@@ -32,6 +32,7 @@ POST /api/logout;  GET /api/users, POST /api/users/add, /api/users/remove, /api/
 GET  /api/setup; POST /api/setup/printer|home|goto|machine|picker|confirm|reset   the Setup tab
 POST /api/setup/picker/type {"type"}, /api/setup/picker/offset {"deg"}, /api/setup/rotate {"angle"};
 POST /api/setup/picker/drop {"lower": bool}  lower over the bin before letting go (else: travel height)
+POST /api/setup/lights {"colour","brightness","always_on","enabled"}  the LEDs (shown at once)
 POST /api/setup/tool {"tool": "picker"|"hotend"}  which tool is on the printer (TOOL_PICKER/_HOTEND)
 
 With accounts (the default), everything except the page itself and the session routes needs the
@@ -258,6 +259,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(r.setup_picker_type(str(self._body()["type"])))
         elif method == "POST" and path == "/api/setup/tool":
             self._json(r.setup_tool(str(self._body()["tool"])))
+        elif method == "POST" and path == "/api/setup/lights":
+            self._json(r.setup_lights(self._body()))
         elif method == "POST" and path == "/api/setup/picker/drop":
             self._json(r.setup_picker_drop(bool(self._body().get("lower"))))
         elif method == "POST" and path == "/api/setup/picker/offset":

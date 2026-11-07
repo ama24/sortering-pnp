@@ -75,6 +75,10 @@ td small{display:block;color:var(--mut);font-size:12.5px}
 #startup .re{align-self:flex-start;margin:3px 0 2px;background:none;border:1px solid var(--line);border-radius:6px;padding:1px 8px;font:inherit;font-size:12px;color:var(--mut);cursor:pointer;width:auto}#startup .re:hover{color:var(--ink);border-color:var(--mut)}#startup .re:disabled{opacity:.5;cursor:default}
 .bc{display:flex;flex-direction:column;gap:6px}.bc .row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bc .steps{font-size:12.5px;color:var(--mut)}.bc .steps b{color:var(--ink)}
 .bc ul{margin:0;padding:0 0 0 18px}.bc button:disabled{opacity:.6;cursor:default}
+.lights{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-start}.lpick{display:flex;gap:8px;align-items:center}
+.lpick input[type=color]{width:44px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}.lpick #lhex{width:86px;font-family:ui-monospace,monospace}
+.lsw{width:34px;height:34px;border-radius:50%;border:1px solid var(--line)}.lsl{display:grid;gap:4px;min-width:260px}
+.lrow{display:grid;grid-template-columns:70px 1fr 36px;gap:8px;align-items:center;font-size:13px}.lrow b{font-weight:600;text-align:right}
 .tag{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;background:var(--line2);color:var(--mut)}
 .tag.on{background:var(--acc-soft);color:var(--acc)}
 .stat{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2)}.stat:last-child{border:0}
@@ -735,11 +739,33 @@ function stepBody(st){const m=SU.machine||{},k=st.key,redo=st.done?` <button cla
  case "tip":return `<p class="note">Over the TPU sheet in the tray, jog the tip down until a sheet of paper just drags under it (0.1 mm steps at the end), then press <b>The tip touches the plate</b>. Every height counts from here; redo it when the picker or the Z switch moved.</p>
   <div class="row"><button class="b s" onclick="setupCall('api/setup/goto',{target:'centre'},'moving above the plate…','tip')">Above the plate</button>${jogPad("tip",false)}<button class="b p s" onclick="setupCall('api/calib/tip',{},'saving…','tip')">The tip touches the plate</button></div>
   <p class="note" style="margin:6px 0 0">tip offset now ${(SU.tip_offset_z>=0?"+":"")+(+SU.tip_offset_z||0).toFixed(2)} mm</p>`+redo;
+ case "lights":return lightsBody(st,redo);
  case "camera":return cameraBody(st,redo);
  case "layout":return `<p class="note">Put the baseplate, the tray and the bins on the bed (any place, turned any way), then <b>Find the bins</b>: one photo finds the grid, every bin and which way it faces, and makes the biggest bin the tray. The step ticks itself when nothing is wrong. Check the bed on <b>Device</b>.</p>
   <div class="row"><button class="b p s" onclick="stepScan()">Find the bins</button> <button class="b s" onclick="go('device')">Open Device</button></div>`+
   (LASTSCAN?`<p class="note" style="margin:6px 0 0">${LASTSCAN.found.length} bin(s) found${(LASTSCAN.problems||[]).length?`: <span class="bad">${LASTSCAN.problems.map(esc).join("; ")}</span>`:""}</p>`:"")+redo;
  }return "";}
+// ---------------------------------------------------------------- setup: lights (leds.py)
+function lightsBody(st,redo){const L=SU.lights||{},c=L.colour||"#ffffff",[r,g,b]=hexRgb(c),pct=Math.round((L.brightness==null?0.5:L.brightness)*100);
+ const sl=(id,lab,v,max)=>`<label class="lrow"><span>${lab}</span><input type="range" id="${id}" min="0" max="${max}" value="${v}" oninput="lightsInput('${id}')"><b id="${id}v">${v}</b></label>`;
+ if(!L.enabled)return `<p class="note" style="margin:0 0 8px">WS2812B: DIN → pin 19 (GPIO10), 5V → pin 2, GND → pin 6.</p><div class="row"><button class="b p s" onclick="setupCall('api/setup/lights',{enabled:true},'','lights')">Use lights</button> ${st.done?"":`<button class="b s" onclick="noLights()">No lights</button>`}</div>`+redo;
+ return `<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex')"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
+  <div class="lsl">${sl("lr","R",r,255)}${sl("lg","G",g,255)}${sl("lb","B",b,255)}${sl("lbr","Intensity",pct,100)}</div></div>
+  <div class="row" style="margin-top:8px"><label class="row note"><input type="checkbox" ${L.always_on?"checked":""} onchange="setupCall('api/setup/lights',{always_on:this.checked},'','lights')"> Always on</label>
+  <button class="b s" onclick="setupCall('api/setup/lights',{enabled:false},'','lights')">Off</button>
+  <span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span></div>
+  <div class="row" style="margin-top:8px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'lights'},'','lights')">OK</button>`}</div>`+redo;}
+function hexRgb(h){const s=(h||"#ffffff").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)||0);}
+function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>(+v).toString(16).padStart(2,"0")).join("");}
+let LSEND=null,LPEND={};
+function lightsInput(id){let c;
+ if(id==="lcol"||id==="lhex"){c=$(id).value.trim();if(!c.startsWith("#"))c="#"+c;if(!/^#[0-9a-f]{6}$/i.test(c)){flash("msg_lights","colour: #RRGGBB",1);return;}c=c.toLowerCase();const[r,g,b]=hexRgb(c);$("lr").value=r;$("lg").value=g;$("lb").value=b;}
+ else c=rgbHex($("lr").value,$("lg").value,$("lb").value);
+ for(const k of["lr","lg","lb","lbr"])$(k+"v").textContent=$(k).value;
+ $("lcol").value=c;$("lhex").value=c;const br=+$("lbr").value/100;$("lsw").style.background=c;$("lsw").style.opacity=0.25+0.75*br;
+ LPEND={colour:c,brightness:br};
+ if(!LSEND)LSEND=setTimeout(async()=>{LSEND=null;const body=LPEND;LPEND={};try{const j=await api("api/setup/lights",body);SU.lights=j.lights;}catch(e){flash("msg_lights",e.message,1);}},120);}
+async function noLights(){try{await api("api/setup/lights",{enabled:false});SU=await api("api/setup/confirm",{step:"lights"});renderSetup();}catch(e){flash("msg_lights",e.message,1);}}
 function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
  $("setupsum").innerHTML=SU.required?(left?`<b>${left}</b> step${left===1?"":"s"} to go.`:'<span class="ok">All done: the machine may sort.</span>'):"(Simulation: not required.)";
  $("steps").innerHTML=SU.steps.map((st,i)=>`<div class="card step"><span class="num ${st.done?"ok":""}">${st.done?"✓":i+1}</span><div><h3>${esc(st.title)}</h3><span class="note">${esc(st.goal)}${st.done?` · done ${esc(st.at||"")} ${esc(st.note||"")}`:""}</span></div><div class="body" style="margin-top:8px">${stepBody(st)}<p id="msg_${st.key}" class="note" style="margin:6px 0 0"></p></div></div>`).join("");}

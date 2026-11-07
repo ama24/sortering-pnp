@@ -42,6 +42,7 @@ Settings are in [configs/machine.yaml](../configs/machine.yaml) (each has a comm
 | A **picker** on the toolhead | servo tweezers, suction cup, magnet or pneumatic tweezers (see below), wired to the Pi; swappable with the hotend |
 | Gridfinity **baseplate** + **bins** | printed from the web page's *Print bins* tab |
 | A matte TPU plate in the working area | blue or green, as for the camera |
+| Addressable LEDs (optional) | a WS2812B ring round the lens, e.g. the Opulo LumenPnP top ring light (see below) |
 
 ### Picker
 
@@ -80,6 +81,33 @@ The old names still work: `vacuum` = `suction`; `gripper`, `tweezers` and `both`
 - **Where it aims:** a cup or a magnet goes onto the middle of the screw's head (seen from above);
   tweezers close on the shank at the centre of gravity. Headless parts are taken in the middle,
   nuts and washers at the centre of their outline.
+
+### Lights
+
+Addressable LEDs (WS2812B, 5 V; the Opulo LumenPnP ring has 8 and a 3-pin JST XH) are driven by
+sortering-pnp itself ([leds.py](../src/sortering_pnp/leds.py)), like the picker: nothing in
+Klipper and no extra package. The data goes out on the Pi's SPI0 MOSI, and the SPI hardware
+makes the LEDs' timing (each LED bit is 3 SPI bits at 2.4 MHz).
+
+| Ring | Pi header |
+|---|---|
+| 5V | pin 2 or 4 (5 V) |
+| GND | pin 6 (ground) |
+| DIN | pin 19 (GPIO10, SPI0 MOSI) |
+
+- **Set up:** `install-pi.sh` adds `dtparam=spi=on` and `core_freq_min=500` (a Pi 4's SPI clock
+  follows the core clock: fixed, the timing holds) to `/boot/firmware/config.txt` and puts you
+  in the `spi` group; reboot once. Then the Setup tab's **Lights** step (before the camera):
+  colour (picker, hex or R/G/B sliders), intensity, *Always on* (off: lit only while a photo is
+  taken, `lights.settle_s` before it). Every change shows on the LEDs at once and is kept in
+  `data/machine.json`. *No lights* completes the step on a machine without them.
+- **Level:** the Pi's 3.3 V data drives a short lead to WS2812B at 5 V in practice. If they
+  flicker or show wrong colours, put a 74AHCT125 level shifter in the data line (or a 1N4001
+  diode in the ring's 5 V lead, which lowers what it counts as high).
+- **Power:** 8 LEDs at full white take about 0.5 A, fine from the Pi's 5 V pin with the
+  official 3 A supply. For more LEDs, feed them from a 5 V buck converter on the 24 V supply,
+  grounds joined.
+- **Settings:** `lights:` in machine.yaml (count, colour order, SPI bus and device).
 
 ### Swappable tool
 
@@ -146,10 +174,12 @@ menu, until every step of the **Setup** tab is checked:
    another type un-checks the step.
 5. **Tip height:** in the step: *Above the plate*, the Z jog buttons and *The tip touches the
    plate* on one row. Checks itself.
-6. **Camera to printer:** in the step: *Take photo* (the codes circled on it and listed with
+6. **Lights:** colour and intensity of the LEDs (see [Lights](#lights)), shown at once; *OK*.
+   *No lights* when there are none. Before the camera: its photos are taken with them.
+7. **Camera to printer:** in the step: *Take photo* (the codes circled on it and listed with
    their bin size; no model needed), the jog pad, *Tip is here* per code, *Fit*. Checks itself
    when the worst error is under 1 mm.
-7. **Layout:** *Find the bins* (= Resync). Checks itself when the bins and a plate are found
+8. **Layout:** *Find the bins* (= Resync). Checks itself when the bins and a plate are found
    without problems.
 
 Until then the machine moves only when you ask it to in these steps. Jogging and the calibration
