@@ -273,28 +273,40 @@ def test_the_lens_looks_down_through_the_bracket_and_the_ring():
     assert lens_front(p) < parts["ring_bracket"].bounding_box()[2]
 
 
-def test_the_ring_sits_in_its_pocket_and_the_clamp_holds_it():
-    """The LumenPnP ring has no mounting holes: it lies in a pocket in the bracket's underside
-    (40 mm disc and its tab), and the clamp ring (or the diffuser) presses its edge in, clear of
-    the LEDs; 4 M2 go through clamp and bracket into the arm's legs."""
+def test_the_ring_is_sandwiched_between_the_bracket_and_the_clamp():
+    """The LumenPnP ring (40 mm, 19.9 mm hole) has no mounting holes: its back lies flat on the
+    bracket, a spigot in its hole centres it, and the clamp ring (or the diffuser) holds it in
+    a recess a little shallower than the board, pressing its edge, clear of the LEDs; 4 M2 go
+    through clamp and bracket into the arm's legs."""
     from manifold3d import Manifold
 
     from sortering_pnp.printables.mounts import ring_board, ring_parts_installed, ring_screws
 
     p = CameraArm(ring=True)
+    assert (p.ring_od, p.ring_id) == (40.0, 19.9)
     parts = ring_parts_installed(p)
     board = ring_board(p)
-    assert (parts["ring_bracket"] ^ board).volume() < 1e-3  # it fits the pocket
-    # and the pocket is snug: a ring 0.5 mm bigger would not fit
-    bigger = Manifold.cylinder(1.0, p.ring_od / 2 + 0.5, p.ring_od / 2 + 0.5, 96)
-    zb = parts["ring_bracket"].bounding_box()[2]
-    assert (parts["ring_bracket"] ^ bigger.translate([0, -p.reach, zb + 0.2])).volume() > 1.0
-    for name in ("ring_clamp", "ring_diffuser"):  # presses the edge, clear of the LEDs
+    bracket = parts["ring_bracket"]
+    assert (bracket ^ board).volume() < 1e-3  # it fits round the spigot
+    assert board.bounding_box()[5] == pytest.approx(bracket.bounding_box()[2] + p.ring_t - 0.4)
+    zb = board.bounding_box()[2]
+    centre = [0, -p.reach, zb + 0.2]
+    # the spigot centres it: a ring with a 0.5 mm smaller hole would not go on
+    small = Manifold.cylinder(1.0, 25.0, 25.0, 96) - Manifold.cylinder(
+        3.0, p.ring_id / 2 - 0.5, p.ring_id / 2 - 0.5, 96
+    ).translate([0, 0, -1])
+    assert (bracket ^ small.translate(centre)).volume() > 1.0
+    for name in ("ring_clamp", "ring_diffuser"):
         clamp = parts[name]
-        assert (clamp ^ board).volume() > 1.0, name
+        squeeze = (clamp ^ board).volume()  # presses the edge: the recess is shallower
+        assert 1.0 < squeeze < 40.0, name
+        assert (clamp ^ bracket).volume() < 1e-3, name
+        bigger = Manifold.cylinder(1.0, p.ring_od / 2 + 0.5, p.ring_od / 2 + 0.5, 96)
+        assert (clamp ^ bigger.translate(centre)).volume() > 1.0, name  # snug round the edge
         # the LEDs and their capacitors: from 10.4 mm (a capacitor near the tab) out
-        leds = _ring_annulus_at(p, 10.4, p.ring_parts_r, board.bounding_box()[2] - p.ring_led_h)
+        leds = _ring_annulus_at(p, 10.4, p.ring_parts_r, zb - p.ring_led_h)
         assert (clamp ^ leds).volume() < 1e-3, name
+    assert p.diffuser_t <= 0.6
     v, _ = _to_mesh(_camera_arm_installed(p))
     spots = ring_screws(p)
     assert all(_hole_centres(v, p.pilot_d / 2, spots, (0, 1)))  # a pilot in each leg

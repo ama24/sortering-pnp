@@ -12,10 +12,11 @@ and T-nuts (the screen holder M5, the camera arm M4 x 7):
   Module 2) under it, lens straight down at the bed's centre when the bed is all the way out
   (where a print ends: the photo position). The camera is as high as it can be, so it sees the
   most of the bed; `drop` adds a post down for a lower camera.
-- ring light (`CameraArm(ring=True)`): legs beside the camera hold a bracket under it with
-  the Opulo LumenPnP top ring light (a 40 mm disc, 20 mm hole, no mounting holes) in a pocket
-  in its underside, the lens looking down through both holes; a clamp ring or a diffuser
-  under the LEDs presses it in, the same 4 M2 screws through all of them into the legs.
+- ring light (`CameraArm(ring=True)`): legs beside the camera hold a bracket under it; the
+  Opulo LumenPnP top ring light (a 40 mm disc, 19.9 mm hole, no mounting holes) is sandwiched
+  between the bracket (flat, a spigot in the ring's hole centres it) and a clamp ring or a
+  diffuser (a recess for the board's edge and tab), the lens looking down through all of them;
+  the same 4 M2 screws go through them into the legs.
 
 Every size is a parameter: measure your printer and set them (prints/mounts/README.md).
 Both are built where they sit on the printer: x along the bar, y towards the back (the bar's
@@ -240,28 +241,28 @@ class CameraArm:
     lens_depth: float = 10.0  # the board's back to the lens' front (the module is 11.5 mm deep)
     lens_front_r: float = 2.5  # the lens' front opening: the field of view starts there
     # ring light: Opulo LumenPnP top ring light (PCB-0002, opulo-inc/lumenpnp src/PCB/ringLight)
-    ring_od: float = 40.0  # a 40 mm disc, 1.6 mm FR4, no mounting holes
-    ring_id: float = 20.0
+    ring_od: float = 40.0  # a 40 mm disc, 1.6 mm FR4, no mounting holes (measured)
+    ring_id: float = 19.9
     ring_t: float = 1.6
     ring_tab_w: float = 12.0  # the connector's tab: 12 mm wide, out to 30.25 mm from the centre
     ring_tab_reach: float = 30.25
     ring_parts_r: float = 18.6  # the 8 WS2812B and their capacitors lie inside this
     ring_led_h: float = 1.6  # WS2812B 5050: 1.6 mm high
-    ring_fit: float = 0.2  # pocket clearance all round
-    ring_pocket: float = 1.5  # pocket depth: the 1.6 mm board stands proud, the clamp presses it
+    ring_fit: float = 0.2  # clearance all round: the recess round the board, the spigot in it
+    ring_squeeze: float = 0.15  # the clamp's recess is this much shallower than the board
     ring_screw_dx: float = 25.0  # the 4 M2 through clamp, bracket and into the legs (r = 24 mm)
     ring_screw_dy: float = 41.0
     ring_screw_d: float = 2.4  # M2 clearance
     leg_r: float = 2.6
     leg_pilot: float = 9.0  # pilot depth in each leg
     bracket_gap: float = 3.0  # the board's front (lens side) to the bracket: its parts, screw heads
-    bracket_t: float = 2.4  # the bracket over the ring
+    bracket_t: float = 2.6  # the bracket over the ring (flat underneath, the ring against it)
     bracket_r: float = 27.0
     lens_hole_d: float = 15.0  # the lens unit goes through (up to 10.6 mm square)
     plug_slot: tuple[float, float, float] = (5.5, 24.6, 31.5)  # vertical JST XH: half width, radii
     clamp_t: float = 1.6
     clamp_lip: float = 1.2  # how far the clamp reaches over the ring's edge
-    diffuser_t: float = 1.0  # the light goes through this (white or clear PETG)
+    diffuser_t: float = 0.6  # the light goes through this: 3 layers of white or clear PETG
     diffuser_air: float = 0.8  # between the LEDs and the diffuser
     diffuser_wall: tuple[float, float] = (9.0, 10.3)  # inner baffle: keeps the glare off the lens
 
@@ -468,24 +469,30 @@ def _tab_notch(p: CameraArm, z0: float, z1: float) -> Manifold:
     return _box(-w, w, -p.bracket_r - 10.0, -17.0, z0, z1)
 
 
+def _recess_depth(p: CameraArm) -> float:
+    """How deep the clamp's (and the diffuser's) recess for the board is."""
+    return p.ring_t - p.ring_squeeze
+
+
 def _bracket_local(p: CameraArm) -> Manifold:
-    """Centred on the lens, z = 0 at its underside (the ring's pocket opens there)."""
-    h = p.bracket_t + p.ring_pocket
+    """Centred on the lens, z = 0 at its underside: flat, the ring's back against it, and a
+    short spigot down into the ring's hole that centres it."""
+    h = p.bracket_t
     tab_w, tab_r, fit = p.ring_tab_w / 2, p.ring_tab_reach, p.ring_fit
+    spigot_r = p.ring_id / 2 - fit
+    if spigot_r - p.lens_hole_d / 2 < 1.0:
+        raise ValueError("the ring's hole is too small for a spigot round the lens")
     body = _union(
         [
             Manifold.cylinder(h, p.bracket_r, p.bracket_r, RING_SEG),
             _rrect(-tab_w - fit - 2.4, tab_w + fit + 2.4, -tab_r - fit - 2.4, 0.0, 2.4, 0.0, h),
+            _ring_annulus(p.lens_hole_d / 2, spigot_r, -(p.ring_t - 0.4), 0.01),
         ]
     )
     sw, s0, s1 = p.plug_slot
     cuts = [
-        Manifold.cylinder(
-            p.ring_pocket + 1, p.ring_od / 2 + fit, p.ring_od / 2 + fit, RING_SEG
-        ).translate([0, 0, -1]),
-        _box(-tab_w - fit, tab_w + fit, -tab_r - fit, -p.ring_od / 2 + 1.0, -1.0, p.ring_pocket),
-        Manifold.cylinder(h + 2, p.lens_hole_d / 2, p.lens_hole_d / 2, RING_SEG).translate(
-            [0, 0, -1]
+        Manifold.cylinder(h + 4, p.lens_hole_d / 2, p.lens_hole_d / 2, RING_SEG).translate(
+            [0, 0, -3]
         ),
         _box(-sw, sw, -s1, -s0, -1.0, h + 1.0),  # the vertical plug goes up through here
     ] + [_cyl_z(p.ring_screw_d / 2, -1.0, h + 1.0, x, y) for x, y in _ring_local_screws(p)]
@@ -498,26 +505,42 @@ def _ring_annulus(r0: float, r1: float, z0: float, z1: float) -> Manifold:
     ).translate([0, 0, z0 - 1])
 
 
+def _board_recess(p: CameraArm) -> Manifold:
+    """Room for the board (its disc and tab) in the top of the clamp or diffuser."""
+    r, w, fit = p.ring_od / 2 + p.ring_fit, p.ring_tab_w / 2, p.ring_fit
+    d = _recess_depth(p)
+    return _union(
+        [
+            Manifold.cylinder(d + 1, r, r, RING_SEG).translate([0, 0, -d]),
+            _box(-w - fit, w + fit, -p.ring_tab_reach - fit, -p.ring_od / 2 + 1.0, -d, 1.0),
+        ]
+    )
+
+
 def _clamp_local(p: CameraArm, diffuser: bool) -> Manifold:
-    """Under the bracket (z = 0 its underside): a flat ring over the ring's edge, or the
-    diffuser, a shallow cup under the LEDs open in the middle for the lens."""
+    """Under the bracket (z = 0 its underside), the ring sandwiched between: a flat ring with
+    a recess for the board, pressing its edge, or the diffuser, a shallow cup under the LEDs
+    open in the middle for the lens."""
     r_in = p.ring_od / 2 - p.clamp_lip
     if r_in < p.ring_parts_r:
         raise ValueError("the clamp ring would press on the LEDs")
-    holes = [_cyl_z(p.ring_screw_d / 2, -10.0, 1.0, x, y) for x, y in _ring_local_screws(p)]
+    d = _recess_depth(p)
+    holes = [_cyl_z(p.ring_screw_d / 2, -20.0, 1.0, x, y) for x, y in _ring_local_screws(p)]
     if not diffuser:
-        ring = _ring_annulus(r_in, p.bracket_r, -p.clamp_t, 0.0)
-        return ring - _union([_tab_notch(p, -5.0, 1.0), *holes])
+        ring = _ring_annulus(r_in, p.bracket_r, -d - p.clamp_t, 0.0)
+        return ring - _union([_board_recess(p), _tab_notch(p, -10.0, 1.0), *holes])
     w0, w1 = p.diffuser_wall
-    air = p.ring_led_h + p.diffuser_air
-    cup = _ring_annulus(w0, p.bracket_r, -air - p.diffuser_t, 0.0)
-    recess = _ring_annulus(w1, r_in, -air, 1.0)
-    baffle_top = Manifold.cylinder(1.3, w1, w1, RING_SEG).translate([0, 0, -0.3])
-    return cup - _union([recess, baffle_top, _tab_notch(p, -10.0, 1.0), *holes])
+    below = d + p.ring_led_h + p.diffuser_air  # the window's top
+    cup = _ring_annulus(w0, p.bracket_r, -below - p.diffuser_t, 0.0)
+    leds = _ring_annulus(w1, r_in, -below, 1.0)
+    baffle_top = Manifold.cylinder(2.0 + p.ring_t, w1, w1, RING_SEG).translate(
+        [0, 0, -p.ring_t - 0.3]
+    )  # the baffle stops under the board's inner edge
+    return cup - _union([_board_recess(p), leds, baffle_top, _tab_notch(p, -20.0, 1.0), *holes])
 
 
 def _bracket_bottom(p: CameraArm) -> float:
-    return bracket_top(p) - p.bracket_t - p.ring_pocket
+    return bracket_top(p) - p.bracket_t
 
 
 def ring_parts_installed(p: CameraArm | None = None) -> dict[str, Manifold]:
@@ -532,17 +555,17 @@ def ring_parts_installed(p: CameraArm | None = None) -> dict[str, Manifold]:
 
 
 def ring_board(p: CameraArm | None = None) -> Manifold:
-    """Installed: the ring light's board (a model for the checks), pressed into its pocket."""
+    """Installed: the ring light's board (a model for the checks), its back on the bracket."""
     p = p or CameraArm(ring=True)
     t, w = p.ring_t, p.ring_tab_w / 2
     disc = _ring_annulus(p.ring_id / 2, p.ring_od / 2, 0.0, t) + _box(
         -w, w, -p.ring_tab_reach, -p.ring_od / 2 + 1.0, 0.0, t
     )
-    return disc.translate([0.0, -p.reach, _bracket_bottom(p) + p.ring_pocket - t])
+    return disc.translate([0.0, -p.reach, _bracket_bottom(p) - t])
 
 
 def build_ring_parts(p: CameraArm | None = None) -> dict[str, Mesh]:
-    """Print orientation: the bracket with its pocket up, the clamp and the diffuser flat
+    """Print orientation: the bracket with its spigot up, the clamp and the diffuser flat
     (the diffuser's window on the bed)."""
     parts = ring_parts_installed(p)
     return {
@@ -595,14 +618,16 @@ camera_arm.stl: the plate goes on the bar's front face, at the bar's centre: 2 x
   down, the flat cable towards the bar.
 
 camera_arm_ring.stl, ring_bracket.stl, ring_clamp.stl, ring_diffuser.stl: the same arm with a
-  ring light round the lens, the Opulo LumenPnP top ring light (a 40 mm disc with a 20 mm hole,
-  8 WS2812B LEDs, 1.6 mm thick, a 12 mm tab with a 3-pin JST XH; no mounting holes). From the
-  top down: the arm, the camera (screwed on as above), the bracket (lens through its
-  {lens_hole:g} mm hole), the ring in the bracket's underside (LEDs down, the tab forward, away
-  from the bar: a vertical plug goes up through the slot in front of the camera), and under it
-  the clamp ring or the diffuser, all held by 4 x M2 x {clamp_screw:g} (M2 x {diffuser_screw:g}
-  with the diffuser) through them and the bracket into the arm's legs ({legs_x:g} x {legs_y:g} mm
-  apart); the clamp presses the ring's edge into its pocket. The diffuser is optional: print
+  ring light round the lens, the Opulo LumenPnP top ring light (a 40 mm disc with a 19.9 mm
+  hole, 8 WS2812B LEDs, 1.6 mm thick, a 12 mm tab with a 3-pin JST XH; no mounting holes). From
+  the top down: the arm, the camera (screwed on as above), the bracket (lens through its
+  {lens_hole:g} mm hole), the ring, and the clamp ring or the diffuser: the ring is sandwiched
+  between the bracket (flat; a short spigot fits the ring's hole and centres it) and the clamp
+  or diffuser (a recess in its top takes the board and its tab). LEDs down, the tab forward,
+  away from the bar: a vertical plug goes up through the slot in front of the camera. All held
+  by 4 x M2 x {clamp_screw:g} (M2 x {diffuser_screw:g} with the diffuser) through them and the
+  bracket into the arm's legs ({legs_x:g} x {legs_y:g} mm apart); the recess is a little
+  shallower than the board, so the screws press it flat. The diffuser is optional: print
   it in white or clear PETG, its {dif_t:g} mm window lies under the LEDs, open in the middle
   so the camera sees past it. Nothing is in the camera's view (Camera Module 3, and the
   Wide one).
@@ -629,8 +654,9 @@ def mount_files(
     screen, arm = screen or ScreenHolder(), arm or CameraArm()
     plain, ringed = replace(arm, ring=False), replace(arm, ring=True)
     lens = -lens_position(arm)[2]
-    bracket = ringed.bracket_t + ringed.ring_pocket
-    cup = ringed.ring_led_h + ringed.diffuser_air + ringed.diffuser_t
+    bracket = ringed.bracket_t
+    depth = _recess_depth(ringed)
+    cup = depth + ringed.ring_led_h + ringed.diffuser_air + ringed.diffuser_t
     notes = MOUNT_NOTES.format(
         tilt=screen.tilt_deg,
         border=screen.border,
@@ -655,7 +681,7 @@ def mount_files(
         head=round(arm.head_d - 0.6, 1),
         screw_dx=arm.screw_dx,
         lens_hole=ringed.lens_hole_d,
-        clamp_screw=_m2_length(ringed.clamp_t + bracket, ringed),
+        clamp_screw=_m2_length(depth + ringed.clamp_t + bracket, ringed),
         diffuser_screw=_m2_length(cup + bracket, ringed),
         legs_x=ringed.ring_screw_dx,
         legs_y=ringed.ring_screw_dy,
