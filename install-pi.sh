@@ -45,22 +45,28 @@ sudo apt-get install -y python3-venv python3-picamera2 rpicam-apps git libgl1 \
 REBOOT=0
 CFGTXT=/boot/firmware/config.txt
 [ -f "$CFGTXT" ] || CFGTXT=/boot/config.txt
-PWM_LINE="dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4"
-if [ -f "$CFGTXT" ] && ! grep -q "^dtoverlay=pwm-2chan" "$CFGTXT"; then
-  say "hardware PWM for the picker's servos ($CFGTXT)"
-  echo "$PWM_LINE" | sudo tee -a "$CFGTXT" >/dev/null
+cfg_line() {  # cfg_line <start> <line>: add <line> to config.txt unless a line starts with <start>
+  [ -f "$CFGTXT" ] || return 0
+  grep -q "^$1" "$CFGTXT" && return 0
+  # config.txt may end in a filtered section ([pi4], [cm5], ...): ours go under [all]
+  if [ "$(grep -E '^\[' "$CFGTXT" | tail -n 1)" != "[all]" ]; then
+    printf '\n[all]\n' | sudo tee -a "$CFGTXT" >/dev/null
+  fi
+  echo "$2" | sudo tee -a "$CFGTXT" >/dev/null
   REBOOT=1
+}
+if [ ! -f "$CFGTXT" ]; then
+  echo "WARNING: no config.txt found: add dtparam=spi=on and the pwm-2chan overlay by hand"
 fi
+say "hardware PWM for the picker's servos, SPI for the LEDs ($CFGTXT)"
+cfg_line "dtoverlay=pwm-2chan" "dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4"
 # the LEDs (WS2812B on GPIO10, SPI0 MOSI): SPI on, and the Pi 4's core clock fixed so the SPI
 # clock (and so the LEDs' timing) does not drift with the CPU's speed.
-if [ -f "$CFGTXT" ] && ! grep -q "^dtparam=spi=on" "$CFGTXT"; then
-  say "SPI for the LEDs ($CFGTXT)"
-  echo "dtparam=spi=on" | sudo tee -a "$CFGTXT" >/dev/null
-  REBOOT=1
-fi
-if [ -f "$CFGTXT" ] && ! grep -q "^core_freq_min=" "$CFGTXT"; then
-  echo "core_freq_min=500" | sudo tee -a "$CFGTXT" >/dev/null
-  REBOOT=1
+cfg_line "dtparam=spi=on" "dtparam=spi=on"
+cfg_line "core_freq_min=" "core_freq_min=500"
+# SPI at once too (the reboot still fixes the clock): /dev/spidev0.0 appears now
+if [ ! -e /dev/spidev0.0 ] && command -v dtparam >/dev/null; then
+  sudo dtparam spi=on || true
 fi
 if ! id -nG "$USER" | grep -qw gpio; then
   sudo usermod -aG gpio "$USER"   # the pins without sudo
@@ -126,5 +132,5 @@ Done. Next:
 EOF
 if [ "$REBOOT" = 1 ]; then
   echo
-  echo "Reboot once (sudo reboot): the picker's pins are ready after it."
+  echo "Reboot once (sudo reboot): the picker's pins and the LEDs (SPI) are ready after it."
 fi

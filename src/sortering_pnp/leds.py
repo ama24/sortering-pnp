@@ -94,7 +94,7 @@ class SpiLeds:
 
     def status(self) -> tuple[bool, str]:
         if not self.path.exists():
-            return False, f"{self.path} missing: run install-pi.sh (turns SPI on), then reboot"
+            return False, f"{self.path} missing: run install-pi.sh, then sudo reboot (SPI)"
         if not os.access(self.path, os.W_OK):
             return False, f"no access to {self.path}: install-pi.sh adds you to the spi group"
         return True, f"{self.cfg.count} LEDs on GPIO10 (pin 19)"
