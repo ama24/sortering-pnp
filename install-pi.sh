@@ -51,8 +51,23 @@ if [ -f "$CFGTXT" ] && ! grep -q "^dtoverlay=pwm-2chan" "$CFGTXT"; then
   echo "$PWM_LINE" | sudo tee -a "$CFGTXT" >/dev/null
   REBOOT=1
 fi
+# the LEDs (WS2812B on GPIO10, SPI0 MOSI): SPI on, and the Pi 4's core clock fixed so the SPI
+# clock (and so the LEDs' timing) does not drift with the CPU's speed.
+if [ -f "$CFGTXT" ] && ! grep -q "^dtparam=spi=on" "$CFGTXT"; then
+  say "SPI for the LEDs ($CFGTXT)"
+  echo "dtparam=spi=on" | sudo tee -a "$CFGTXT" >/dev/null
+  REBOOT=1
+fi
+if [ -f "$CFGTXT" ] && ! grep -q "^core_freq_min=" "$CFGTXT"; then
+  echo "core_freq_min=500" | sudo tee -a "$CFGTXT" >/dev/null
+  REBOOT=1
+fi
 if ! id -nG "$USER" | grep -qw gpio; then
   sudo usermod -aG gpio "$USER"   # the pins without sudo
+  REBOOT=1
+fi
+if getent group spi >/dev/null && ! id -nG "$USER" | grep -qw spi; then
+  sudo usermod -aG spi "$USER"    # the LEDs without sudo
   REBOOT=1
 fi
 

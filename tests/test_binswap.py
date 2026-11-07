@@ -125,7 +125,7 @@ def test_ok_while_idle_checks_the_bins(machine):
     runner.printer.gcode("G28")  # the OK checks with a photo: the printer is homed
     runner.requests.append(BinRequest(104, "E1", "full", "B", 30))
     runner.bin_counts[104] = 30
-    assert runner.command("ok") == "change the bins, then press Change bin again"
+    assert runner.command("ok") == "parked: change the bins, then Done"
     assert runner.command("ok") == "bin E1 emptied: it starts again"
     assert runner.requests == [] and 104 not in runner.bin_counts
 

@@ -85,7 +85,7 @@ another repository.
   start/step/auto on a real printer until it's complete. Setup moves call
   `preflight(home=False)`, so only *Home now* and sorting ever home, and they need no picker.
   Order: printer, homing, machine (then the head goes to `printer.change_position`), picker (OK =
-  TOOL_PICKER), tip, camera, layout; tip height and camera to printer are done in their steps.
+  TOOL_PICKER), tip, lights (or "no lights"), camera, layout; tip height and camera to printer are done in their steps.
   Photos for calibration and Resync need no model (`CameraVision.analyse` reads only the codes
   then); sorting does. Machine values from the page go to `paths.machine`, over machine.yaml.
 - **Picker pins:** `pins.py`. sortering-pnp switches the Pi's own pins itself (gpiozero for a
@@ -93,6 +93,10 @@ another repository.
   install). Motion sends `M400` before `grab`/`release`; `off()` on stop, error, e-stop and exit.
   The simulator has `SimPins`. Tweezers on a stepper turn through a Klipper macro
   (`picker.rotate_macro`).
+- **Lights:** `leds.py`. Addressable LEDs (WS2812B ring) on the Pi's SPI MOSI (GPIO10, pin 19),
+  written to /dev/spidev0.0 with the standard library (3 SPI bits per LED bit at 2.4 MHz);
+  `SimLeds` in the simulator. Lit always or only for photos (`Lights.for_photo`); the Setup
+  tab's Lights step sets colour and brightness (kept in `paths.machine`).
 - **Grip:** `grip.py`. Screws: axis and centre of mass from the three keypoints (head_top,
   bearing, tip) plus head sizes from parts.json (`vision.shapes_from_parts`); the grip point is
   on the shank. Other parts: area moments of the outline. `Part.grip_bed` is where the tool goes;

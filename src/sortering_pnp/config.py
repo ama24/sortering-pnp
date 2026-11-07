@@ -108,6 +108,22 @@ class Camera:
 
 
 @dataclass
+class Lights:
+    """Addressable LEDs (WS2812B, e.g. the LumenPnP ring) on the Pi's SPI MOSI, GPIO10 (pin 19):
+    leds.py. Set in the Setup tab (Lights); machine.json keeps what is chosen there."""
+
+    enabled: bool = False  # there are lights (Setup tab: Lights)
+    count: int = 8  # LEDs in the chain (the LumenPnP ring: 8)
+    colour: str = "#ffffff"  # #RRGGBB
+    brightness: float = 0.5  # 0..1 (8 LEDs at full white: about 0.5 A from the Pi's 5 V)
+    always_on: bool = True  # on while sortering-pnp runs (False: only while a photo is taken)
+    settle_s: float = 0.3  # only for photos: lit this long before the photo (exposure)
+    order: str = "GRB"  # the colour order the LEDs expect (WS2812B: GRB)
+    spi_bus: int = 0  # /dev/spidev<bus>.<device>: SPI0 MOSI is GPIO10
+    spi_device: int = 0
+
+
+@dataclass
 class YMotion:
     """Gentle bed moves (Y on a bed-slinger): loose parts lie on the bed. Klipper has one
     acceleration for all axes, so it is lowered for each move that moves Y and set back after."""
@@ -258,6 +274,7 @@ class Web:
 class Machine:
     paths: Paths = field(default_factory=Paths)
     camera: Camera = field(default_factory=Camera)
+    lights: Lights = field(default_factory=Lights)
     printer: Printer = field(default_factory=Printer)
     tool: Tool = field(default_factory=Tool)
     picker: Picker = field(default_factory=Picker)
@@ -297,6 +314,14 @@ class Machine:
             parse_colour(self.camera.mask_colour)
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
+        li = self.lights
+        if sorted(li.order.upper()) != ["B", "G", "R"]:
+            raise ConfigError("lights.order must be RGB, GRB, ... (each letter once)")
+        if not 0 <= li.brightness <= 1 or li.count < 1:
+            raise ConfigError("lights: brightness 0..1, count at least 1")
+        s = li.colour.strip().lstrip("#")
+        if len(s) != 6 or any(c not in "0123456789abcdefABCDEF" for c in s):
+            raise ConfigError(f"lights.colour must be #RRGGBB, got {li.colour!r}")
         if self.camera.source not in ("overview", "head"):
             raise ConfigError("camera.source must be overview or head")
         a = self.camera.adjust

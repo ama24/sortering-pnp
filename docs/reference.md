@@ -42,6 +42,7 @@ Settings are in [configs/machine.yaml](../configs/machine.yaml) (each has a comm
 | A **picker** on the toolhead | servo tweezers, suction cup, magnet or pneumatic tweezers (see below), wired to the Pi; swappable with the hotend |
 | Gridfinity **baseplate** + **bins** | printed from the web page's *Print bins* tab |
 | A matte TPU plate in the working area | blue or green, as for the camera |
+| Addressable LEDs (optional) | a WS2812B ring round the lens, e.g. the Opulo LumenPnP top ring light (see below) |
 
 ### Picker
 
@@ -80,6 +81,33 @@ The old names still work: `vacuum` = `suction`; `gripper`, `tweezers` and `both`
 - **Where it aims:** a cup or a magnet goes onto the middle of the screw's head (seen from above);
   tweezers close on the shank at the centre of gravity. Headless parts are taken in the middle,
   nuts and washers at the centre of their outline.
+
+### Lights
+
+Addressable LEDs (WS2812B, 5 V; the Opulo LumenPnP ring has 8 and a 3-pin JST XH) are driven by
+sortering-pnp itself ([leds.py](../src/sortering_pnp/leds.py)), like the picker: nothing in
+Klipper and no extra package. The data goes out on the Pi's SPI0 MOSI, and the SPI hardware
+makes the LEDs' timing (each LED bit is 3 SPI bits at 2.4 MHz).
+
+| Ring | Pi header |
+|---|---|
+| 5V | pin 2 or 4 (5 V) |
+| GND | pin 6 (ground) |
+| DIN | pin 19 (GPIO10, SPI0 MOSI) |
+
+- **Set up:** `install-pi.sh` adds `dtparam=spi=on` and `core_freq_min=500` (a Pi 4's SPI clock
+  follows the core clock: fixed, the timing holds) to `/boot/firmware/config.txt` and puts you
+  in the `spi` group; reboot once. Then the Setup tab's **Lights** step (before the camera):
+  colour (picker, hex or R/G/B sliders), intensity, *Always on* (off: lit only while a photo is
+  taken, `lights.settle_s` before it). Every change shows on the LEDs at once and is kept in
+  `data/machine.json`. *No lights* completes the step on a machine without them.
+- **Level:** the Pi's 3.3 V data drives a short lead to WS2812B at 5 V in practice. If they
+  flicker or show wrong colours, put a 74AHCT125 level shifter in the data line (or a 1N4001
+  diode in the ring's 5 V lead, which lowers what it counts as high).
+- **Power:** 8 LEDs at full white take about 0.5 A, fine from the Pi's 5 V pin with the
+  official 3 A supply. For more LEDs, feed them from a 5 V buck converter on the 24 V supply,
+  grounds joined.
+- **Settings:** `lights:` in machine.yaml (count, colour order, SPI bus and device).
 
 ### Swappable tool
 
@@ -146,10 +174,12 @@ menu, until every step of the **Setup** tab is checked:
    another type un-checks the step.
 5. **Tip height:** in the step: *Go to centre* (over the plate), the Z jog buttons and *Set
    height* on one row. Checks itself.
-6. **Camera to printer:** in the step: *Take photo* (the codes circled on it and listed with
+6. **Lights:** colour and intensity of the LEDs (see [Lights](#lights)), shown at once; *OK*.
+   *No lights* when there are none. Before the camera: its photos are taken with them.
+7. **Camera to printer:** in the step: *Take photo* (the codes circled on it and listed with
    their bin size; no model needed), the jog pad, *Tip is here* per code, *Fit*. Checks itself
    when the worst error is under 1 mm.
-7. **Layout:** *Find bins* (= Resync). Checks itself when the bins and a plate are found
+8. **Layout:** *Find bins* (= Resync). Checks itself when the bins and a plate are found
    without problems.
 
 Until then the machine moves only when you ask it to in these steps. Jogging and the calibration
@@ -402,19 +432,27 @@ machine never stops for it: it keeps sorting everything else. When only the wait
 left, it waits, and still looks at the tray every `standby.interval_s`: parts thrown in
 meanwhile are sorted. The requests are kept across a restart.
 
-**Change bin** takes two presses, next to the bed on the page or with **Change bin** in the printer menu:
-1. **Change bin E1:** the machine finishes its move and parks (bed out, safe for
-   your hands);
-2. empty the bin, or put another (empty) bin in its place, then **Bin E1 changed**. The next
-   photo checks what stands there now, and sorting goes on:
+All bin changes are in one banner at the top of the Device tab, with one button that steps
+through them (or **Change bin** in the printer menu):
+1. **Park:** the machine finishes its move and parks (bed out, safe for your hands); also
+   while automatic mode stands by;
+2. empty the bins, or put other (empty) bins in their place;
+3. **Done:** a photo checks what stands there now, and sorting goes on:
 - **the same code:** the bin was emptied; its count starts again, a wild bin is free again;
 - **another code:** a different bin stands there; it becomes a wild bin (or takes up its old
   rules, if it was used before). The old bin is kept aside with what it holds: put it back
   later and its count and contents come back with it;
 - **no code:** the cell is empty; the old bin is kept aside the same way.
 
-Change bin also works when the machine is not sorting: the first press only confirms, the second
-takes a photo and does the same check.
+Change bin also works when the machine is not sorting: Park moves the bed out (when it is
+homed), Done takes a photo and does the same check. A bin's menu on the bed has **Change**
+(ask for it), **Full** and **Emptied**.
+
+**Buttons that act at once:** Recheck, Resync and Change bin don't wait for the run to end:
+the run (or automatic mode) stops after the move in progress, the action is done, and
+automatic mode carries on if it was on. Every photo shows on the Device tab as soon as it is
+taken, before the model has looked at it, with the bins' codes and their cells; in automatic
+mode the camera counts down to the next photo.
 
 ## Strategies and picking order
 
@@ -556,8 +594,8 @@ off, camera unplugged…) it switches itself off and says why on the page.
 ## The start-up check
 
 The first run after sortering-pnp starts (Automatic, Sort once or One pick; also automatic
-mode carrying on after a restart) begins with a check, shown with a tick per step at the top
-of the Device tab (**Check again** runs it alone). It is `run.startup_check`:
+mode carrying on after a restart) begins with a check, shown with a tick per step
+in the left menu, under Device (**Recheck** runs it alone, also while sorting). It is `run.startup_check`:
 1. **Homing**, with the usual checks before moving.
 2. **Layout check:** one photo of the bins, then a resync: where the grid and every bin stand.
    The tray stays the bin it was.

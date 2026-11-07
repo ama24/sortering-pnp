@@ -25,15 +25,17 @@ camera_arm.stl: the plate goes on the bar's front face, at the bar's centre: 2 x
   down, the flat cable towards the bar.
 
 camera_arm_ring.stl, ring_bracket.stl, ring_clamp.stl, ring_diffuser.stl: the same arm with a
-  ring light round the lens, the Opulo LumenPnP top ring light (a 40 mm disc with a 20 mm hole,
-  8 WS2812B LEDs, 1.6 mm thick, a 12 mm tab with a 3-pin JST XH; no mounting holes). From the
-  top down: the arm, the camera (screwed on as above), the bracket (lens through its
-  15 mm hole), the ring in the bracket's underside (LEDs down, the tab forward, away
-  from the bar: a vertical plug goes up through the slot in front of the camera), and under it
-  the clamp ring or the diffuser, all held by 4 x M2 x 10 (M2 x 12
-  with the diffuser) through them and the bracket into the arm's legs (25 x 41 mm
-  apart); the clamp presses the ring's edge into its pocket. The diffuser is optional: print
-  it in white or clear PETG, its 1 mm window lies under the LEDs, open in the middle
+  ring light round the lens, the Opulo LumenPnP top ring light (a 40 mm disc with a 19.9 mm
+  hole, 8 WS2812B LEDs, 1.6 mm thick, a 12 mm tab with a 3-pin JST XH; no mounting holes). From
+  the top down: the arm, the camera (screwed on as above), the bracket (lens through its
+  15 mm hole), the ring, and the clamp ring or the diffuser: the ring is sandwiched
+  between the bracket (flat; a short spigot fits the ring's hole and centres it) and the clamp
+  or diffuser (a recess in its top takes the board and its tab). LEDs down, the tab forward,
+  away from the bar: a vertical plug goes up through the slot in front of the camera. All held
+  by 4 x M3 x 12 (M3 x 16 with the diffuser) through them and the
+  bracket into the arm's legs (24.4 x 41 mm apart); the recess is a little
+  shallower than the board, so the screws press it flat. The diffuser is optional: print
+  it in white or clear PETG, its 0.6 mm window lies under the LEDs, open in the middle
   so the camera sees past it. Nothing is in the camera's view (Camera Module 3, and the
   Wide one).
 

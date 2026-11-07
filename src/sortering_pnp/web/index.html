@@ -70,12 +70,18 @@ td small{display:block;color:var(--mut);font-size:12.5px}
 #events{font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--mut);max-height:240px;overflow:auto;white-space:pre-wrap}
 #console{font:12.5px/1.7 ui-monospace,Menlo,Consolas,monospace;background:#fbfbf9;border:1px solid var(--line2);border-radius:var(--r2);padding:10px 12px;height:220px;overflow:auto;white-space:pre-wrap;color:var(--ink)}
 #console .t{color:var(--soft);margin-right:8px}
-#startup{padding:12px 18px}#startup .sulist{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:flex-start;margin:6px 0 0}
-#startup .su{display:flex;gap:8px;align-items:flex-start;min-width:150px;max-width:340px}#startup .su b{font-weight:600}
-#startup .mk{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--line2);color:var(--mut)}
-#startup .done .mk{background:var(--ok);color:#fff}#startup .failed .mk{background:var(--bad);color:#fff}#startup .skipped .mk{background:var(--warn-soft);color:var(--warn)}
-#startup .running .mk{background:var(--acc-soft);color:var(--acc);animation:supulse 1s ease-in-out infinite}@keyframes supulse{50%{opacity:.45}}
-#startup .det{font-size:12.5px;color:var(--mut);line-height:1.35}
+#startup{display:flex;flex-direction:column;gap:1px;margin:2px 0 0 22px;padding-left:10px;border-left:1px solid var(--line)}
+#startup .su{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--mut);padding:2px 0;cursor:default}
+#startup .mk{flex:none;width:15px;height:15px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;background:var(--line2);color:var(--mut)}
+#startup .done{color:var(--ink)}#startup .done .mk{background:var(--ok);color:#fff}#startup .failed{color:var(--bad)}#startup .failed .mk{background:var(--bad);color:#fff}
+#startup .skipped .mk{background:var(--warn-soft);color:var(--warn)}#startup .running{color:var(--acc)}#startup .running .mk{background:var(--acc-soft);color:var(--acc);animation:supulse 1s ease-in-out infinite}@keyframes supulse{50%{opacity:.45}}
+#startup .re{align-self:flex-start;margin:3px 0 2px;background:none;border:1px solid var(--line);border-radius:6px;padding:1px 8px;font:inherit;font-size:12px;color:var(--mut);cursor:pointer;width:auto}#startup .re:hover{color:var(--ink);border-color:var(--mut)}#startup .re:disabled{opacity:.5;cursor:default}
+.bc{display:flex;flex-direction:column;gap:6px}.bc .row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bc .steps{font-size:12.5px;color:var(--mut)}.bc .steps b{color:var(--ink)}
+.bc ul{margin:0;padding:0 0 0 18px}.bc button:disabled{opacity:.6;cursor:default}
+.lights{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-start}.lpick{display:flex;gap:8px;align-items:center}
+.lpick input[type=color]{width:44px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}.lpick #lhex{width:86px;font-family:ui-monospace,monospace}
+.lsw{width:34px;height:34px;border-radius:50%;border:1px solid var(--line)}.lsl{display:grid;gap:4px;min-width:260px}
+.lrow{display:grid;grid-template-columns:70px 1fr 36px;gap:8px;align-items:center;font-size:13px}.lrow b{font-weight:600;text-align:right}
 .tag{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;background:var(--line2);color:var(--mut)}
 .tag.on{background:var(--acc-soft);color:var(--acc)}
 .stat{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2)}.stat:last-child{border:0}
@@ -230,7 +236,7 @@ button.p{font-weight:600}button.big{padding:11px 18px}
 <aside class="side">
  <div class="brand"><span class="logo"><i></i><i></i><i></i><i></i></span><span class="bl"><b>sortering-pnp</b><small id="machname">pick-and-place sorter</small></span></div>
  <nav aria-label="Sections">
-  <div class="ngroup"><span class="glabel">Operate</span><button data-t="device" class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Device</span><span id="devbadge" class="badge" hidden></span></button></div>
+  <div class="ngroup"><span class="glabel">Operate</span><button data-t="device" class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Device</span><span id="devbadge" class="badge" hidden></span></button><div id="startup" aria-label="Start-up check"></div></div>
   <div class="ngroup"><span class="glabel">Prepare</span><button data-t="setup"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Setup</span><span id="setupbadge" class="badge" hidden></span></button><button data-t="calib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span>Camera Calibration</span></button><button data-t="print"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg><span>Print bins</span></button></div>
   <div class="ngroup"><span class="glabel">Library</span><button data-t="models"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 5-9 5-9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/></svg><span>Models</span></button><button data-t="files"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Files</span></button><button data-t="photos"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Real photos</span></button></div>
   <div class="ngroup"><span class="glabel">Admin</span><button data-t="users"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6M17 11a3 3 0 1 0 0-6M22 20c0-2.6-1.7-4.6-4-5.4"/></svg><span>Users</span></button></div>
@@ -265,11 +271,10 @@ button.p{font-weight:600}button.big{padding:11px 18px}
  <div class="phead"><div class="pt"><h1>Device</h1><p>The tray, the bins and what the machine does, live</p><div id="msg" class="note"></div></div>
   <div class="acts"><button class="b p big" onclick="cmd('auto')" title="Standby: looks for parts every minute and sorts them, until Stop. Stays on after a restart.">Automatic</button><button class="b big" onclick="cmd('start')">Sort once</button><button class="b big" onclick="cmd('step')">One pick</button><button class="b big" onclick="cmd('pause')">Pause</button><button class="b big" onclick="cmd('resume')">Resume</button><button class="b big" onclick="cmd('stop')">Stop</button></div></div>
  <div id="attn"></div>
- <div id="startup" class="card"></div>
  <div class="dgrid">
   <div class="card dcard">
    <div class="chead"><h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Camera</h2><span class="note" id="camnote"></span>
-    <span class="seg sm"><label><input type="checkbox" id="showlab" checked onchange="drawOverlay()">names</label><label><input type="checkbox" id="showout" checked onchange="drawOverlay()">outlines</label></span></div>
+    <span class="seg sm"><label><input type="checkbox" id="showlab" checked onchange="drawOverlay()">names</label><label><input type="checkbox" id="showout" checked onchange="drawOverlay()">outlines</label><label><input type="checkbox" id="showcode" checked onchange="drawOverlay()">codes</label></span></div>
    <div class="camwrap"><img id="view" alt="" onload="drawOverlay()"><svg id="ov"></svg><div id="camempty" class="empty"><span>No photo yet: press <b>One pick</b> or <b>Sort once</b>.</span></div></div>
    <div id="target" class="tline"></div>
   </div>
@@ -428,14 +433,14 @@ async function changePw(){try{await api("api/users/password",{old:$("oldpw").val
 async function cmd(c){try{const j=await api("api/command",{command:c,strategy:$("strategy").value});flash("msg",j.result);}catch(e){flash("msg",e.message,1);}poll();}
 async function binFull(m){closeMenu();try{const j=await api("api/bins/full",{marker:m});Object.assign(S,j);flash("laymsg","noted: it is asked to be changed, and the estimates learn from it");poll();}catch(e){flash("laymsg",e.message,1);}}
 async function emptied(m){closeMenu();try{const j=await api("api/bins/emptied",{marker:m});Object.assign(S,j);renderBed();}catch(e){flash("laymsg",e.message,1);}}
-async function askChange(m){closeMenu();try{const j=await api("api/bins/change",{marker:m});Object.assign(S,j);poll();}catch(e){flash("laymsg",e.message,1);}}
+async function askChange(m){closeMenu();try{const j=await api("api/bins/change",{marker:m});Object.assign(S,j);renderAttention();poll();}catch(e){flash("laymsg",e.message,1);}}
 function readyMap(){const r={};for(const x of S.ready||[])r[x.marker]=x;return r;}
 function swapMap(){const r={};for(const x of S.requests||[])r[x.marker]=x;return r;}
 let shownView="";
 async function poll(){try{S=await api("api/state");}catch(e){$("status").innerHTML='<span class="dot bad"></span>no connection';return;}
  const cls={running:"ok",done:"ok",standby:"ok",error:"bad",stuck:"warn",waiting:"warn",parked:"warn",paused:"warn",stopping:"warn"}[S.status]||"";
  $("status").innerHTML=`<span class="dot ${cls}"></span><b>${esc(S.status)}</b>${S.auto?" · automatic":""}${S.driver==="sim"?" · simulation":""}`;
- NEXT=S.next_look_s==null?null:Date.now()+S.next_look_s*1000;
+ NEXT=S.next_look_s==null?null:Date.now()+S.next_look_s*1000;SHOT_T=S.shot_age_s==null?null:Date.now()-S.shot_age_s*1000;
  $("msg").textContent=live(S.message);renderStartup();
  const st=$("strategy");if(!st.options.length){for(const[k,v]of Object.entries(S.strategies)){const o=document.createElement("option");o.value=k;o.textContent=v;st.appendChild(o);}st.value=S.strategy;}
  const img=S.view||S.shot;if(img&&img!==shownView){shownView=img;$("view").src="runs/"+encodeURIComponent(img);}
@@ -447,19 +452,24 @@ async function poll(){try{S=await api("api/state");}catch(e){$("status").innerHT
  $("nowline").textContent=(["running","waiting","parked","stopping"].includes(S.status)?S.phase||S.message:live(S.message))||"";
  renderAttention();
  if(!pending.length&&++layTick%3===0)loadLayout(true);else renderBed();}
-let layTick=0,NEXT=null;
+let layTick=0,NEXT=null,SHOT_T=null;
+function mmss(s){return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
+function camNote(){const n=(S.parts||[]).filter(p=>p.in_work!==false).length,el=$("camnote");if(!el)return;
+ if(!S.view){el.textContent="";return;}
+ const t=NEXT!=null?`next photo in ${mmss(Math.max(0,Math.round((NEXT-Date.now())/1000)))}`:SHOT_T!=null?ago(Math.round((Date.now()-SHOT_T)/1000)):"";
+ el.textContent=`${n} part${n===1?"":"s"}`+(t?` · ${t}`:"");}
+function ago(s){return s<5?"just now":s<60?`${s} s ago`:s<3600?`${Math.floor(s/60)} min ago`:"";}
 // automatic mode: "next look in 45 s", counted down here between polls
 function live(t){if(NEXT==null||!t)return t;const s=Math.max(0,Math.round((NEXT-Date.now())/1000));
  return t.replace(/next look in \d+ s/,"next look in "+(s>=60?`${Math.floor(s/60)} min ${String(s%60).padStart(2,"0")} s`:`${s} s`));}
-setInterval(()=>{if(NEXT!=null&&S){$("msg").textContent=live(S.message);renderActivity();$("nowline").textContent=live(S.message);}},1000);
+setInterval(()=>{if(S)camNote();if(NEXT!=null&&S){$("msg").textContent=live(S.message);renderActivity();$("nowline").textContent=live(S.message);}},1000);
 // the start-up check (startup.py): homing, layout check, bins check, ready
 function renderStartup(){const su=S.startup||{},steps=su.steps||[],box=$("startup");if(!box)return;
- const icon={done:"✓",failed:"✗",skipped:"–",running:"…",pending:""},run=steps.some(s=>s.state==="running");
- const head=!su.started?"Not checked since sortering-pnp started: the check runs by itself on the first Automatic, Sort once or One pick":
-  run?"Checking…":su.finished?`Done at ${new Date(su.finished*1000).toLocaleTimeString()}`:"Stopped: see the step marked ✗";
- box.innerHTML=`<div class="chead" style="margin:0"><h2 style="font-size:15px">Start-up check</h2><span class="note">${esc(head)}</span><span class="grow"></span>`+
-  `<button class="b s" onclick="cmd('startup')" ${run?"disabled":""} title="Home, resync the bins, and look into every bin: one with parts collects their kind, an empty one is a free wild bin">${su.started?"Check again":"Check now"}</button></div>`+
-  `<div class="sulist">${steps.map((s,i)=>`<div class="su ${s.state}"><span class="mk">${icon[s.state]||i+1}</span><div><b>${esc(s.label)}</b>${s.detail?`<div class="det">${esc(s.detail)}</div>`:""}</div></div>`).join("")}</div>`;}
+ const icon={done:"✓",failed:"✗",skipped:"–",running:"•",pending:""},run=steps.some(s=>s.state==="running");
+ const html=steps.map(s=>`<div class="su ${s.state}" title="${esc(s.detail||(su.started?"":"runs on the first start"))}"><span class="mk">${icon[s.state]||""}</span>${esc(s.label)}</div>`).join("")+
+  `<button class="re" onclick="recheck()" ${run?"disabled":""}>${run?"Checking…":"Recheck"}</button>`;
+ if(box.innerHTML!==html)box.innerHTML=html;}
+async function recheck(){go("device");await cmd("startup");}
 setInterval(()=>{if(!$("login").classList.contains("on"))poll();},1500);session();loadLayout(true);
 
 // ---------------------------------------------------------------- device: camera
@@ -480,8 +490,11 @@ function drawOverlay(){const svg=$("ov"),im=$("view"),H=S.view_h;
   const x0=Math.min(...xs)-m,y0=Math.min(...ys)-m,x1=Math.max(...xs)+m,y1=Math.max(...ys)+m,lab=`next: ${T.name}${T.cell?" → "+T.cell:""}`,lw2=lab.length*fs*0.68+fs,lx=Math.max(0,Math.min(x0,W-lw2)),ly=y1+fs*1.9>Hh?y0-fs*1.75:y1+fs*0.3;
   s+=`<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" rx="${fs*0.4}" fill="none" stroke="#fff" stroke-width="${lw*4}"/><rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" rx="${fs*0.4}" fill="none" stroke="#c8462c" stroke-width="${lw*2.2}"/>`+
    `<rect x="${lx}" y="${ly}" width="${lw2}" height="${fs*1.45}" rx="${fs*0.35}" fill="#c8462c"/><text x="${lx+fs*0.5}" y="${ly+fs*1.03}" font-size="${fs*1.05}" font-weight="700" fill="#fff">${esc(lab)}</text>`;}
+ if($("showcode").checked)for(const mk of S.markers||[]){if(!mk.plate)continue;const[x,y]=mapPt(H,mk.plate[0],mk.plate[1]);if(x<0||y<0||x>W||y>Hh)continue;
+  const lab=mk.cell?`${mk.marker} · ${mk.cell}`:String(mk.marker),w=lab.length*fs*0.62+fs*0.7;
+  s+=`<g><circle cx="${x}" cy="${y}" r="${fs*0.35}" fill="#1d4ed8" stroke="#fff" stroke-width="${lw}"/><rect x="${x+fs*0.5}" y="${y-fs*0.75}" width="${w}" height="${fs*1.4}" rx="${fs*0.3}" fill="#1d4ed8" opacity=".9"/><text x="${x+fs*0.85}" y="${y+fs*0.32}" font-size="${fs}" font-weight="600" fill="#fff">${esc(lab)}</text></g>`;}
  svg.innerHTML=s;
- const n=parts.length;$("camnote").textContent=S.view?`${n} part${n===1?"":"s"} in the tray · ${S.view.slice(9,11)}:${S.view.slice(11,13)}:${S.view.slice(13,15)}`:"";
+ camNote();
  $("target").innerHTML=T?`Next: <b>${esc(T.name)}</b>${T.cell?` into bin <b>${esc(T.cell)}</b> (${T.bin})`:""}`:(S.plan?esc(S.plan):"");}
 
 // ---------------------------------------------------------------- device: statistics and activity
@@ -548,7 +561,14 @@ const WARN_ICO='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stro
 function renderAttention(){const reqs=S.requests||[],parked=S.swap_phase==="parked",su=S.setup||{},left=(su.missing||[]).length;
  const why=x=>x.why==="full"?"is full":x.why==="asked"?"is to be changed":`is needed for ${esc(x.for_kind||"a new kind")}`;
  $("attn").innerHTML=(su.required&&left?`<div class="attn w">${WARN_ICO}<span class="tx"><b>Setup is not finished</b> <span>· ${left} step${left===1?"":"s"} left: ${esc((su.missing||[]).join(", "))}. Until then the machine only moves when you ask.</span></span><button onclick="go('setup')">Open Setup</button></div>`:"")+
-  reqs.map(x=>`<div class="attn w">${WARN_ICO}<span class="tx"><b>Bin ${esc(x.cell)} ${why(x)}</b> <span>· ${esc(x.what)} · ${x.count} part${x.count===1?"":"s"}. ${parked?"The machine is parked: change the bin, then press the button.":"The machine keeps sorting everything else."}</span></span><button onclick="cmd('change')">${parked?`Bin ${esc(x.cell)} changed`:`Change bin ${esc(x.cell)}`}</button></div>`).join("");}
+  binChange(reqs);}
+// bin changes: 1 Park, 2 swap or empty them by hand, 3 Done (a photo checks them)
+function binChange(reqs){const ph=S.swap_phase||"";if(!reqs.length&&!ph)return "";
+ const why=x=>x.why==="full"?"full":x.why==="asked"?"change":`for ${esc(x.for_kind||"a new kind")}`;
+ const step=ph==="parked"?2:ph==="parking"?1:0,lab=["Park","Parking…","Done"][step];
+ const st=["Park","Swap or empty","Done"].map((t,i)=>i===step?`<b>${i+1} ${t}</b>`:`${i+1} ${t}`).join(" · ");
+ return `<div class="attn w bc">${WARN_ICO}<span class="tx"><b>Bin change</b><ul>${reqs.map(x=>`<li><b>${esc(x.cell)}</b> ${why(x)} · ${esc(x.what)} (${x.count})</li>`).join("")||"<li>bins of your choice</li>"}</ul><span class="steps">${st}</span></span>`+
+  `<button onclick="cmd('change')" ${step===1?"disabled":""}>${lab}</button></div>`;}
 function renderBedBar(){const reqs=S.requests||[],parked=S.swap_phase==="parked",L=draft;
  const cell=m=>{const b=L&&L.bins.find(b=>b.marker===m);return b?cellName(b.x,b.y):String(m);};
  $("bedbar").innerHTML=
@@ -561,12 +581,12 @@ function showMenu(html,e){const m=$("menu");m.innerHTML=html;m.hidden=false;cons
 function binMenu(m,e){const b=draft.bins.find(b=>b.marker===m);if(!b)return;const f=(S.fill||{})[m]||{},claim=(S.claims||{})[m],q=swapMap()[m],r=readyMap()[m],n=f.count||0;
  const what=b.role==="work"?"the tray":claim||b.label||b.holds.join(", ")||(b.role==="wild"?"free wild bin":b.role);
  showMenu(`<div class="mh"><b>${cellName(b.x,b.y)} · bin ${m}</b><br>${esc(what)}${n?` · ${n} part${n===1?"":"s"}${f.share!=null&&b.role!=="work"?`, ~${Math.round(Math.min(1,f.share)*100)} % full`:""}`:""}</div>`+
-  (q?`<button class="warnb" onclick="closeMenu();cmd('change')">${S.swap_phase==="parked"?"Bin changed: check it":"Change bin "+esc(q.cell)+" now"}</button>`:(b.role!=="work"?`<button onclick="askChange(${m})">Change bin (empty or swap it)…</button>`:""))+
+  (q?`<div class="mh">Change asked: see the top of the page</div>`:(b.role!=="work"?`<button onclick="askChange(${m})">Change</button>`:""))+
   `<button onclick="editBin(${m})">Edit role, rules, size…</button>`+
   (b.role!=="work"?`<button onclick="makeTray(${m})">Make it the tray</button>`:"")+
   `<button onclick="turnBin(${m})">Turn 90°</button>`+
-  (n&&b.role!=="work"?`<button onclick="binFull(${m})">It is full (teach the estimate)</button>`:"")+
-  (n||claim||r?`<button onclick="emptied(${m})">Emptied</button>`:"")+
+  (n&&b.role!=="work"&&!q?`<button onclick="binFull(${m})" title="It is full now: change it, and learn how full a bin gets">Full</button>`:"")+
+  ((n||claim||r)&&!q?`<button onclick="emptied(${m})" title="You emptied it: its count starts again">Emptied</button>`:"")+
   `<div class="sep"></div><a href="api/print/bin?marker=${m}&fmt=3mf" onclick="closeMenu()">Print this bin (3MF)</a>`+
   `<button class="warnb" onclick="removeBin(${m})">Take it off the layout</button>`,e);}
 let addCorner=false;
@@ -586,7 +606,7 @@ function makeTray(m){closeMenu();for(const o of draft.bins)if(o.role==="work")o.
 async function applyChanges(){try{const j=await api("api/layout",{layout:draft});lay=j.layout;draft=JSON.parse(JSON.stringify(lay));const n=pending.length;pending=[];showProblems(j.problems);
  flash("laymsg",(j.problems.length?"applied, but see the problems above":`${n} change${n===1?"":"s"} applied`)+(["running","waiting","parked"].includes(S.status)?": used from the next pick":""));renderBed();renderPrint();}catch(e){flash("laymsg",e.message,1);}}
 function discard(){pending=[];draft=JSON.parse(JSON.stringify(lay));flash("laymsg","changes discarded");renderBed();}
-async function scan(){if(pending.length&&!confirm("Resync replaces the queued changes. Go on?"))return;pending=[];flash("laymsg","taking a photo…");try{const j=await api("api/scan",{});await loadLayout();showProblems(j.problems);
+async function scan(){if(pending.length&&!confirm("Resync replaces the queued changes. Go on?"))return;pending=[];flash("laymsg","taking a photo…");try{const j=await api("api/scan",{});if(j.queued){flash("laymsg",j.queued);poll();return;}await loadLayout();showProblems(j.problems);
  const wb=lay.bins.find(b=>b.marker===j.work);flash("laymsg",`${j.found.length} bin(s) · grid at ${j.origin.map(v=>v.toFixed(1)).join(", ")} · tray: ${wb?`bin ${wb.marker} (${wb.w}×${wb.d})${j.work_auto?", the biggest":", your choice"}`:"none"}`+(j.removed.length?` · not seen: ${j.removed.join(", ")}`:""));}catch(e){flash("laymsg",e.message,1);}}
 // dialogs
 function modal(title,body,ok){$("mtitle").textContent=title;$("mbody").innerHTML=body;$("mok").onclick=()=>{if(ok()!==false)closeModal();};$("modal").hidden=false;}
@@ -720,11 +740,33 @@ function stepBody(st){const m=SU.machine||{},k=st.key,redo=st.done?` <button cla
  case "tip":return `<p class="note">Over the TPU sheet in the tray, jog the tip down until a sheet of paper just drags under it (0.1 mm steps at the end), then <b>Set height</b>. Every height counts from here; redo it when the picker or the Z switch moved.</p>
   <div class="row"><button class="b s" onclick="setupCall('api/setup/goto',{target:'centre'},'moving to the plate centre…','tip')">Go to centre</button>${jogPad("tip",false)}<button class="b p s" onclick="setupCall('api/calib/tip',{},'saving…','tip')">Set height</button></div>
   <p class="note" style="margin:6px 0 0">tip offset now ${(SU.tip_offset_z>=0?"+":"")+(+SU.tip_offset_z||0).toFixed(2)} mm</p>`+redo;
+ case "lights":return lightsBody(st,redo);
  case "camera":return cameraBody(st,redo);
  case "layout":return `<p class="note">Put the baseplate, the tray and the bins on the bed (any place, turned any way), then <b>Find bins</b>: one photo finds the grid and every bin; the biggest is the tray.</p>
   <div class="row"><button class="b p s" onclick="stepScan()">Find bins</button> <button class="b s" onclick="go('device')">Device</button></div>`+
   (LASTSCAN?`<p class="note" style="margin:6px 0 0">${LASTSCAN.found.length} bin(s) found${(LASTSCAN.problems||[]).length?`: <span class="bad">${LASTSCAN.problems.map(esc).join("; ")}</span>`:""}</p>`:"")+redo;
  }return "";}
+// ---------------------------------------------------------------- setup: lights (leds.py)
+function lightsBody(st,redo){const L=SU.lights||{},c=L.colour||"#ffffff",[r,g,b]=hexRgb(c),pct=Math.round((L.brightness==null?0.5:L.brightness)*100);
+ const sl=(id,lab,v,max)=>`<label class="lrow"><span>${lab}</span><input type="range" id="${id}" min="0" max="${max}" value="${v}" oninput="lightsInput('${id}')"><b id="${id}v">${v}</b></label>`;
+ if(!L.enabled)return `<p class="note" style="margin:0 0 8px">WS2812B: DIN → pin 19 (GPIO10), 5V → pin 2, GND → pin 6.</p><div class="row"><button class="b p s" onclick="setupCall('api/setup/lights',{enabled:true},'','lights')">Use lights</button> ${st.done?"":`<button class="b s" onclick="noLights()">No lights</button>`}</div>`+redo;
+ return `<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex')"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
+  <div class="lsl">${sl("lr","R",r,255)}${sl("lg","G",g,255)}${sl("lb","B",b,255)}${sl("lbr","Intensity",pct,100)}</div></div>
+  <div class="row" style="margin-top:8px"><label class="row note"><input type="checkbox" ${L.always_on?"checked":""} onchange="setupCall('api/setup/lights',{always_on:this.checked},'','lights')"> Always on</label>
+  <button class="b s" onclick="setupCall('api/setup/lights',{enabled:false},'','lights')">Off</button>
+  <span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span></div>
+  <div class="row" style="margin-top:8px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'lights'},'','lights')">OK</button>`}</div>`+redo;}
+function hexRgb(h){const s=(h||"#ffffff").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)||0);}
+function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>(+v).toString(16).padStart(2,"0")).join("");}
+let LSEND=null,LPEND={};
+function lightsInput(id){let c;
+ if(id==="lcol"||id==="lhex"){c=$(id).value.trim();if(!c.startsWith("#"))c="#"+c;if(!/^#[0-9a-f]{6}$/i.test(c)){flash("msg_lights","colour: #RRGGBB",1);return;}c=c.toLowerCase();const[r,g,b]=hexRgb(c);$("lr").value=r;$("lg").value=g;$("lb").value=b;}
+ else c=rgbHex($("lr").value,$("lg").value,$("lb").value);
+ for(const k of["lr","lg","lb","lbr"])$(k+"v").textContent=$(k).value;
+ $("lcol").value=c;$("lhex").value=c;const br=+$("lbr").value/100;$("lsw").style.background=c;$("lsw").style.opacity=0.25+0.75*br;
+ LPEND={colour:c,brightness:br};
+ if(!LSEND)LSEND=setTimeout(async()=>{LSEND=null;const body=LPEND;LPEND={};try{const j=await api("api/setup/lights",body);SU.lights=j.lights;}catch(e){flash("msg_lights",e.message,1);}},120);}
+async function noLights(){try{await api("api/setup/lights",{enabled:false});SU=await api("api/setup/confirm",{step:"lights"});renderSetup();}catch(e){flash("msg_lights",e.message,1);}}
 function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
  $("setupsum").innerHTML=SU.required?(left?`<b>${left}</b> step${left===1?"":"s"} to go.`:'<span class="ok">All done: the machine may sort.</span>'):"(Simulation: not required.)";
  $("steps").innerHTML=SU.steps.map((st,i)=>`<div class="card step"><span class="num ${st.done?"ok":""}">${st.done?"✓":i+1}</span><div><h3>${esc(st.title)}</h3><span class="note">${esc(st.goal)}${st.done?` · done ${esc(st.at||"")} ${esc(st.note||"")}`:""}</span></div><div class="body" style="margin-top:8px">${stepBody(st)}<p id="msg_${st.key}" class="note" style="margin:6px 0 0"></p></div></div>`).join("");}
