@@ -816,6 +816,7 @@ class Runner:
             if self._ok.is_set():  # a bin was changed: this photo shows what stands there now
                 self._ok.clear()
                 self._resolve_requests(layout, shot, T)
+                self._add_seen_bins(layout, shot, T)  # also bins put anywhere else
                 planner.claims = self.claims
                 prev = None
             with self._claims_lock:
@@ -858,6 +859,9 @@ class Runner:
                 self.note(plan.note)
                 self.say(plan.note)
             self._ask_bins(planner, layout, shot.parts)
+            if plan.kind == "wait_bin" and self._look_for_bins(layout, T):
+                prev = None  # an empty bin turned up (not seen before): plan again with it
+                continue
             if plan.kind == "wait_bin":  # everything else is sorted: only a bin change helps
                 asked = "; ".join(r.text() for r in self.requests) or plan.reason
                 if asked != waiting_for:  # say it once, not on every look
@@ -1555,6 +1559,41 @@ class Runner:
             nb = layout.place_from_marker(marker, centre, yaw)
             moved.append({"marker": marker, "x": nb.x, "y": nb.y, "rot": nb.rot, "new": not known})
         return moved
+
+    def _look_for_bins(self, layout: Layout, T: Transform2D) -> bool:
+        """Waiting for a bin: a photo of the bins first. A bin this run left out (its code was
+        covered at the start), back from aside or new is used at once; True when one was."""
+        shot = self.take_shot(layout, T, area="bins", paint=False)
+        return bool(self._add_seen_bins(layout, shot, T))
+
+    def _add_seen_bins(self, layout: Layout, shot: Shot, T: Transform2D) -> list[str]:
+        """Bins in the photo that the run's `layout` does not have: added to it (and to the
+        saved layout), new codes as wild bins. Bin changes asked for a new kind are dropped:
+        they are asked again if still needed. Returns the cells added."""
+        disk = self.layout()
+        added: list[str] = []
+        for marker, centre, yaw in self._seen_bins(layout, shot, T):
+            if marker == layout.work_marker or layout.bin_by_marker(marker) is not None:
+                continue
+            trial = Layout.from_dict(layout.to_dict())
+            trial.place_from_marker(marker, centre, yaw)
+            if trial.problems():  # e.g. on top of a bin the run still counts on
+                continue
+            layout.place_from_marker(marker, centre, yaw)
+            disk.place_from_marker(marker, centre, yaw)
+            b = layout.bin_by_marker(marker)
+            added.append(f"{layout.bin_name(b)} ({marker}, {b.role})" if b else str(marker))
+        if not added:
+            return []
+        if not disk.problems():
+            disk.save(self.layout_path)
+        with self._claims_lock:
+            self.requests = [r for r in self.requests if r.why != "new_kind"]
+            self._save_claims()
+        text = "bins seen now, used from here on: " + ", ".join(added)
+        self.note(text)
+        self.say(text)
+        return added
 
     def _seen_bins(
         self, layout: Layout, shot: Shot, T: Transform2D

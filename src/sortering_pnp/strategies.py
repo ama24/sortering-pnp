@@ -82,7 +82,10 @@ class Planner:
         if self.strategy == "sort":
             run = self.machine.run
             ask = run.when_no_bin == "ask"
-            return destination(p, self.layout, run.min_score, self.claims, self.full, ask), None
+            dec = destination(
+                p, self.layout, run.min_score, self.claims, self.full, ask, run.share_wild
+            )
+            return dec, None
         if self.strategy == "clear":
             b = next((b for b in self.layout.bins if b.role == "all"), None) or next(
                 (b for b in self.layout.bins if b.role == "overflow"), None

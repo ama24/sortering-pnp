@@ -111,6 +111,7 @@ run:
     catalogue: true            # exact volumes from items.json (Files tab), when there is one
     learn: true                # Full on a bin teaches how densely its family packs
   when_no_bin: ask             # a new kind, no free wild bin: ask for a bin change | overflow
+  share_wild: class            # ... but first share a wild bin: class (other length) | family | none
   check_emptied: true          # after a bin change, parts still seen in a bin are counted
 
 standby:                       # automatic mode

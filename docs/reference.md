@@ -330,9 +330,12 @@ machine could move complete bins aside by itself.
 (`run.scan_bins_on_start`):
 - bins that moved are updated in the layout;
 - markers the layout doesn't know join as new **wild** bins;
-- bins the camera can't see (covered, removed) are not used in that run (`run.only_seen_bins`).
+- bins the camera can't see (covered, removed) are left out of the run (`run.only_seen_bins`)
+  until it sees them: when a part waits for a bin, and after every bin change, it photographs
+  the bins again, and a bin seen then (uncovered, put back, or new, anywhere on the grid) is
+  used from that moment ("bins seen now, used from here on: B5 ...").
 
-So you can put a new printed bin on the bed and it's used straight away.
+So you can put a new printed bin on the bed and it's used straight away, even mid-run.
 
 ## How full the bins are
 
@@ -367,7 +370,11 @@ empty one. The camera may miss parts hidden by the walls.
 
 The machine asks for a bin change when
 - a bin is **full** (see above): its kind carries on in a free wild bin if there is one;
-- a **new kind** needs a bin and no wild bin is free (`run.when_no_bin: ask`; `overflow`
+- a **new kind** needs a bin and no wild bin is free, and no wild bin collects a kind like it.
+  `run.share_wild: class` (the default) first puts a new length in with its class: with no
+  free bin, DIN912_M3x10 goes into the bin collecting DIN912_M3x8 ("in with DIN912_M3x8");
+  `family` also shares across sizes (DIN912_M4 in with DIN912_M3x8), `none` never shares.
+  Only when that fails (`run.when_no_bin: ask`; `overflow`
   sends it to the overflow bin instead, as before). When there is no bin it could ask for
   (every wild bin already asked for), that kind goes to the overflow bin; without one it
   waits. It chooses the bin to give up: a bin
