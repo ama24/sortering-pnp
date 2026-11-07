@@ -97,6 +97,7 @@ run:
   order: census                # census: biggest kind first, finish it, back to a kind that turns up again | largest_group | nearest
   scan_bins_on_start: true     # find the bins with the camera when a run starts (new markers = wild bins)
   only_seen_bins: true         # use only the bins the camera sees in that first photo
+  startup_check: true          # first run after a start: home, resync, look into the bins (Device tab)
   shake:
     enabled: true              # shake the bed to spread clumps when nothing can be picked
     axis: Y                    # Y for bed-slingers (Ender 3, Prusa MK3)

@@ -2,7 +2,7 @@
 
 GET  /                      the page
 GET  /api/state             sorter state, latest picture, parts, events
-POST /api/command           {"command": start|step|pause|resume|stop|estop, "strategy": ...}
+POST /api/command           {"command": start|step|auto|startup|pause|resume|stop|estop, ...}
 GET  /api/layout            layout + problems;  POST /api/layout  save a layout
 POST /api/scan              photo -> move bins to where their markers are
 POST /api/calib/photo       photo -> markers;   POST /api/calib/record {"marker": id}

@@ -26,6 +26,7 @@ def machine(tmp_path: Path) -> Machine:
     m.paths.setup = "setup.json"
     m.paths.machine = "machine.json"
     m.paths.captures = "captures"
+    m.run.startup_check = False  # tests that want it (test_startup.py) turn it on
     m.paths.sessions = "real"
     m.printer.driver = "sim"
     m.printer.photo_position = [0.0, 200.0, 60.0]

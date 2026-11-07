@@ -67,6 +67,12 @@ td small{display:block;color:var(--mut);font-size:12.5px}
 #events{font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--mut);max-height:240px;overflow:auto;white-space:pre-wrap}
 #console{font:12.5px/1.7 ui-monospace,Menlo,Consolas,monospace;background:#fbfbf9;border:1px solid var(--line2);border-radius:var(--r2);padding:10px 12px;height:220px;overflow:auto;white-space:pre-wrap;color:var(--ink)}
 #console .t{color:var(--soft);margin-right:8px}
+#startup{padding:12px 18px}#startup .sulist{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:flex-start;margin:6px 0 0}
+#startup .su{display:flex;gap:8px;align-items:flex-start;min-width:150px;max-width:340px}#startup .su b{font-weight:600}
+#startup .mk{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--line2);color:var(--mut)}
+#startup .done .mk{background:var(--ok);color:#fff}#startup .failed .mk{background:var(--bad);color:#fff}#startup .skipped .mk{background:var(--warn-soft);color:var(--warn)}
+#startup .running .mk{background:var(--acc-soft);color:var(--acc);animation:supulse 1s ease-in-out infinite}@keyframes supulse{50%{opacity:.45}}
+#startup .det{font-size:12.5px;color:var(--mut);line-height:1.35}
 .tag{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;background:var(--line2);color:var(--mut)}
 .tag.on{background:var(--acc-soft);color:var(--acc)}
 .stat{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2)}.stat:last-child{border:0}
@@ -256,6 +262,7 @@ button.p{font-weight:600}button.big{padding:11px 18px}
  <div class="phead"><div class="pt"><h1>Device</h1><p>The tray, the bins and what the machine does, live</p><div id="msg" class="note"></div></div>
   <div class="acts"><button class="b p big" onclick="cmd('auto')" title="Standby: looks for parts every minute and sorts them, until Stop. Stays on after a restart.">Automatic</button><button class="b big" onclick="cmd('start')">Sort once</button><button class="b big" onclick="cmd('step')">One pick</button><button class="b big" onclick="cmd('pause')">Pause</button><button class="b big" onclick="cmd('resume')">Resume</button><button class="b big" onclick="cmd('stop')">Stop</button></div></div>
  <div id="attn"></div>
+ <div id="startup" class="card"></div>
  <div class="dgrid">
   <div class="card dcard">
    <div class="chead"><h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Camera</h2><span class="note" id="camnote"></span>
@@ -427,7 +434,8 @@ let shownView="";
 async function poll(){try{S=await api("api/state");}catch(e){$("status").innerHTML='<span class="dot bad"></span>no connection';return;}
  const cls={running:"ok",done:"ok",standby:"ok",error:"bad",stuck:"warn",waiting:"warn",parked:"warn",paused:"warn",stopping:"warn"}[S.status]||"";
  $("status").innerHTML=`<span class="dot ${cls}"></span><b>${esc(S.status)}</b>${S.auto?" · automatic":""}${S.driver==="sim"?" · simulation":""}`;
- $("msg").textContent=S.message;
+ NEXT=S.next_look_s==null?null:Date.now()+S.next_look_s*1000;
+ $("msg").textContent=live(S.message);renderStartup();
  const st=$("strategy");if(!st.options.length){for(const[k,v]of Object.entries(S.strategies)){const o=document.createElement("option");o.value=k;o.textContent=v;st.appendChild(o);}st.value=S.strategy;}
  const img=S.view||S.shot;if(img&&img!==shownView){shownView=img;$("view").src="runs/"+encodeURIComponent(img);}
  $("camempty").hidden=!!img;drawOverlay();renderStats();renderActivity();
@@ -435,10 +443,22 @@ async function poll(){try{S=await api("api/state");}catch(e){$("status").innerHT
 
  const nreq=(S.requests||[]).length;$("devbadge").hidden=!nreq;$("devbadge").textContent=nreq;
  $("machname").textContent=S.driver==="sim"?"simulated printer":"Klipper printer";
- $("nowline").textContent=(["running","waiting","parked","standby","stopping"].includes(S.status)?S.phase||S.message:S.message)||"";
+ $("nowline").textContent=(["running","waiting","parked","stopping"].includes(S.status)?S.phase||S.message:live(S.message))||"";
  renderAttention();
  if(!pending.length&&++layTick%3===0)loadLayout(true);else renderBed();}
-let layTick=0;
+let layTick=0,NEXT=null;
+// automatic mode: "next look in 45 s", counted down here between polls
+function live(t){if(NEXT==null||!t)return t;const s=Math.max(0,Math.round((NEXT-Date.now())/1000));
+ return t.replace(/next look in \d+ s/,"next look in "+(s>=60?`${Math.floor(s/60)} min ${String(s%60).padStart(2,"0")} s`:`${s} s`));}
+setInterval(()=>{if(NEXT!=null&&S){$("msg").textContent=live(S.message);renderActivity();$("nowline").textContent=live(S.message);}},1000);
+// the start-up check (startup.py): homing, layout check, bins check, ready
+function renderStartup(){const su=S.startup||{},steps=su.steps||[],box=$("startup");if(!box)return;
+ const icon={done:"✓",failed:"✗",skipped:"–",running:"…",pending:""},run=steps.some(s=>s.state==="running");
+ const head=!su.started?"Not checked since sortering-pnp started: the check runs by itself on the first Automatic, Sort once or One pick":
+  run?"Checking…":su.finished?`Done at ${new Date(su.finished*1000).toLocaleTimeString()}`:"Stopped: see the step marked ✗";
+ box.innerHTML=`<div class="chead" style="margin:0"><h2 style="font-size:15px">Start-up check</h2><span class="note">${esc(head)}</span><span class="grow"></span>`+
+  `<button class="b s" onclick="cmd('startup')" ${run?"disabled":""} title="Home, resync the bins, and look into every bin: one with parts collects their kind, an empty one is a free wild bin">${su.started?"Check again":"Check now"}</button></div>`+
+  `<div class="sulist">${steps.map((s,i)=>`<div class="su ${s.state}"><span class="mk">${icon[s.state]||i+1}</span><div><b>${esc(s.label)}</b>${s.detail?`<div class="det">${esc(s.detail)}</div>`:""}</div></div>`).join("")}</div>`;}
 setInterval(()=>{if(!$("login").classList.contains("on"))poll();},1500);session();loadLayout(true);
 
 // ---------------------------------------------------------------- device: camera
@@ -473,7 +493,7 @@ function renderStats(){const parts=(S.parts||[]).filter(p=>p.in_work!==false),by
  $("statnote").textContent=`${parts.length} part${parts.length===1?"":"s"}`+(S.picks?` · ${S.picks} sorted this run`:"")+(S.failed_picks?` · ${S.failed_picks} missed`:"");}
 function renderActivity(){const busy=["running","waiting","parked","stopping"].includes(S.status);
  const cls={running:"ok",standby:"ok",error:"bad",stuck:"warn",waiting:"warn",parked:"warn",paused:"warn"}[S.status]||"";
- $("now").innerHTML=`<span class="dot ${cls}"></span><span>${esc(busy||S.status==="standby"?(S.phase||S.message):S.message)}</span>`;
+ $("now").innerHTML=`<span class="dot ${cls}"></span><span>${esc(busy?(S.phase||S.message):live(S.message))}</span>`;
  const T=S.timing||{};$("actnote").textContent=T.cycle_s?`last cycle ${T.cycle_s} s`:"";
  const con=$("console"),atEnd=con.scrollTop+con.clientHeight>=con.scrollHeight-8;
  con.innerHTML=(S.console||[]).map(l=>`<div><span class="t">${esc(l.slice(0,8))}</span>${esc(l.slice(9))}</div>`).join("")||'<span class="note">nothing yet</span>';
