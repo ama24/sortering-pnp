@@ -1432,6 +1432,25 @@ class Runner:
             self.printer.gcode("M400")
         return [round(x, 2), round(y, 2), round(z, 2)]
 
+    def goto_point(self, marker: int) -> list[float]:
+        """Move tip here: back to where the tip was recorded for `marker` (Tip is here), 2 mm
+        above the code, to see whether the point was taken on its centre."""
+        self._idle()
+        pair = next((p for p in self.calib_pairs if p["marker"] == marker), None)
+        if pair is None:
+            raise PrinterError(f"no point recorded for code {marker}: Tip is here first")
+        layout = self.layout()
+        b = layout.bin_by_marker(marker)
+        x, y = (float(v) for v in pair["bed"])
+        z = layout.marker_z(b.height_u if b else 3) + 2.0
+        with self._lock:
+            self.motion.preflight(home=False)
+            self.motion.travel(x, y)
+            self.motion.move(z=z)
+            self.printer.gcode("M400")
+        self.say(f"tip over the point recorded for code {marker}")
+        return [round(x, 2), round(y, 2), round(z, 2)]
+
     def scan_bins(self) -> dict[str, Any]:
         """Photo, then put every bin whose marker is seen where it really is. While the sorter
         runs it stops first (after the move in progress) and carries on afterwards."""

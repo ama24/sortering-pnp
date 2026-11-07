@@ -179,7 +179,7 @@ menu, until every step of the **Setup** tab is checked:
 6. **Lights:** colour and intensity of the LEDs (see [Lights](#lights)), shown at once; *OK*.
    *No lights* when there are none. Before the camera: its photos are taken with them.
 7. **Camera to printer:** in the step: *Take photo* (the codes circled on it and listed with
-   their bin size; no model needed), the jog pad, *Tip is here* per code, *Fit*. Checks itself
+   their bin size; no model needed), the jog pad, *Tip is here* per code (then *Move tip here* goes back to that point), *Fit*. Checks itself
    when the worst error is under 1 mm.
 8. **Layout:** *Find bins* (= Resync). Checks itself when the bins and a plate are found
    without problems.
