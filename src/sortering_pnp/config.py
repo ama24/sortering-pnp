@@ -193,6 +193,9 @@ class Run:
     keep_photos: int = 300  # keep this many photos in the runs folder (0 = keep all)
     scan_bins_on_start: bool = True  # find the bins with the camera when a run starts
     only_seen_bins: bool = True  # use only the bins the camera sees (covered ones are skipped)
+    # the first run after sortering-pnp starts: home, resync, and look into the bins (a bin
+    # with parts collects their kind, an empty one is a free wild bin): startup.py
+    startup_check: bool = True
     # census: the most numerous kind first, finished before the next, and back to a kind
     # done earlier when more of it turns up | largest_group: the biggest on each photo | nearest
     order: str = "census"

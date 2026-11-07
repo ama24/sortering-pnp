@@ -22,6 +22,7 @@ Settings are in [configs/machine.yaml](../configs/machine.yaml) (each has a comm
 - [One cycle: photo, pick, drop, park](#one-cycle-photo-pick-drop-park)
 - [Gentle bed moves](#gentle-bed-moves)
 - [Automatic mode](#automatic-mode)
+- [The start-up check](#the-start-up-check)
 - [Homing](#homing)
 - [A camera on the tool head (optional)](#a-camera-on-the-tool-head-optional)
 - [Real photos (Photos tab)](#real-photos-photos-tab)
@@ -525,7 +526,8 @@ then runs by itself until you press Stop:
 1. **Standby:** the bed stays all the way out at the photo position (`printer.photo_position`)
    and the motors are switched off, so it's quiet (`standby.motors_off`). Every minute
    (`standby.interval_s`) the camera looks at the plate. With the motors off nothing moves:
-   the bed is still parked where the camera was calibrated.
+   the bed is still parked where the camera was calibrated. The page counts down to the next
+   look ("next look in 45 s").
 2. **Parts seen:** it starts at once (parts on the plate don't move by themselves). **Resume**
    (or Start) while it waits looks now, without waiting for the next look.
 3. **Sorting:** it homes (see below), finds the bins, and sorts the largest group first, until
@@ -536,6 +538,25 @@ then runs by itself until you press Stop:
 Automatic mode **stays on after a restart** or power cut: when `sortering-pnp serve` starts, it
 carries on. Stop (or STOP) switches it off. After `standby.max_errors` errors in a row (printer
 off, camera unplugged…) it switches itself off and says why on the page.
+
+## The start-up check
+
+The first run after sortering-pnp starts (Automatic, Sort once or One pick; also automatic
+mode carrying on after a restart) begins with a check, shown with a tick per step at the top
+of the Device tab (**Check again** runs it alone). It is `run.startup_check`:
+1. **Homing**, with the usual checks before moving.
+2. **Layout check:** one photo of the bins, then a resync: where the grid and every bin stand.
+   The tray stays the bin it was.
+3. **Bins check:** the model runs once on that same photo: the whole calibrated picture, at
+   the scale it was trained at, with nothing painted over. A wild bin with parts on its floor
+   collects their kind (the most common one; the class when no length was measured: it then
+   takes every length of it), and its count is what the camera sees (more when it was already
+   counting that kind: the camera sees only the top). An empty bin is a free wild bin, and an
+   empty bin with no rules becomes wild. Nothing on or next to a bin's code (its shelf or
+   post) is counted, as the model can take the printed code for parts, and nothing below
+   `run.min_score`. The walls of tall bins can hide parts from the camera: a bin that looks
+   empty is taken as empty.
+4. **Ready.**
 
 ## Homing
 

@@ -37,6 +37,7 @@ from .printer import Motion, Printer, PrinterError
 from .rules import family, wild_key
 from .setup import KEYS as SETUP_KEYS
 from .setup import Setup
+from .startup import Checklist, kind_of, parts_in_bin
 from .strategies import STRATEGIES, Plan, Planner
 from .todo import TodoList
 from .transform import MIN_SPREAD_MM, BedCalibration, Transform2D
@@ -86,6 +87,9 @@ class Runner:
         self._stop = threading.Event()
         self._now = threading.Event()  # automatic mode: Resume / Start, look and sort now
         self._in_auto = False
+        self._next_look: float | None = None  # automatic mode: when it looks again (time.time)
+        self.startup = Checklist()  # the start-up check (startup.py), shown on the Device tab
+        self._started_up = False  # done since the program started
         self._shot_no = 0
         self.calib_pairs: list[dict[str, Any]] = []
         cal = self.calibration()
@@ -244,6 +248,12 @@ class Runner:
             "target": self.state.target,
             "view": self.state.view,
             "view_h": self.state.view_h,
+            "next_look_s": (
+                round(max(0.0, self._next_look - time.time()), 1)
+                if self._next_look is not None
+                else None
+            ),
+            "startup": self.startup.to_dict(),
             "setup": {
                 "required": self.require_setup,
                 "complete": not self.setup.missing(),
@@ -312,6 +322,16 @@ class Runner:
             )
             self._thread.start()
             return f"automatic: {strat}"
+        if cmd == "startup":
+            if running:
+                return "already running: stop first"
+            if self.require_setup and self.setup.missing():
+                return "finish the Setup tab first: " + ", ".join(self.setup.missing())
+            self._stop.clear()
+            self._set(status="running", message="start-up check")
+            self._thread = threading.Thread(target=self._startup_run, name="sorter", daemon=True)
+            self._thread.start()
+            return "start-up check: homing, layout, bins"
         if cmd in ("change", "change_bin"):
             cmd = "ok"
         if cmd == "ok":  # Change bin: the first press parks; the second checks the bins
@@ -728,6 +748,8 @@ class Runner:
         missing = getattr(self.vision, "model_missing", lambda: None)()
         if missing:
             raise PrinterError(missing)
+        if self.m.run.startup_check and not self._started_up:
+            self._start_up()
         layout, T = self._prepare()
         with self._lock:
             self.motion.preflight()
@@ -949,9 +971,18 @@ class Runner:
         them at once; then wait again. Runs until Stop (or too many errors in a row)."""
         self._in_auto = True
         try:
+            if self.m.run.startup_check and not self._started_up:
+                self._start_up()
             self._auto_loop(strategy)
+        except Exception as exc:  # noqa: BLE001 - the start-up check failed: shown on the page
+            if self._started_up:
+                raise
+            log.exception("start-up check")
+            self.note(f"start-up check failed: {exc}")
+            self._set(status="error", message=f"start-up check failed: {exc}")
         finally:
             self._in_auto = False
+            self._next_look = None
 
     def _auto_loop(self, strategy: str) -> None:
         sb = self.m.standby
@@ -990,11 +1021,16 @@ class Runner:
                     errors = 0
                     continue  # look again at once: more parts may have arrived meanwhile
                 errors = 0
-                nxt = time.strftime("%H:%M:%S", time.localtime(time.time() + sb.interval_s))
                 status = "stuck" if tried is not None else "standby"
                 msg = "parts need a hand" if tried is not None else "waiting for parts"
-                self._set(status=status, message=f"{msg} · next look at {nxt} (Resume: now)")
-                if self._wait(sb.interval_s, wake=True):
+                self._next_look = time.time() + sb.interval_s  # the page counts down to it
+                self._set(
+                    status=status,
+                    message=f"{msg} · next look in {round(sb.interval_s)} s (Resume: now)",
+                )
+                stopped = self._wait(sb.interval_s, wake=True)
+                self._next_look = None
+                if stopped:
                     break
             except Exception as exc:  # noqa: BLE001 - shown on the page; standby keeps trying
                 errors += 1
@@ -1560,6 +1596,114 @@ class Runner:
             moved.append({"marker": marker, "x": nb.x, "y": nb.y, "rot": nb.rot, "new": not known})
         return moved
 
+    # ------------------------------------------------------------------ the start-up check
+    def _startup_run(self) -> None:
+        """The Device tab's button: the start-up check alone, then idle."""
+        try:
+            self._start_up()
+            self._set(status="idle", message="start-up check done: ready")
+        except Exception as exc:  # noqa: BLE001 - shown on the page
+            self.pins.off()
+            log.exception("start-up check")
+            self.note(f"start-up check failed: {exc}")
+            self._set(status="error", message=f"start-up check failed: {exc}")
+
+    def _start_up(self) -> None:
+        """Homing, layout check (resync), bins check (what each bin holds), ready: startup.py.
+        A step that fails stops the check (and the run) with the reason on the list."""
+        sc = self.startup
+        sc.begin()
+        self.note("start-up check")
+        self.say("start-up check: homing, layout, bins")
+        try:
+            sc.set("homing", "running")
+            self.phase("start-up: homing")
+            with self._lock:
+                self.motion.preflight()
+            sc.set("homing", "done", "homed")
+
+            sc.set("layout", "running")
+            self.phase("start-up: finding the bins")
+            layout, T = self.layout(), self.transform()
+            shot = self.take_shot(layout, T, area="bins", paint=False)
+            sc.set("layout", "done", self._startup_layout(layout, shot, T))
+
+            sc.set("bins", "running")
+            if getattr(self.vision, "model_missing", lambda: None)():
+                sc.set("bins", "skipped", "no model: the bins keep what they had")
+            else:
+                self.phase("start-up: looking into the bins")
+                sc.set("bins", "done", self._startup_bins(layout, shot))
+            sc.set("ready", "done", "ready to sort")
+        except Exception as exc:
+            sc.fail_running(str(exc))
+            raise
+        self._started_up = True
+        self.say("start-up check done: ready")
+
+    def _startup_layout(self, layout: Layout, shot: Shot, T: Transform2D) -> str:
+        """Resync from the photo; the plate stays the one it was (run start never re-chooses
+        it). Changes and saves `layout`."""
+        seen = self._seen_bins(layout, shot, T)
+        if not seen:
+            raise PrinterError("the camera sees no bin codes (markers covered or dirty?)")
+        old, old_auto = layout.work_marker, layout.work_auto
+        report = layout.resync(seen)
+        if old is not None and layout.work_marker != old and layout.bin_by_marker(old):
+            layout.set_work(old, auto=old_auto)
+        problems = layout.problems()
+        if problems:
+            raise PrinterError("layout: " + "; ".join(problems))
+        layout.save(self.layout_path)
+        wb = layout.work_bin()
+        text = f"{len(report['found'])} bins, tray {layout.bin_name(wb) if wb else 'none'}"
+        if report["removed"]:
+            text += f"; not seen: {', '.join(map(str, report['removed']))}"
+        self.note(f"start-up: {text}")
+        return text
+
+    def _startup_bins(self, layout: Layout, shot: Shot) -> str:
+        """What each bin holds, from the parts on its floor (none counted on its code): a wild
+        bin with parts collects their kind, an empty one is free. An empty bin with no rules
+        becomes wild. Bins with other roles keep them."""
+        filled: list[str] = []
+        empty: list[str] = []
+        changed = False
+        min_score = self.m.run.min_score
+        with self._claims_lock:
+            for b in layout.bins:
+                if b.role == "work":
+                    continue
+                ps = parts_in_bin(layout, b, shot.parts, min_score)
+                mk, cell = b.marker, layout.bin_name(b)
+                if b.role == "sort" and not b.holds and not ps:
+                    b.role, changed = "wild", True
+                if b.role != "wild":
+                    continue
+                if ps:
+                    key = kind_of(ps, layout.wild_by)
+                    vol = sum(part_volume_mm3(p, self.m.run.fill, self.volumes) for p in ps)
+                    if self.claims.get(mk) == key:  # the same kind: the camera sees only the top
+                        n = max(len(ps), self.bin_counts.get(mk, 0))
+                        vol = max(vol, self.bin_volume.get(mk, 0.0))
+                    else:
+                        n = len(ps)
+                    self.claims[mk], self.bin_counts[mk], self.bin_volume[mk] = key, n, vol
+                    self.bin_family[mk] = family(Counter(p.cls for p in ps).most_common(1)[0][0])
+                    filled.append(f"{cell} {key} ({n})")
+                else:
+                    for d in (self.claims, self.bin_counts, self.bin_volume, self.bin_family):
+                        d.pop(mk, None)
+                    self.requests = [r for r in self.requests if r.marker != mk]
+                    empty.append(cell)
+            self._save_claims()
+        if changed:
+            layout.save(self.layout_path)
+        text = f"{len(filled)} with parts" + (f": {', '.join(filled)}" if filled else "")
+        text += f"; {len(empty)} empty, free wild bins" + (f": {', '.join(empty)}" if empty else "")
+        self.note(f"start-up: {text}")
+        return text
+
     def _look_for_bins(self, layout: Layout, T: Transform2D) -> bool:
         """Waiting for a bin: a photo of the bins first. A bin this run left out (its code was
         covered at the start), back from aside or new is used at once; True when one was."""
@@ -1889,18 +2033,7 @@ class Runner:
         b = layout.bin_by_marker(marker)
         if b is None or not self.m.run.check_emptied:
             return 0
-        x0, y0, x1, y1 = layout.cells_rect(b.x, b.y, b.w, b.d)
-        inset = binspec.GAP_MM / 2 + binspec.WALL_MM + 1.0
-        x0, y0, x1, y1 = x0 + inset, y0 + inset, x1 - inset, y1 - inset
-        mx, my = layout.marker_centre(b)
-        h = binspec.SHELF_DEPTH_MM / 2 + 1.0
-        return sum(
-            1
-            for p in shot.parts
-            if x0 <= p.bed_xy[0] <= x1
-            and y0 <= p.bed_xy[1] <= y1
-            and not (abs(p.bed_xy[0] - mx) <= h and abs(p.bed_xy[1] - my) <= h)
-        )
+        return len(parts_in_bin(layout, b, shot.parts))
 
     def bins_ok(self) -> dict[str, Any]:
         """The OK while not sorting: photo of the bins, then as after a bin change."""

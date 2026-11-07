@@ -134,8 +134,8 @@ def _wild(
             None, "waiting for a length measurement (wild bins sort by part number)", waiting=True
         )
     full_one = None
-    for b in wild:
-        if claims.get(b.marker) == key:
+    for b in wild:  # a bin claimed for the class (its lengths unknown) takes every length
+        if claims.get(b.marker) in (key, p.cls):
             if b.marker not in full:
                 return Decision(b, f"wild bin {b.marker} collects {key}")
             full_one = full_one or b
