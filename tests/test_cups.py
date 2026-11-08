@@ -61,3 +61,11 @@ def test_the_files_and_notes():
     )
     notes = files["CUPS.txt"].decode()
     assert "TPU 95A" in notes and "M3" in notes and all(n in notes for n in TIPS)
+
+
+def test_every_cup_is_the_same_length():
+    """Swapping cups must not change the tip height: every lip at the same distance."""
+    rims = {c.name: _profile(c)[1]["rim"] for c in all_cups()}
+    assert all(r == pytest.approx(Cup(TIPS["AS"]).length) for r in rims.values()), rims
+    for c in all_cups():
+        assert build(c).bounding_box()[5] == pytest.approx(c.length)

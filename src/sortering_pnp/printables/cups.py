@@ -66,7 +66,10 @@ class Cup:
     sieve: bool = False
     body_d: float = 7.0  # shank and neck: straight
     shank_l: float = 7.0  # into the picker's 7 mm socket
-    neck_l: float = 20.0  # below the socket
+    neck_l: float = 20.0  # below the socket, at least (longer to make every cup `length` long)
+    length: float = (
+        47.0  # shank's end to the lip, the same for every cup: swap without recalibrating
+    )
     bore_d: float = 4.3  # the pump tube's inside: no channel wider
     shank_bore_d: float = 3.2  # narrower in the shank: wall left behind the screws' holes
     fix_z: float = 3.5  # the M3 screws' axis, from the shank's end (the socket's bottom)
@@ -95,12 +98,24 @@ def _inside(c: Cup) -> tuple[float, float, float]:
 
 
 def _profile(c: Cup) -> tuple[list[tuple[float, float]], dict[str, float]]:
+    """The half section, its neck made longer so the lip is at `length` (the same for every cup:
+    the tip height stays when the cup is swapped)."""
+    _, marks = _profile_at(c, c.neck_l)
+    extra = c.length - marks["rim"]
+    if extra < -1e-9:
+        raise ValueError(
+            f"{c.name}: {marks['rim']:.2f} mm long with the shortest neck, over {c.length:g}"
+        )
+    return _profile_at(c, c.neck_l + extra)
+
+
+def _profile_at(c: Cup, neck_l: float) -> tuple[list[tuple[float, float]], dict[str, float]]:
     """The half section (r, z) to revolve, from the shank's end (z = 0) up to the lip, and the
     heights that matter: the outside up, the inside back down, one simple polygon. Every slope
     is 45 deg or steeper: it prints standing on the shank with no supports."""
     t = c.tip
     R, rb, rs = c.body_d / 2, c.bore_d / 2, c.shank_bore_d / 2
-    z_neck = c.shank_l + c.neck_l
+    z_neck = c.shank_l + neck_l
     r_fold = rb + t.fold_t  # the folds' outside, before folding in
     outer = [(R, 0.0), (R, z_neck), (r_fold, z_neck + (R - r_fold))]
     z = z_neck + (R - r_fold)
@@ -213,7 +228,10 @@ Fit: the Ø7 shank goes 7 mm into the picker's socket; 3 M3 screws, 120 deg apar
 the socket's bottom, press into its blind holes (Ø{fix_d:g}, {fix_depth:g} mm deep: they don't reach
 the bore, nothing leaks). Snug them, don't crush the TPU.
 
-Body: straight Ø7, neck {neck:g} mm below the socket, bore Ø4.3 (the pump's tube; Ø3.2 in the shank,
+Length: every cup is {length:g} mm from the shank's end to the lip (the neck makes up the
+difference, {neck:g} mm or more below the socket): swap cups without measuring the tip height again.
+
+Body: straight Ø7, bore Ø4.3 (the pump's tube; Ø3.2 in the shank,
 behind the screws). The folds go inwards: no channel is wider than 4.3 mm.
 
 Tips (every hole smaller than an M2's core, Ø1.57: no screw goes in):
@@ -240,7 +258,7 @@ def cup_files() -> list[tuple[str, bytes]]:
             _, marks = _profile(c)
             rows.append(
                 f"  {t.name}  lip Ø{t.lip_d:g}, {t.folds} folds, hole Ø{t.hole_d:g} "
-                f"(sieve: {n} x Ø{t.sieve_d:g}), {marks['rim']:.1f} mm long: {t.use}"
+                f"(sieve: {n} x Ø{t.sieve_d:g}), neck {marks['neck_top'] - c.shank_l:.1f} mm: {t.use}"
             )
     c0 = Cup(TIPS["AS"])
     notes = CUP_NOTES.format(
@@ -248,6 +266,7 @@ def cup_files() -> list[tuple[str, bytes]]:
         fix_d=c0.fix_d,
         fix_depth=c0.fix_depth,
         neck=c0.neck_l,
+        length=c0.length,
         table="\n".join(rows),
     )
     out.append(("CUPS.txt", notes.encode()))

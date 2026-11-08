@@ -120,7 +120,8 @@ board lying in the tray, at the height the parts will lie.
   `sortering-pnp print mounts --reach … --bar-height …`. See [mounts/MOUNTS.txt](mounts/MOUNTS.txt).
 - **Suction cups** ([cups/](cups/)), TPU 95A, for the suction picker. A straight Ø7 body: the
   shank goes 7 mm into the picker's socket and is held by 3 M3 screws (120° apart) in blind
-  holes; a 20 mm neck with the pump tube's Ø4.3 bore; the folds go inwards (no channel wider
+  holes; a neck (20 mm or more) with the pump tube's Ø4.3 bore; **every cup is 47 mm long**, shank
+  to lip, so swapping them keeps the tip height; the folds go inwards (no channel wider
   than 4.3 mm). Five tips, each also as `_sieve`:
   - [cup_AS.stl](cups/cup_AS.stl), [cup_AM.stl](cups/cup_AM.stl): two stiff folds and a short
     lip (Ø4.4 / Ø6.2) for flat faces: pan, button, cheese and hex heads, nuts (M2-M3 / M4-M5).
