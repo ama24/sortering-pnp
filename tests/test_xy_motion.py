@@ -41,6 +41,7 @@ def _figures(machine, monkeypatch, request):
     a ramp, and Klipper's corners left alone (but in the tests marked `corners`)."""
     xm = machine.printer.xy_motion
     xm.accel_y, xm.max_feed_y, xm.steps = 1000.0, None, 8
+    xm.profile = "s_curve"  # the S's maths (the default is trapezoid)
     if "corners" not in request.node.name:
         monkeypatch.setattr(Motion, "_corner_velocity", lambda self: 0.0)
 
@@ -289,6 +290,7 @@ def test_the_bed_ramps_like_a_mill_by_default(tmp_path):
     """Defaults (and machine.yaml): long, soft ramps for the bed; the head as Klipper's."""
     xm = config_mod.XYMotion()
     assert (xm.accel_y, xm.max_feed_y, xm.steps, xm.accel_x) == (200.0, 3000.0, 12, 3000.0)
+    assert xm.profile == "trapezoid"  # one G1: Klipper's straight ramp, no stairs
     m = config_mod.load(Path(__file__).resolve().parents[1] / "configs" / "machine.yaml")
     assert (m.printer.xy_motion.accel_y, m.printer.xy_motion.max_feed_y) == (200.0, 3000.0)
     assert not m.standby.motors_off  # no homing (a sharp stop of the bed) between looks
@@ -331,3 +333,12 @@ def test_homing_moves_the_bed_gently_corners(machine):
         "SET_VELOCITY_LIMIT ACCEL=3000",
     ]
     assert (pr.accel, pr.scv) == (3000.0, 5.0)
+
+
+def test_the_default_bed_move_is_one_g1_with_klippers_ramp(machine):
+    machine.printer.xy_motion.profile = config_mod.XYMotion().profile
+    fp = FakePrinter([10.0, 0.0, 50.0])
+    Motion(fp, machine).move(y=200.0)
+    ms = moves(fp.sent[-1])
+    assert len(ms) == 1 and ms[0]["Y"] == 200.0  # no steps: the speed rises in a straight line
+    assert "SET_VELOCITY_LIMIT ACCEL=1000" in fp.sent[-1].splitlines()

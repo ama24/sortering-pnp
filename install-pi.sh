@@ -96,6 +96,12 @@ torch.ones(2) + 1  # the CUDA build would stop here with "Illegal instruction"
 print(f"ok: OpenCV {cv2.__version__}, torch {torch.__version__}")
 EOF
 
+# ---------------------------------------------------------------- Klipper's side
+# sortering_pnp.cfg next to printer.cfg, its include once and after your sections, no
+# [safe_z_home], then FIRMWARE_RESTART (never while printing). Backups are kept next to them.
+say "Klipper: sortering_pnp.cfg and printer.cfg"
+(cd "$HERE" && "$VENV/bin/sortering-pnp" klipper) || echo "WARNING: Klipper's config was not set up: see README, Install"
+
 # ---------------------------------------------------------------- start at boot (optional)
 if [ "$SERVICE" = 1 ]; then
   say "sortering-pnp service (starts at boot; automatic mode resumes if it was on)"
@@ -124,8 +130,7 @@ fi
 cat <<EOF
 
 Done. Next:
-  1. Klipper: cp $HERE/klipper/sortering_pnp.cfg ~/printer_data/config/
-     and add [include sortering_pnp.cfg] to printer.cfg (once), then FIRMWARE_RESTART.
+  1. Klipper: done above (lines marked !! need you). Mainsail should say Ready.
      The picker needs nothing in Klipper: choose it in the web page (Setup tab, Picker).
   2. source $VENV/bin/activate && cd $HERE && sortering-pnp check
   3. sortering-pnp serve   (or run this script again with --service to start it at every boot)

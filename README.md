@@ -65,6 +65,7 @@ project works without the others.
 - [How it works, in one minute](#how-it-works-in-one-minute)
 - [What you need](#what-you-need)
 - [Install](#install)
+- [Klipper's config: what goes wrong](#klippers-config-what-goes-wrong)
 - [First-time setup](#first-time-setup)
 - [Everyday use](#everyday-use)
 - [How it works, in more detail](#how-it-works-in-more-detail)
@@ -157,7 +158,9 @@ See [prints/README.md](prints/README.md) for which files to print and how.
      { echo "[include mainsail.cfg]"; cat ~/klipper/config/printer-creality-ender3-2018.cfg; } > printer.cfg
      ```
 
-     Then set `[mcu] serial:` to what `ls /dev/serial/by-id/*` shows (Mainsail, *Machine* tab).
+     Keep that first line `[include mainsail.cfg]`: Mainsail's buttons and macros need it.
+     Then set `[mcu] serial:` to what `ls /dev/serial/by-id/*` shows (Mainsail, *Machine* tab),
+     the whole `/dev/serial/by-id/usb-...` path, not `/dev/ttyUSB0` (that one can change).
    - **Check:** in Mainsail the printer is *Ready*; `STEPPER_BUZZ STEPPER=stepper_x` (and `_y`,
      `_z`) moves each motor +1 mm first; `QUERY_ENDSTOPS` shows each switch; then home.
 
@@ -173,21 +176,51 @@ See [prints/README.md](prints/README.md) for which files to print and how.
    so an install today and one next year give the same program. Nothing else is downloaded: the
    camera, calibration and measuring code are part of sortering-pnp.
    `--service` starts sortering-pnp at every boot.
-3. **Tell Klipper about the sorter:**
+3. **Klipper is set up by the script too** (its step "Klipper: sortering_pnp.cfg and
+   printer.cfg"; on its own: `~/sortering-pnp/.venv/bin/sortering-pnp klipper`, safe to run
+   again). It:
+   - copies `klipper/sortering_pnp.cfg` next to `printer.cfg` (an edited copy is kept as
+     `sortering_pnp.cfg.bak`);
+   - writes `[include sortering_pnp.cfg]` into `printer.cfg` **once**, **after your own sections**
+     and before Klipper's `#*# SAVE_CONFIG` block (sortering_pnp.cfg slows Y homing: `[stepper_y]
+     homing_speed: 20`, and in Klipper the later value wins);
+   - comments out `[safe_z_home]` (lines starting `#sortering-pnp#`), removes the include of the
+     old `sortering_pnp_picker.cfg`;
+   - keeps the old file as `printer.cfg.sortering-<date>`, then restarts Klipper
+     (FIRMWARE_RESTART; not while it prints).
 
-   ```bash
-   cp ~/sortering-pnp/klipper/sortering_pnp.cfg ~/printer_data/config/
-   echo "[include sortering_pnp.cfg]" >> ~/printer_data/config/printer.cfg
-   ```
-
-   Run the `echo` line only once. Then **FIRMWARE_RESTART** in Mainsail. That is all Klipper
-   needs: the picker isn't in Klipper at all, sortering-pnp switches the Pi's pins itself (see
-   [The picker](#the-picker) below).
+   Lines marked **!!** are what it can't fix: see
+   [Klipper's config: what goes wrong](#klippers-config-what-goes-wrong). Mainsail should then
+   say *Ready*. That is all Klipper needs: the picker isn't in Klipper at all, sortering-pnp
+   switches the Pi's pins itself (see [The picker](#the-picker) below).
 4. **Open the page:** `http://<your-pi>:8080` on your phone or PC. The first visit asks you to
    create an account.
 
 From now on **sortering-pnp is the only program that moves the printer**. Even the camera calibration
 photos are taken from its page.
+
+### Klipper's config: what goes wrong
+
+Everything we ran into, with what to do. `sortering-pnp klipper` fixes the first four itself
+and warns about the rest; Mainsail's console shows Klipper's own message.
+
+| You see | Why | Do |
+|---|---|---|
+| Two `[include sortering_pnp.cfg]` lines, or *Section 'gcode_macro TOOL_PICKER' already exists*-type errors | the include was added twice (an `echo >>` run twice) | run `sortering-pnp klipper`: it keeps one |
+| Y homing is still fast | the include stands **before** `[stepper_y]`, so printer.cfg's `homing_speed` wins | run `sortering-pnp klipper`: it moves the include after your sections |
+| *homing_override and safe_z_home cannot be used simultaneously* | printer.cfg has `[safe_z_home]`; sortering_pnp.cfg brings `[homing_override]` (Z homes over the plate, never over a bin) | run `sortering-pnp klipper`: it comments `[safe_z_home]` out |
+| *Unable to open config file sortering_pnp_picker.cfg* | an older version put the picker in Klipper; it is on the Pi's pins now | run `sortering-pnp klipper`: it removes that include (the file can go too) |
+| *Option 'step_pin' in section 'stepper_y' must be specified*, or a printer with no axes | printer.cfg is still **KIAUH's placeholder**; sortering_pnp.cfg only adds to your printer's sections | copy your printer's example into printer.cfg ([Install](#install), step 1), keep `[include mainsail.cfg]` as its first line, run `sortering-pnp klipper` |
+| *mcu 'mcu': Unable to connect* | `[mcu] serial:` is empty, a placeholder (`<your-mcu-id>`) or `/dev/ttyUSB0` that moved | `ls /dev/serial/by-id/*`, write that whole path, FIRMWARE_RESTART; the printer must be on |
+| *SAVE_CONFIG section ... conflicts with included value* | a setting that SAVE_CONFIG writes (e.g. `[input_shaper]`, `[stepper_z] position_endstop`) was put in sortering_pnp.cfg | keep those in printer.cfg only; sortering_pnp.cfg has none of them |
+| The tool variable is lost, or another program's saved variables are | two `[save_variables]` (Klipper keeps one file) | delete the one in printer.cfg (the warning says so) |
+| No *Screw sorter* menu on the printer's screen | no `[display]` in printer.cfg (the Ender 3 V2's DWIN screen can't show Klipper menus) | optional: the web page does everything |
+| *Unknown command: RESPOND* | no `[respond]` | sortering_pnp.cfg has it now: run `sortering-pnp klipper` |
+| *Move out of range* when picking near the plate | the tip reaches lower than the nozzle did | `[stepper_z] position_min: -5` in printer.cfg (see [docs/reference.md#homing](docs/reference.md#homing)) |
+| Endstops reversed (`QUERY_ENDSTOPS` says TRIGGERED with nothing pressed) | the example's pin polarity doesn't match your switch | add or remove `!` on that `endstop_pin:` in printer.cfg |
+| Edits to `~/printer_data/config/sortering_pnp.cfg` disappear | the installer replaces it on every update (the old one: `.bak`) | put your changes in printer.cfg, or copy them over from `.bak` after an update |
+
+Never edit printer.cfg's `#*#` block by hand: Klipper's SAVE_CONFIG writes it.
 
 ### Finding your way around the page
 
@@ -456,7 +489,8 @@ On the Pi:
 cd ~/sortering-pnp && git pull && ./install-pi.sh --service
 ```
 
-The install script brings everything to the versions this release was tested with.
+The install script brings everything to the versions this release was tested with, and puts
+the new `sortering_pnp.cfg` into Klipper (restarting it when something changed).
 
 ---
 
