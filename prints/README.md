@@ -123,18 +123,20 @@ board lying in the tray, at the height the parts will lie.
   holes; a neck (20 mm or more) with the pump tube's Ø4.3 bore; **every cup is 47 mm long**, shank
   to lip, so swapping them keeps the tip height; the folds go inwards (no channel wider
   than 4.3 mm). Five tips; AM, DM and DL also as `_sieve`:
-  - [cup_AS.stl](cups/cup_AS.stl), [cup_AM.stl](cups/cup_AM.stl): two stiff folds and a short
+  - [cup_AS.stl](cups/cup_AS.stl), [cup_AM.stl](cups/cup_AM.stl): three folds and a short
     lip (Ø4.4 / Ø6.2) for flat faces: pan, button, cheese and hex heads, nuts (M2-M3 / M4-M5).
   - [cup_DS.stl](cups/cup_DS.stl), [cup_DM.stl](cups/cup_DM.stl), [cup_DL.stl](cups/cup_DL.stl):
-    four soft folds and a thin skirt (Ø5.2 / Ø7.6 / Ø10.6) for curved or tilted faces
+    four folds and a thin skirt (Ø5.2 / Ø7.6 / Ø10.6) for curved or tilted faces
     (M2-M3 / M3-M5 / M5-M6, M8 at a pinch).
-  - `_sieve`: a dome with a ring of 3 / 5 / 9 holes (Ø1.2) on its sides instead of one hole;
+  - `_sieve`: a dome with a ring of 3 / 4 / 8 holes (Ø1.5) on its sides instead of one hole;
     the part rests on the dome's top, 0.4 mm below the lip, so it can't plug them. AS and DS
     have none: their Ø3 cup has no room for one a 0.4 mm nozzle can print.
 
-  Every hole is smaller than an M2's core (Ø1.57): no screw goes in. Made for a **0.4 mm
-  nozzle**: every wall is two lines or more (the D skirt's edge one), every hole Ø1.2 or more,
-  checked by slicing each cup. Print standing on the shank, no supports. See
+  **Soft:** the folds and the lip are one line of a 0.4 mm nozzle (0.45 mm), the cup's wall
+  0.6 mm, so they compress. The hole is Ø2.2 (S) or Ø2.5 (M, L): the screw's head lies on the
+  lip and closes the cup, so the hole only has to be smaller than the smallest head the tip
+  picks. Every wall one line or more, every hole Ø1.2 or more, checked by slicing each cup.
+  Print standing on the shank, no supports. See
   [cups/CUPS.txt](cups/CUPS.txt).
 - **Labels** ([labels/](labels/)): paper codes for plain bins. Print at 100 % and glue them on
   the shelf.

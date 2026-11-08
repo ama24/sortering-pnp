@@ -7,9 +7,10 @@ import math
 import pytest
 
 from sortering_pnp.printables.cups import (
+    HEAD_COVER,
     MIN_HOLE,
     MIN_LINE,
-    MIN_WALL,
+    SOFT_WALL,
     TIPS,
     Cup,
     _inside,
@@ -21,7 +22,7 @@ from sortering_pnp.printables.cups import (
     walls,
 )
 
-M2_CORE = 1.57  # the smallest screw's core: no hole may let it in
+TWO_LINES = 0.85  # the sieve's webs and the plateau the part rests on
 
 
 @pytest.mark.parametrize("cup", all_cups(), ids=lambda c: c.name)
@@ -47,15 +48,20 @@ def test_the_body_is_straight_and_no_channel_is_wider_than_the_tube(cup):
     neck = [r for r, z in poly if z <= marks["neck_top"] + 1e-9]
     assert max(neck) == pytest.approx(cup.body_d / 2)  # Ø7 straight, shank and neck
     assert marks["neck_top"] - cup.shank_l >= 20.0
-    passage = [r for r, z in poly if z <= marks["folds_top"] and r < cup.body_d / 2 - 0.5]
+    passage = [a for z, a, _ in walls(cup) if z <= marks["folds_top"]]  # the inside's radius
     assert max(passage) <= cup.bore_d / 2 + 1e-9  # the folds go inwards
     assert cup.fix_depth < (cup.body_d - cup.shank_bore_d) / 2 - 0.5  # blind: no leak
 
 
 @pytest.mark.parametrize("name", TIPS)
-def test_no_screw_goes_through_and_the_sieve_lets_more_air_by(name):
+def test_the_head_covers_the_hole_and_the_sieve_lets_more_air_by(name):
+    """The screw's head lies on the lip and closes the cup: the hole only has to be smaller
+    than the smallest head the tip picks. Wider than the folds' passage would gain nothing."""
     t = TIPS[name]
-    assert t.hole_d < M2_CORE and t.sieve_d < M2_CORE
+    c = Cup(t)
+    assert t.hole_d <= HEAD_COVER * t.min_head_d
+    assert t.hole_d <= 2 * (c.bore_d / 2 - t.amp) + 1e-9  # the folds' narrowest passage
+    assert t.hole_d > 2.0 or name in ("AS", "DS")  # bigger than before (Ø1.2-1.4)
     if not t.sieve_d:
         assert name in ("AS", "DS")  # no room for a printable sieve in a Ø3 cup
         with pytest.raises(ValueError):
@@ -93,24 +99,37 @@ def test_every_cup_is_the_same_length():
 
 @pytest.mark.parametrize("cup", all_cups(), ids=lambda c: c.name)
 def test_a_04_nozzle_prints_every_wall(cup):
-    """Across every layer each wall is two lines or more; only the D skirt thins towards its
-    edge, to one line. (A thinner wall was empty in the slicer: the cup above it floated.)"""
-    _, marks = _profile(cup)
-    ci = _inside(cup)[0]  # the skirt starts at the cup's inside
+    """Across every layer each wall is one line or more (a thinner wall was empty in the
+    slicer: the cup above it floated)."""
     for z, a, b in walls(cup):
         width = 2 * b if a < 1e-9 else b - a  # a run from the axis: the dome's top, both sides
-        if cup.tip.style == "D" and z >= marks["floor"] and a >= ci - 1e-9:
-            assert width >= MIN_LINE - 1e-9, (z, a, b)  # the skirt
-        else:
-            assert width >= MIN_WALL - 1e-9, (z, a, b)
+        assert width >= MIN_LINE - 1e-9, (z, a, b)
+
+
+@pytest.mark.parametrize("cup", all_cups(), ids=lambda c: c.name)
+def test_the_folds_and_the_cup_are_soft(cup):
+    """The printed ones were too stiff (folds 0.9-1.0, cup 0.9-1.0 mm: they did not compress,
+    the tip felt like PLA). Above the neck every wall is at most SOFT_WALL across, the folds
+    and the lip one line; the floor round the hole is a thin cone, not a solid wedge."""
+    t = cup.tip
+    assert t.fold_t <= 0.5 and t.rim_t <= 0.5 and _inside(cup)[1] <= SOFT_WALL
+    _, marks = _profile(cup)
+    z_soft = marks["neck_top"] + (cup.body_d / 2 - (cup.bore_d / 2 + t.fold_t))  # past the chamfer
+    for z, a, b in walls(cup):
+        if z_soft + 0.05 < z < marks["folds_top"]:
+            assert b - a <= t.fold_t + 1e-6, (z, a, b)  # the folds: one line
+        if z > marks["folds_top"] and a > 1e-9:  # the floor (no solid wedge) and the cup
+            # where a sieve's dome meets the wall, the ring holding it: dome + wall
+            most = cup.floor_t + SOFT_WALL if cup.sieve else SOFT_WALL
+            assert b - a <= most + 1e-6, (z, a, b)
 
 
 @pytest.mark.parametrize("cup", [c for c in all_cups() if c.sieve], ids=lambda c: c.name)
 def test_a_04_nozzle_prints_the_sieve(cup):
-    """Holes big enough not to close up, two lines of TPU between them (thinner webs were
+    """Holes big enough not to close up, two lines of TPU between them (0.45 mm webs were
     dropped by the slicer and the holes merged)."""
     d = cup.tip.sieve_d
-    assert MIN_HOLE <= d < M2_CORE and cup.tip.hole_d >= MIN_HOLE
+    assert MIN_HOLE <= d < cup.tip.hole_d and cup.tip.hole_d >= MIN_HOLE
     spots = holes(cup)
     for i, (x0, y0) in enumerate(spots):
         for x1, y1 in spots[i + 1 :]:
@@ -118,4 +137,4 @@ def test_a_04_nozzle_prints_the_sieve(cup):
         rho = math.hypot(x0, y0)
         assert rho - d / 2 >= cup.plateau_r + cup.web / 3 - 1e-9  # the plateau stays whole
         assert rho + d / 2 <= _inside(cup)[0] - cup.web / 3 + 1e-9  # off the cup's wall
-    assert 2 * cup.plateau_r >= MIN_WALL  # the top the part rests on: two lines
+    assert 2 * cup.plateau_r >= TWO_LINES  # the top the part rests on: two lines

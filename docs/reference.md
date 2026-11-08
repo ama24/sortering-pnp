@@ -65,8 +65,9 @@ picker's 7 mm socket by 3 M3 screws in blind holes, a neck with a Ø4.3 bore (ev
 long, shank to lip: swapping keeps the tip height), folds that go
 inwards, and five tips (AS, AM: a short lip for flat faces; DS, DM, DL: a thin skirt for curved
 ones); AM, DM and DL also with a sieve (a ring of holes on a dome the part rests on). Every hole
-is smaller than an M2's core. Sized for a 0.4 mm nozzle (`MIN_WALL`, `MIN_HOLE`): every wall two
-lines or more across each layer, except the D skirt's one-line edge.
+is smaller than the smallest head the tip picks (the head closes the cup). Soft: the folds and
+the lip one line of a 0.4 mm nozzle, the cup's wall `SOFT_WALL` (0.6 mm); sized for a 0.4 mm
+nozzle (`MIN_LINE`, `MIN_HOLE`): every wall one line or more across each layer.
 
 - **Pins:** sortering-pnp switches them itself ([pins.py](../src/sortering_pnp/pins.py)); the
   picker is not in Klipper. GPIO12 (`picker.action_pin`) is a plain on/off output for a pump

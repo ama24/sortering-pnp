@@ -1,15 +1,17 @@
-"""Suction cups in TPU 95A for the suction picker: one straight body, five tips, each with and
-without a sieve.
+"""Suction cups in TPU 95A for the suction picker: one straight body, five tips, the M and L
+ones also with a sieve.
 
 The body: a Ø7 shank that goes 7 mm into the picker's socket, held by 3 M3 screws at 120 deg
 that press into blind holes (blind: a hole through to the bore would leak), then a straight Ø7
 neck of 20 mm with the Ø4.3 bore of the pump's tube. No channel is wider than 4.3 mm: the folds
-of the bellows go inwards (the passage narrows to about Ø2 there, still wider than the tip's hole).
+of the bellows go inwards (the passage narrows to Ø2.6 there, as wide as the tip's hole).
 
-The tips (screws lie on the plate; every hole is smaller than an M2's core, Ø1.57, so no screw
-goes in):
-- A: two stiff folds and a cone lip: flat faces (pan, button, cheese and hex heads, nuts).
-- D: four soft folds and a thin skirt (0.45 mm at its edge): takes up a few mm of height and
+The folds and the cup are soft: the folds one line thick (0.45 mm), the cup's wall 0.6 mm
+thinning to a one-line lip, the floor 0.6 mm (thicker ones, 0.9-1 mm, did not compress and felt
+like PLA). The hole is big (Ø2.2-2.5): the screw's head lies on the lip and closes the cup, so
+it only has to be smaller than the smallest head the tip picks (HEAD_COVER of it).
+- A: three folds and a cone lip: flat faces (pan, button, cheese and hex heads, nuts).
+- D: four folds and a skirt flaring to its one-line edge: takes up a few mm of height and
   follows curved or tilted faces.
 S, M and L are the lip's size (S for M2-M3 heads, M for M4-M5, L for M6, M8 at a pinch).
 `sieve` (M and L tips): instead of one hole, a dome with a ring of holes; the part rests on the
@@ -20,9 +22,9 @@ one a 0.4 mm nozzle can print (their cup is Ø3 inside).
 Printed standing on the shank's end, tip up, no supports: every overhang is 45 deg or steeper
 (the dome and the floors are cones). TPU 95A, 0.4 mm nozzle, 3 walls, slow (20-25 mm/s).
 
-Sized for a 0.4 mm nozzle (checked by slicing): every wall at least two lines (MIN_WALL, measured
-across each layer) except the D skirt's edge (one line), every hole at least MIN_HOLE, and a web
-of two lines between two holes: thinner webs are dropped by the slicer and the holes merge.
+Sized for a 0.4 mm nozzle (checked by slicing): every wall at least one line (MIN_LINE, measured
+across each layer), every hole at least MIN_HOLE, and a web of two lines between two sieve holes:
+thinner webs are dropped by the slicer and the holes merge.
 """
 
 from __future__ import annotations
@@ -36,9 +38,11 @@ from .meshio import Mesh
 
 SEG = 72  # facets round the axis
 NOZZLE = 0.4
-MIN_WALL = 0.85  # two lines of a 0.4 nozzle: thinner walls drop out or leak
-MIN_LINE = 0.42  # one line: only the D skirt's edge
-MIN_HOLE = 1.2  # TPU closes smaller holes up (and a screw's core is wider: M2's is 1.57)
+MIN_LINE = 0.42  # one line of a 0.4 nozzle: no wall thinner (it would drop out)
+SOFT_WALL = 0.6  # the folds and the cup: at most this (a line and a bit), so they give
+MIN_HOLE = 1.2  # TPU closes smaller holes up
+HEAD_COVER = 0.65  # a hole at most this part of the smallest head the tip picks: the head
+# lies on the lip and closes the cup, so nothing goes in
 
 
 @dataclass(frozen=True)
@@ -54,17 +58,26 @@ class Tip:
     fold_t: float  # wall of the folds (measured across, horizontally)
     hole_d: float  # the single hole (without sieve)
     sieve_d: float  # each hole of the sieve (0: no sieve, no room for one)
+    min_head_d: float  # the smallest head the tip picks (it covers the hole)
     use: str
 
 
 TIPS: dict[str, Tip] = {
     t.name: t
     for t in (
-        Tip("AS", "A", 4.4, 0.85, 1.8, 2, 3.0, 1.0, 1.0, 1.2, 0.0, "M2-M3 heads, flat faces"),
-        Tip("AM", "A", 6.2, 0.85, 2.2, 2, 3.0, 1.0, 1.0, 1.4, 1.2, "M4-M5 heads, flat faces"),
-        Tip("DS", "D", 5.2, 0.45, 2.6, 4, 2.4, 1.1, 0.9, 1.2, 0.0, "M2-M3, curved or tilted"),
-        Tip("DM", "D", 7.6, 0.45, 3.2, 4, 2.4, 1.1, 0.9, 1.4, 1.2, "M3-M5, curved or tilted"),
-        Tip("DL", "D", 10.6, 0.45, 3.8, 4, 2.4, 1.1, 0.9, 1.4, 1.2, "M5-M6 (M8), curved"),
+        Tip(
+            "AS", "A", 4.4, 0.45, 1.8, 3, 2.4, 0.85, 0.45, 2.2, 0.0, 3.8, "M2-M3 heads, flat faces"
+        ),
+        Tip(
+            "AM", "A", 6.2, 0.45, 2.2, 3, 2.4, 0.85, 0.45, 2.5, 1.5, 7.0, "M4-M5 heads, flat faces"
+        ),
+        Tip(
+            "DS", "D", 5.2, 0.45, 2.6, 4, 2.4, 0.85, 0.45, 2.2, 0.0, 3.8, "M2-M3, curved or tilted"
+        ),
+        Tip(
+            "DM", "D", 7.6, 0.45, 3.2, 4, 2.4, 0.85, 0.45, 2.5, 1.5, 5.5, "M3-M5, curved or tilted"
+        ),
+        Tip("DL", "D", 10.6, 0.45, 3.8, 4, 2.4, 0.85, 0.45, 2.5, 1.5, 8.5, "M5-M6 (M8), curved"),
     )
 }
 
@@ -84,10 +97,10 @@ class Cup:
     fix_z: float = 3.5  # the M3 screws' axis, from the shank's end (the socket's bottom)
     fix_d: float = 2.6  # blind hole for an M3 screw's point (the thread bites around it)
     fix_depth: float = 1.0
-    floor_t: float = 0.9  # the plate the hole goes through, the dome (two lines across)
+    floor_t: float = 0.6  # the plate the hole goes through, the dome (3 layers)
     recess: float = 0.4  # the dome's top below the rim: the lip seals first
     plateau_r: float = 0.45  # the dome's top, where the part rests: no hole there
-    web: float = 0.9  # TPU between two sieve holes (two lines)
+    web: float = 0.9  # TPU between two sieve holes (two lines: one was dropped by the slicer)
     holes: list[tuple[float, float]] = field(default_factory=list, compare=False)
 
     @property
@@ -100,9 +113,9 @@ def _inside(c: Cup) -> tuple[float, float, float]:
     t = c.tip
     rim_in = t.lip_d / 2 - t.rim_t
     if t.style == "A":  # a short cup, its inside a little conical (straight with the sieve)
-        ci, wall = (rim_in if c.sieve else rim_in - 0.4), 1.0
-    else:  # the skirt: its inside flares 0.6 mm more, 0.9 mm thick at the base
-        ci, wall = rim_in - 0.6, 0.9
+        ci, wall = (rim_in if c.sieve else rim_in - 0.4), SOFT_WALL
+    else:  # the skirt: its inside flares 0.6 mm more, SOFT_WALL thick at the base
+        ci, wall = rim_in - 0.6, SOFT_WALL
     return ci, wall, rim_in
 
 
@@ -155,13 +168,19 @@ def _profile_at(c: Cup, neck_l: float) -> tuple[list[tuple[float, float]], dict[
         marks |= {"hole_top": p3}
     inner.append((ci, floor))
     base_r = ci + wall
-    rise = abs(base_r - r_fold)  # out (or in) to the cup at 45 deg, along the floor below it
-    z1 = max(z_b, floor - rise)
-    if c.sieve and base_r > r_fold:  # the cone under the dome flares out from the folds' top:
-        z1 = z_b  # follow it at once, or the wall between them thins to nothing
-    outer += [(r_fold, z1), (base_r, z1 + rise)]
-    if floor > z1 + rise + 1e-9:
-        outer.append((base_r, floor))
+    if c.sieve:
+        rise = abs(base_r - r_fold)  # out (or in) to the cup at 45 deg, along the floor below it
+        z1 = max(z_b, floor - rise)
+        if base_r > r_fold:  # the cone under the dome flares out from the folds' top: follow
+            z1 = z_b  # it at once, or the wall between them thins to nothing
+        if z1 > z_b + 1e-9:
+            outer.append((r_fold, z1))
+        outer.append((base_r, z1 + rise))
+        if floor > z1 + rise + 1e-9:
+            outer.append((base_r, floor))
+    else:  # a thin floor, no wedge: in at 45 deg along the cone to the hole, a short ring
+        r_min = t.hole_d / 2 + wall  # round the hole, out at 45 deg along the funnel
+        outer += [(r_min, z_b + (r_fold - r_min)), (r_min, marks["hole_top"]), (base_r, floor)]
     n = 1 if t.style == "A" else 8
     for k in range(1, n + 1):  # A: one straight cone; D: a skirt flaring and thinning
         u = k / n
@@ -170,7 +189,7 @@ def _profile_at(c: Cup, neck_l: float) -> tuple[list[tuple[float, float]], dict[
         th = wall + (t.rim_t - wall) * u
         outer.append((ro, zz))
         inner.append((ro - th, zz))
-    marks |= {"floor": floor, "rim": rim, "transition": z1 + rise}
+    marks |= {"floor": floor, "rim": rim}
     return outer + list(reversed(inner)), marks
 
 
@@ -258,8 +277,9 @@ CUP_NOTES = """Suction cups for the suction picker (sortering-pnp print catalogu
 
 Material: TPU 95A. 0.4 mm nozzle, 0.2 mm layers, 3 walls (or more: the folds are walls only),
 100 % infill, 20-25 mm/s, no supports. Stand it on the shank's end (as exported), tip up.
-Every wall is at least two lines of a 0.4 nozzle (the D skirt's edge one line), every hole at
-least Ø{min_hole:g}: checked by slicing every cup (Bambu Studio, classic and Arachne walls).
+The folds and the lip are one line of a 0.4 nozzle (they must give), the cup's wall {soft:g} mm,
+every hole at least Ø{min_hole:g}: checked by slicing every cup (Bambu Studio, classic and Arachne
+walls). Slow down for the folds (15-20 mm/s) if the slicer allows.
 
 Fit: the Ø7 shank goes 7 mm into the picker's socket; 3 M3 screws, 120 deg apart, {fix_z:g} mm from
 the socket's bottom, press into its blind holes (Ø{fix_d:g}, {fix_depth:g} mm deep: they don't reach
@@ -271,11 +291,12 @@ difference, {neck:g} mm or more below the socket): swap cups without measuring t
 Body: straight Ø7, bore Ø4.3 (the pump's tube; Ø3.2 in the shank,
 behind the screws). The folds go inwards: no channel is wider than 4.3 mm.
 
-Tips (every hole smaller than an M2's core, Ø1.57: no screw goes in):
+Tips (each hole smaller than the smallest head the tip picks: the head lies on the lip and
+closes the cup, nothing goes in):
 {table}
-A: two stiff folds and a cone lip, for flat faces (pan, button, cheese and hex heads, nuts).
-D: four soft folds and a thin skirt (0.45 mm at the edge, one line): a few mm of give, follows
-   curved and tilted faces (the side of a head, countersunk heads).
+A: three folds and a cone lip, for flat faces (pan, button, cheese and hex heads, nuts).
+D: four folds and a skirt flaring to a one-line edge: a few mm of give, follows curved and
+   tilted faces (the side of a head, countersunk heads).
 _sieve (AM, DM, DL): a dome with a ring of holes instead of one. The part rests on the dome's
    flat top, 0.4 mm below the lip, so the holes on its sides stay open: it can't plug the cup,
    more air flows, and it lets go at once. Holding force is the same (vacuum x the lip's area).
@@ -307,6 +328,7 @@ def cup_files() -> list[tuple[str, bytes]]:
         neck=c0.neck_l,
         length=c0.length,
         min_hole=MIN_HOLE,
+        soft=SOFT_WALL,
         table="\n".join(rows),
     )
     out.append(("CUPS.txt", notes.encode()))
