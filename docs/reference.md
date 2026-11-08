@@ -214,7 +214,8 @@ The steps below are the same work in more detail.
    bins stand where and which way round, and makes the **biggest bin the plate**. To use
    another bin as the plate, give it the role *work*; Resync keeps your choice from then on.
    Bins taken off the bed keep their rules and get them back when they return. Give the other
-   bins rules (*holds*) or leave them wild.
+   bins rules (*holds*) or leave them wild. With a model loaded, Resync also does the start-up
+   check's **Bins check** on the same photo (see [The start-up check](#the-start-up-check)).
 8. **Device tab**: pick a strategy and press **Start automatic** (*Manual* has Sort once and One
    pick), or use the printer menu.
 
@@ -622,8 +623,15 @@ in the left menu, under Device (**Recheck** runs it alone, also while sorting). 
    counting that kind: the camera sees only the top). An empty bin is a free wild bin, and an
    empty bin with no rules becomes wild. Nothing on or next to a bin's code (its shelf or
    post) is counted, as the model can take the printed code for parts, and nothing below
-   `run.min_score`. The walls of tall bins can hide parts from the camera: a bin that looks
-   empty is taken as empty.
+   `run.min_score`. The code is kept out twice: where the layout puts it and where the photo
+   shows it (on a rim, seen from above, a code appears shifted outwards). A bin with only
+   unknown parts keeps what it had; a bin with rules keeps them (the console says when it
+   holds something its rules don't take). The walls of tall bins can hide parts from the
+   camera: a bin that looks empty is taken as empty.
+   The photo is shown at once, then replaced by the result: each bin's floor with its cell and
+   code, the parts counted in it, the code areas shaded, parts dropped on a code crossed out,
+   and what each bin collects now. Resync does the same check (only these two: sorting photos
+   still show the model only the tray). [binscheck.py](../src/sortering_pnp/binscheck.py)
 4. **Ready.**
 
 ## Homing

@@ -22,7 +22,7 @@ from typing import Any
 
 import numpy as np
 
-from . import binspec, pickers
+from . import binscheck, binspec, pickers
 from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
@@ -35,10 +35,11 @@ from .io import read_json, write_json
 from .layout import Layout, yaw_from_up
 from .leds import Lights, make_leds, parse_hex
 from .models import ModelError, ModelStore
-from .parts import compute_gaps, to_bed
+from .parts import Part, compute_gaps, to_bed
 from .photos import Photos
 from .printer import Motion, Printer, PrinterError
 from .rules import family, wild_key
+from .rules import match as rule_match
 from .setup import KEYS as SETUP_KEYS
 from .setup import Setup
 from .startup import Checklist, kind_of, parts_in_bin
@@ -886,6 +887,7 @@ class Runner:
                 {
                     "marker": mk.marker,
                     "plate": [round(v, 2) for v in mk.centre],
+                    "view_px": [round(float(v), 1) for v in mk.view_px] if mk.view_px else None,
                     "cell": _cell_of(layout, mk.marker),
                 }
                 for mk in shot.markers
@@ -899,7 +901,7 @@ class Runner:
             return
         photos = sorted(self.runs_dir.glob("*_[0-9][0-9][0-9][0-9].jpg"))
         for p in photos[:-keep]:
-            for f in (p, p.with_name(p.stem + "_vis.jpg")):
+            for f in (p, *(p.with_name(f"{p.stem}_{s}.jpg") for s in ("vis", "view", "bins"))):
                 f.unlink(missing_ok=True)
 
     # ------------------------------------------------------------------ the loop
@@ -1488,9 +1490,13 @@ class Runner:
         if not parked:
             with self._lock:
                 self.motion.preflight(home=False)
-        shot = self.take_shot(layout, T, move=not parked, area="bins")
+        shot = self.take_shot(layout, T, move=not parked, area="bins", paint=False)
         report = layout.resync(self._seen_bins(layout, shot, T))
         layout.save(self.layout_path)
+        checked = None
+        if getattr(self.vision, "model_missing", lambda: None)() is None:
+            self.phase("looking into the bins")
+            checked = self._bins_check(layout, shot, T)
         wb = layout.work_bin()
         plate = f"bin {wb.marker} ({wb.w}x{wb.d})" if wb else "none"
         self.note(
@@ -1503,7 +1509,7 @@ class Runner:
         else:
             self.setup.reset("layout")
         bins = [{"marker": b.marker, "x": b.x, "y": b.y, "rot": b.rot} for b in layout.bins]
-        return {**report, "bins": bins, "problems": problems}
+        return {**report, "bins": bins, "problems": problems, "bins_check": checked}
 
     # ------------------------------------------------------------------ the Setup tab
     MACHINE_KEYS = (
@@ -1918,7 +1924,7 @@ class Runner:
                 sc.set("bins", "skipped", "no model: the bins keep what they had")
             else:
                 self.phase("start-up: looking into the bins")
-                sc.set("bins", "done", self._startup_bins(layout, shot))
+                sc.set("bins", "done", self._bins_check(layout, shot, T))
             sc.set("ready", "done", "ready to sort")
         except Exception as exc:
             sc.fail_running(str(exc))
@@ -1947,23 +1953,35 @@ class Runner:
         self.note(f"start-up: {text}")
         return text
 
-    def _startup_bins(self, layout: Layout, shot: Shot) -> str:
-        """What each bin holds, from the parts on its floor (none counted on its code): a wild
-        bin with parts collects their kind, an empty one is free. An empty bin with no rules
-        becomes wild. Bins with other roles keep them."""
+    def _bins_check(self, layout: Layout, shot: Shot, T: Transform2D | None) -> str:
+        """What each bin holds (binscheck.py), from one model pass on the whole board: Resync
+        and the start-up check only. Parts on a bin's code are not counted (the printed code
+        looks like parts to the model), nor unknown or unsure ones. A wild bin with parts
+        collects their kind, an empty one is free; one with only unknown parts keeps what it
+        had. An empty bin with no rules becomes wild. A bin with rules keeps them (a kind its
+        rules do not take is told). The picture with the result replaces the photo."""
+        spots = binscheck.code_spots(shot, T)
+        per_bin, dropped = binscheck.sort_out(layout, shot.parts, self.m.run.min_score, spots)
+        looks: list[binscheck.BinLook] = []
         filled: list[str] = []
         empty: list[str] = []
         changed = False
-        min_score = self.m.run.min_score
         with self._claims_lock:
             for b in layout.bins:
                 if b.role == "work":
                     continue
-                ps = parts_in_bin(layout, b, shot.parts, min_score)
                 mk, cell = b.marker, layout.bin_name(b)
-                if b.role == "sort" and not b.holds and not ps:
+                seen = per_bin.get(mk, [])
+                ps = [p for p in seen if not p.unknown]
+                look = binscheck.BinLook(mk, cell, seen)
+                looks.append(look)
+                if b.role == "sort" and not b.holds and not seen:
                     b.role, changed = "wild", True
                 if b.role != "wild":
+                    look.result = self._bins_check_kept(b, ps)
+                    continue
+                if seen and not ps:  # only unknown parts: maybe the code after all
+                    look.result = f"unknown only: kept ({self.claims.get(mk) or 'free'})"
                     continue
                 if ps:
                     key = kind_of(ps, layout.wild_by)
@@ -1973,21 +1991,62 @@ class Runner:
                         vol = max(vol, self.bin_volume.get(mk, 0.0))
                     else:
                         n = len(ps)
+                    if self.claims.get(mk) != key:
+                        self.say(f"bin {cell} ({mk}): {key} seen in it, collects {key} now")
                     self.claims[mk], self.bin_counts[mk], self.bin_volume[mk] = key, n, vol
                     self.bin_family[mk] = family(Counter(p.cls for p in ps).most_common(1)[0][0])
                     filled.append(f"{cell} {key} ({n})")
+                    look.result, look.changed = f"{key} ({n})", True
                 else:
                     for d in (self.claims, self.bin_counts, self.bin_volume, self.bin_family):
                         d.pop(mk, None)
                     self.requests = [r for r in self.requests if r.marker != mk]
                     empty.append(cell)
+                    look.result = "empty: wild, free"
             self._save_claims()
         if changed:
             layout.save(self.layout_path)
         text = f"{len(filled)} with parts" + (f": {', '.join(filled)}" if filled else "")
         text += f"; {len(empty)} empty, free wild bins" + (f": {', '.join(empty)}" if empty else "")
-        self.note(f"start-up: {text}")
+        if dropped:
+            text += f"; {len(dropped)} on codes, not counted"
+        self.note(f"bins check: {text}")
+        self.say(f"bins check: {text}")
+        self._show_bins_check(shot, T, layout, looks, dropped, spots)
         return text
+
+    def _bins_check_kept(self, b: Any, ps: list[Part]) -> str:
+        """A bin with its own role or rules keeps them: what is written on it."""
+        if b.role != "sort":
+            return b.role
+        rules = ", ".join(b.holds)
+        if ps and not any(rule_match(r, p) != "no" for r in b.holds for p in ps):
+            seen = kind_of(ps, "part")
+            self.say(f"bin {b.marker}: {seen} seen in it, but its rules take {rules}: kept")
+            return f"rules {rules} (holds {seen}?)"
+        return f"rules {rules}"
+
+    def _show_bins_check(
+        self,
+        shot: Shot,
+        T: Transform2D | None,
+        layout: Layout,
+        looks: list[binscheck.BinLook],
+        dropped: list[Part],
+        spots: dict[int, tuple[float, float]],
+    ) -> None:
+        """The bins check drawn on the photo, shown on the page in its place."""
+        view, H = getattr(shot, "view", None), getattr(shot, "view_h", None)
+        if view is None or H is None or T is None:
+            return
+        out = Path(view).with_name(f"{shot.name}_bins.jpg")
+        try:
+            done = binscheck.draw(Path(view), H, T, layout, looks, dropped, spots, out)
+        except Exception:  # noqa: BLE001 - only the picture is missing
+            log.exception("bins check picture")
+            return
+        if done is not None:
+            self._set(view=done.name)
 
     def _look_for_bins(self, layout: Layout, T: Transform2D) -> bool:
         """Waiting for a bin: a photo of the bins first. A bin this run left out (its code was

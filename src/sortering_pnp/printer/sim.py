@@ -8,6 +8,7 @@ drops; SimVision "photographs" the world and draws a top view for the web page.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import math
 import random
 import re
@@ -345,6 +346,10 @@ class SimVision:
                 Tm = np.eye(3)
                 Tm[:2, :2], Tm[:2, 2] = T.A, T.t
                 shot.view_h = (self._px @ Tm).tolist()
+                Hv = np.asarray(shot.view_h)
+                for i, mk in enumerate(markers):  # each code's centre in the picture
+                    u, v, w = Hv @ np.array([mk.centre[0], mk.centre[1], 1.0])
+                    markers[i] = dataclasses.replace(mk, view_px=(float(u / w), float(v / w)))
         return shot
 
     def _draw(
