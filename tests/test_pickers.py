@@ -169,6 +169,42 @@ def test_pi_pins_drive_servos_with_hardware_pwm(machine, tmp_path):
     assert (chip / "pwm1" / "duty_cycle").read_text() == "1500000"
 
 
+class LateFile:
+    """A channel file just after the export: root's for the first few writes, until udev hands
+    it to the gpio group (the Pi said: Permission denied: .../pwm1/period)."""
+
+    def __init__(self, refusals):
+        self.refusals, self.text = refusals, None
+
+    def write_text(self, value):
+        if self.refusals:
+            self.refusals -= 1
+            raise PermissionError(13, "Permission denied")
+        self.text = value
+
+
+def test_a_new_pwm_channel_is_waited_for_until_udev_gives_it(machine, tmp_path):
+    from sortering_pnp.pins import PERMS_WAIT_S, _write
+
+    waits = []
+    f = LateFile(refusals=4)
+    _write(f, "20000000", sleep=waits.append)
+    assert f.text == "20000000" and len(waits) == 4  # waited, then written
+    never = LateFile(refusals=10**6)
+    waits.clear()
+    with pytest.raises(PrinterError, match="gpio group.*install-pi.sh|install-pi.sh.*gpio group"):
+        _write(never, "1", sleep=waits.append)
+    assert sum(waits) == pytest.approx(PERMS_WAIT_S, abs=0.06)  # gives up after a few seconds
+
+
+def test_the_installer_gives_the_gpio_group_every_pwm_channel():
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / "install-pi.sh").read_text(encoding="utf-8")
+    assert "/etc/udev/rules.d/99-sortering-pnp-pwm.rules" in text
+    assert 'SUBSYSTEM=="pwm", ACTION=="add|change"' in text and "chgrp -R gpio /sys%p" in text
+
+
 def test_pi_pins_say_what_is_missing(machine, tmp_path):
     machine.picker.set_type("magnet")  # a servo
     pins = PiPins(machine, pwm_root=tmp_path / "none", output=FakeOutput)

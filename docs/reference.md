@@ -73,7 +73,11 @@ lines or more across each layer, except the D skirt's one-line edge.
   (gpiozero, part of Raspberry Pi OS) or a servo; GPIO13 (`picker.turn_pin`) the turning servo.
   Servos use the Pi's two hardware PWM channels (`/sys/class/pwm`), enabled by
   `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` in `/boot/firmware/config.txt`, which
-  `install-pi.sh` adds (reboot once). GND is pin 34.
+  `install-pi.sh` adds (reboot once). GND is pin 34. A channel's files are root's for a moment
+  after it is exported, until udev gives them to the `gpio` group: the program waits up to 3 s
+  for that, and `install-pi.sh` adds a udev rule (`/etc/udev/rules.d/99-sortering-pnp-pwm.rules`)
+  that does it for every PWM chip. "Permission denied: …/pwm1/period" means that rule or the
+  `gpio` group is missing: run `install-pi.sh` again.
 - **Order and safety:** before grabbing or letting go, sortering-pnp waits until Klipper has
   finished every move (`M400`). The pump goes off on Stop, on an error, on the emergency stop
   and when the program ends; a MOSFET module's pull-down keeps it off while nothing drives the

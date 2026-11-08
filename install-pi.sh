@@ -72,6 +72,16 @@ if ! id -nG "$USER" | grep -qw gpio; then
   sudo usermod -aG gpio "$USER"   # the pins without sudo
   REBOOT=1
 fi
+# the servos' PWM channels: exporting one makes its files as root's. Raspberry Pi OS's own rule
+# hands them to the gpio group only for some chip paths; this one does it for every PWM chip
+# and every channel exported on it (the program also waits a moment for it after an export).
+PWM_RULE=/etc/udev/rules.d/99-sortering-pnp-pwm.rules
+PWM_RULE_TEXT='SUBSYSTEM=="pwm", ACTION=="add|change", RUN+="/bin/sh -c '"'"'chgrp -R gpio /sys%p && chmod -R g+rwX /sys%p'"'"'"'
+if [ "$(cat "$PWM_RULE" 2>/dev/null)" != "$PWM_RULE_TEXT" ]; then
+  echo "$PWM_RULE_TEXT" | sudo tee "$PWM_RULE" >/dev/null
+  sudo udevadm control --reload-rules || true
+  sudo udevadm trigger --subsystem-match=pwm || true
+fi
 if getent group spi >/dev/null && ! id -nG "$USER" | grep -qw spi; then
   sudo usermod -aG spi "$USER"    # the LEDs without sudo
   REBOOT=1
