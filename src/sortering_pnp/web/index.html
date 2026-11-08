@@ -490,7 +490,7 @@ function drawOverlay(){const svg=$("ov"),im=$("view"),H=S.view_h;
   const x0=Math.min(...xs)-m,y0=Math.min(...ys)-m,x1=Math.max(...xs)+m,y1=Math.max(...ys)+m,lab=`next: ${T.name}${T.cell?" → "+T.cell:""}`,lw2=lab.length*fs*0.68+fs,lx=Math.max(0,Math.min(x0,W-lw2)),ly=y1+fs*1.9>Hh?y0-fs*1.75:y1+fs*0.3;
   s+=`<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" rx="${fs*0.4}" fill="none" stroke="#fff" stroke-width="${lw*4}"/><rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" rx="${fs*0.4}" fill="none" stroke="#c8462c" stroke-width="${lw*2.2}"/>`+
    `<rect x="${lx}" y="${ly}" width="${lw2}" height="${fs*1.45}" rx="${fs*0.35}" fill="#c8462c"/><text x="${lx+fs*0.5}" y="${ly+fs*1.03}" font-size="${fs*1.05}" font-weight="700" fill="#fff">${esc(lab)}</text>`;}
- if($("showcode").checked)for(const mk of S.markers||[]){if(!mk.plate)continue;const[x,y]=mapPt(H,mk.plate[0],mk.plate[1]);if(x<0||y<0||x>W||y>Hh)continue;
+ if($("showcode").checked)for(const mk of S.markers||[]){if(!mk.view_px&&!mk.plate)continue;const[x,y]=mk.view_px||mapPt(H,mk.plate[0],mk.plate[1]);if(x<0||y<0||x>W||y>Hh)continue;
   const lab=mk.cell?`${mk.marker} · ${mk.cell}`:String(mk.marker),w=lab.length*fs*0.62+fs*0.7;
   s+=`<g><circle cx="${x}" cy="${y}" r="${fs*0.35}" fill="#1d4ed8" stroke="#fff" stroke-width="${lw}"/><rect x="${x+fs*0.5}" y="${y-fs*0.75}" width="${w}" height="${fs*1.4}" rx="${fs*0.3}" fill="#1d4ed8" opacity=".9"/><text x="${x+fs*0.85}" y="${y+fs*0.32}" font-size="${fs}" font-weight="600" fill="#fff">${esc(lab)}</text></g>`;}
  svg.innerHTML=s;

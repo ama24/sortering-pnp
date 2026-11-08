@@ -5,7 +5,7 @@
   bins check    the model on that same photo (once, on the whole calibrated picture, nothing
                 painted over): a bin with parts in it collects their kind, an empty one is a
                 free wild bin. Nothing is counted on a bin's code (its shelf or post): the
-                printed code looks like parts to the model
+                printed code looks like parts to the model. binscheck.py; Resync does it too
   ready
 
 The Device tab shows the list with a tick for every step done.
@@ -64,22 +64,32 @@ class Checklist:
         return {"steps": self.steps, "started": self.started, "finished": self.finished}
 
 
-def parts_in_bin(
-    layout: Layout, b: Bin, parts: Iterable[Part], min_score: float = 0.0
-) -> list[Part]:
-    """Parts the camera sees on a bin's floor (inside its walls), none on or next to its code."""
+def floor_rect(layout: Layout, b: Bin) -> tuple[float, float, float, float]:
+    """A bin's floor, inside its walls (printer X/Y): x0, y0, x1, y1."""
     x0, y0, x1, y1 = layout.cells_rect(b.x, b.y, b.w, b.d)
     inset = binspec.GAP_MM / 2 + binspec.WALL_MM + 1.0
-    x0, y0, x1, y1 = x0 + inset, y0 + inset, x1 - inset, y1 - inset
-    mx, my = layout.marker_centre(b)
+    return x0 + inset, y0 + inset, x1 - inset, y1 - inset
+
+
+def parts_in_bin(
+    layout: Layout,
+    b: Bin,
+    parts: Iterable[Part],
+    min_score: float = 0.0,
+    codes: Iterable[tuple[float, float]] = (),
+) -> list[Part]:
+    """Parts the camera sees on a bin's floor (inside its walls), none on or next to its code:
+    where the layout puts the code, nor at `codes` (where the photo shows codes, printer X/Y)."""
+    x0, y0, x1, y1 = floor_rect(layout, b)
     h = CODE_KEEPOUT_MM
+    spots = [layout.marker_centre(b), *codes]
     return [
         p
         for p in parts
         if p.score >= min_score
         and x0 <= p.bed_xy[0] <= x1
         and y0 <= p.bed_xy[1] <= y1
-        and not (abs(p.bed_xy[0] - mx) <= h and abs(p.bed_xy[1] - my) <= h)
+        and not any(abs(p.bed_xy[0] - x) <= h and abs(p.bed_xy[1] - y) <= h for x, y in spots)
     ]
 
 
