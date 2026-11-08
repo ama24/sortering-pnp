@@ -374,10 +374,10 @@ program notices; they never block sorting.
 ## Everyday use
 
 1. **Throw the parts into the tray** and spread them a little with your hand.
-2. Press **Automatic** on the Device tab (or *Screw sorter → Automatic* on the printer's display).
+2. Press **Start automatic** on the Device tab (or *Screw sorter → Automatic* on the printer's display).
    The machine waits until nothing moves any more, sorts until the tray is empty, then waits
    again: just keep throwing parts in. It looks again every minute, with the motors off so it's
-   quiet. **Sort once** sorts what's there and stops.
+   quiet. **Manual → Sort once** sorts what's there and stops.
 3. **Watch the Device tab** if you like: the photo with the next part boxed, the bed, what lies
    in the tray, and a line for everything the machine does (parking, taking a photo, running the
    model, picking X, leaving X in bin Y).

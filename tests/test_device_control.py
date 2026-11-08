@@ -105,3 +105,24 @@ def test_every_photo_shows_before_the_model_has_looked(machine, tmp_path):
     assert s["shot_age_s"] is not None and s["shot_age_s"] < 5
     cells = {m["marker"]: m["cell"] for m in s["markers"]}
     assert cells[103] and cells[104]  # the codes, with their bins' cells
+
+
+def test_the_page_is_told_what_really_runs(machine):
+    """Automatic mode remembered from the last stop is not automatic mode running: after a
+    restart that did not start it (Setup unfinished) the page must not show it as on."""
+    runner, _ = _runner(machine)
+    runner._save_mode(True, "sort")  # on at the last stop, not running now
+    s = runner.snapshot()
+    assert (s["mode"], s["auto"], s["auto_saved"]) == ("", False, True)
+    machine.standby.interval_s = 60
+    runner.command("auto", "sort")
+    _until(lambda: runner.state.status == "standby")
+    assert runner.snapshot()["mode"] == "auto" and runner.snapshot()["auto"]
+    runner.command("stop")
+    runner.wait(10)
+    s = runner.snapshot()
+    assert (s["mode"], s["auto"], s["auto_saved"]) == ("", False, False)
+    runner.command("step")
+    assert runner.snapshot()["mode"] == "step"
+    runner.wait(20)
+    assert runner.snapshot()["mode"] == ""
