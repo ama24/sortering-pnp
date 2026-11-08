@@ -462,6 +462,7 @@ let layTick=0,NEXT=null,SHOT_T=null;
 function mmss(s){return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
 function camNote(){const n=(S.parts||[]).filter(p=>p.in_work!==false).length,el=$("camnote");if(!el)return;
  if(!S.view){el.textContent="";return;}
+ if(S.analysing){el.textContent="new photo · running the model…";return;}
  const t=NEXT!=null?`next photo in ${mmss(Math.max(0,Math.round((NEXT-Date.now())/1000)))}`:SHOT_T!=null?ago(Math.round((Date.now()-SHOT_T)/1000)):"";
  el.textContent=`${n} part${n===1?"":"s"}`+(t?` · ${t}`:"");}
 function ago(s){return s<5?"just now":s<60?`${s} s ago`:s<3600?`${Math.floor(s/60)} min ago`:"";}
@@ -519,13 +520,19 @@ function drawOverlay(){const svg=$("ov"),im=$("view"),H=S.view_h;
  $("target").innerHTML=T?`Next: <b>${esc(T.name)}</b>${T.cell?` into bin <b>${esc(T.cell)}</b> (${T.bin})`:""}`:(S.plan?esc(S.plan):"");}
 
 // ---------------------------------------------------------------- device: statistics and activity
-function renderStats(){const parts=(S.parts||[]).filter(p=>p.in_work!==false),by={};
+// what the last finished analysis found: kept while the next photo is taken (S.analysing), and
+// never replaced by nothing when the field is missing; "The tray is empty" only when it found none
+let CENSUS=null;
+function renderStats(){if(Array.isArray(S.census))CENSUS=S.census;
+ const busy=S.analysing?" · taking a new photo…":"";
+ if(CENSUS==null){$("bars").innerHTML='<p class="note">No photo analysed yet.</p>';$("statnote").textContent=busy.slice(3);return;}
+ const parts=CENSUS.filter(p=>p.in_work!==false),by={};
  for(const p of parts){const c=by[p.cls]||(by[p.cls]={n:0,len:{}});c.n++;const k=p.length!=null?p.length+" mm":"not measured yet";c.len[k]=(c.len[k]||0)+1;}
  const rows=Object.entries(by).sort((a,b)=>b[1].n-a[1].n||a[0].localeCompare(b[0])),max=Math.max(1,...rows.map(r=>r[1].n));
  $("bars").innerHTML=rows.map(([cls,c])=>{const col=colourOf(cls),lens=Object.entries(c.len).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0]));
   return `<div class="brow"><span class="nm" title="${esc(cls)}"><b>${esc(cls)}</b></span><span class="track"><span class="fillb" style="display:block;width:${100*c.n/max}%;background:${col}"></span></span><span class="n">${c.n}</span></div>`+
    (lens.length>1||(lens.length===1&&lens[0][0]!=="not measured yet"&&Object.keys(c.len).length)?lens.map(([l,n])=>`<div class="brow sub"><span class="nm">${esc(l)}</span><span class="track"><span class="fillb" style="display:block;width:${100*n/max}%;background:${col};opacity:.55"></span></span><span class="n">${n}</span></div>`).join(""):"");}).join("")||'<p class="note">The tray is empty.</p>';
- $("statnote").textContent=`${parts.length} part${parts.length===1?"":"s"}`+(S.picks?` · ${S.picks} sorted this run`:"")+(S.failed_picks?` · ${S.failed_picks} missed`:"");}
+ $("statnote").textContent=`${parts.length} part${parts.length===1?"":"s"}`+(S.picks?` · ${S.picks} sorted this run`:"")+(S.failed_picks?` · ${S.failed_picks} missed`:"")+busy;}
 function renderActivity(){const busy=["running","waiting","parked","stopping"].includes(S.status);
  const cls={running:"ok",standby:"ok",error:"bad",stuck:"warn",waiting:"warn",parked:"warn",paused:"warn"}[S.status]||"";
  $("now").innerHTML=`<span class="dot ${cls}"></span><span>${esc(busy?(S.phase||S.message):live(S.message))}</span>`;

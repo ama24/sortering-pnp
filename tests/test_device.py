@@ -6,6 +6,7 @@ from __future__ import annotations
 import time
 
 import numpy as np
+import pytest
 
 from sortering_pnp.layout import Bin, Layout
 from sortering_pnp.printer.sim import SimPart, SimPrinter, SimVision, SimWorld
@@ -102,3 +103,62 @@ def test_a_layout_with_problems_is_refused_while_sorting(machine):
         assert "not applied while sorting" in str(exc)
     runner.command("stop")
     runner.wait(30)
+
+
+def test_in_the_tray_stays_while_the_next_photo_is_taken(machine):
+    """The census ("In the tray") is the last finished analysis: a new photo clears the
+    outlines but not the census, and it empties only when an analysis finds nothing."""
+    import threading
+
+    runner, world = _runner(machine, n=4)
+    assert runner.snapshot()["census"] is None  # nothing analysed yet: not "empty"
+    layout, T = runner._prepare()
+    runner.take_shot(layout, T, move=False)
+    s = runner.snapshot()
+    before = s["census"]
+    assert before and len(before) == len(s["parts"]) and not s["analysing"]
+    assert set(before[0]) == {"cls", "length", "in_work"}
+
+    runner.vision.delay_s = 0.5
+    t = threading.Thread(target=runner.take_shot, args=(layout, T), kwargs={"move": False})
+    t.start()
+    end = time.time() + 5
+    while not runner.snapshot()["analysing"] and time.time() < end:
+        time.sleep(0.01)
+    s = runner.snapshot()
+    assert s["analysing"] and s["parts"] == []  # the new photo, its outlines not known yet
+    assert s["census"] == before  # ... but the graph keeps the last result
+    t.join(5)
+    assert not runner.snapshot()["analysing"]
+
+    world.parts = []  # the tray really is empty: the next analysis says so
+    runner.vision.delay_s = 0.0
+    runner.take_shot(layout, T, move=False)
+    s = runner.snapshot()
+    assert s["census"] == [] and not s["analysing"]
+
+
+def test_in_the_tray_kept_when_no_model_looked(machine):
+    """Without a model only the codes are read: no parts then is not an empty tray."""
+    runner, world = _runner(machine, n=3)
+    layout, T = runner._prepare()
+    runner.take_shot(layout, T, move=False)
+    before = runner.snapshot()["census"]
+    assert before
+    runner.vision.model_missing = lambda: "no model"
+    world.parts = []
+    runner.take_shot(layout, T, move=False)
+    assert runner.snapshot()["census"] == before
+
+
+def test_analysing_cleared_when_the_analysis_fails(machine):
+    runner, _ = _runner(machine, n=2)
+    layout, T = runner._prepare()
+
+    def boom(*a, **k):
+        raise RuntimeError("model crashed")
+
+    runner.vision.analyse = boom
+    with pytest.raises(RuntimeError):
+        runner.take_shot(layout, T, move=False)
+    assert not runner.snapshot()["analysing"]

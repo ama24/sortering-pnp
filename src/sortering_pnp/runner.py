@@ -70,6 +70,10 @@ class State:
     target: dict[str, Any] | None = None  # the part it picks next (Device tab: boxed)
     view: str | None = None  # the latest photo without drawings (the page draws on it)
     view_h: list[list[float]] | None = None  # plate mm -> view pixels (3x3 homography)
+    # the Device tab's "In the tray": what the last finished analysis found (cls, length,
+    # in_work per part), kept while the next photo is taken; None until a model has looked
+    census: list[dict[str, Any]] | None = None
+    analysing: bool = False  # a new photo is shown, its parts are not known yet
 
 
 ADJUST_RANGE = {  # Camera Calibration tab: what the sliders may set
@@ -253,6 +257,8 @@ class Runner:
             "counts": {str(k): v for k, v in s.counts.items()},
             "shot": s.shot,
             "parts": s.parts,
+            "census": s.census,
+            "analysing": s.analysing,
             "markers": s.markers,
             "events": list(self.events)[-60:],
             "console": list(self.console)[-80:],
@@ -517,11 +523,14 @@ class Runner:
                     photo = self.vision.snap(name)
                 self._show_photo(photo, name)
                 self.phase("running the model")
-                shot = (
-                    self.vision.analyse(photo, name, heights, work)
-                    if work is not None
-                    else self.vision.analyse(photo, name, heights)
-                )
+                try:
+                    shot = (
+                        self.vision.analyse(photo, name, heights, work)
+                        if work is not None
+                        else self.vision.analyse(photo, name, heights)
+                    )
+                finally:
+                    self._set(analysing=False)
             else:
                 self.phase("taking a photo")
                 with self.lights.for_photo():
@@ -853,7 +862,17 @@ class Runner:
             return
         view, view_h = shown
         self._shot_t = time.time()
-        self._set(view=Path(view).name, view_h=view_h, shot=None, parts=[], markers=[], target=None)
+        # the outlines belong to the old photo and go; the census ("In the tray") stays until
+        # the analysis of this one replaces it
+        self._set(
+            view=Path(view).name,
+            view_h=view_h,
+            shot=None,
+            parts=[],
+            markers=[],
+            target=None,
+            analysing=True,
+        )
 
     def _finish_shot(self, shot: Shot, layout: Layout, T: Transform2D | None) -> Shot:
         self.markers_seen |= {mk.marker for mk in shot.markers}
@@ -863,26 +882,36 @@ class Runner:
         compute_gaps(shot.parts)
         self.last_shot = shot
         self._prune_photos()
+        parts = [
+            {
+                "id": p.id,
+                "cls": p.cls,
+                "poly": _poly_for_page(p.polygon),
+                "xy": [round(float(v), 1) for v in p.plate_xy],
+                "length": p.length_mm,
+                "score": round(p.score, 2),
+                "bed": [round(v, 1) for v in p.bed_xy] if T is not None else None,
+                "gap": None if math.isinf(p.gap_mm) else round(p.gap_mm, 1),
+                "in_work": bool(
+                    T is not None and layout.in_work(p.bed_xy, self.m.run.work_margin_mm)
+                ),
+            }
+            for p in shot.parts
+        ]
+        # without a model only the codes were read: no parts is not an empty tray
+        modelled = not getattr(self.vision, "model_missing", lambda: None)()
+        census = (
+            [{k: d[k] for k in ("cls", "length", "in_work")} for d in parts]
+            if modelled
+            else self.state.census
+        )
         self._set(
             shot=shot.vis.name if shot.vis else None,
             view=shot.view.name if getattr(shot, "view", None) else None,
             view_h=getattr(shot, "view_h", None),
-            parts=[
-                {
-                    "id": p.id,
-                    "cls": p.cls,
-                    "poly": _poly_for_page(p.polygon),
-                    "xy": [round(float(v), 1) for v in p.plate_xy],
-                    "length": p.length_mm,
-                    "score": round(p.score, 2),
-                    "bed": [round(v, 1) for v in p.bed_xy] if T is not None else None,
-                    "gap": None if math.isinf(p.gap_mm) else round(p.gap_mm, 1),
-                    "in_work": bool(
-                        T is not None and layout.in_work(p.bed_xy, self.m.run.work_margin_mm)
-                    ),
-                }
-                for p in shot.parts
-            ],
+            parts=parts,
+            census=census,
+            analysing=False,
             markers=[
                 {
                     "marker": mk.marker,
