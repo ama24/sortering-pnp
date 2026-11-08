@@ -77,6 +77,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     m = _load(args)
     runner, world = _build(m)
+    if world is None:  # a real printer: every start begins with no bins (Resync finds them)
+        runner.fresh_session()
     server = make_server(runner, m.web.host, args.port or m.web.port, _accounts(m))
     listener = None
     if m.printer.driver == "moonraker":

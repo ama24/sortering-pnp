@@ -281,8 +281,18 @@ class Web:
 
 
 @dataclass
+class Bed:
+    """The Gridfinity grid the bed holds. Every start on a real printer begins with this grid
+    and no bins (Runner.fresh_session); Resync or the start-up check finds them."""
+
+    cols: int = 5  # cells along X (5 x 42 mm on a 220 mm bed)
+    rows: int = 5  # cells along Y
+
+
+@dataclass
 class Machine:
     paths: Paths = field(default_factory=Paths)
+    bed: Bed = field(default_factory=Bed)
     camera: Camera = field(default_factory=Camera)
     lights: Lights = field(default_factory=Lights)
     printer: Printer = field(default_factory=Printer)
@@ -338,6 +348,8 @@ class Machine:
         for key in ("focus", "white_balance", "exposure"):
             if getattr(a, key) not in ("auto", "manual"):
                 raise ConfigError(f"camera.adjust.{key} must be auto or manual")
+        if self.bed.cols < 1 or self.bed.rows < 1:
+            raise ConfigError("bed.cols and bed.rows must be at least 1")
         if self.run.when_no_bin not in ("ask", "overflow"):
             raise ConfigError("run.when_no_bin must be ask or overflow")
         if self.run.share_wild not in ("class", "family", "none"):

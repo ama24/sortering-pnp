@@ -610,6 +610,12 @@ off, camera unplugged…) it switches itself off and says why on the page.
 
 ## The start-up check
 
+**Every start is a new session** (real printer; the simulator keeps its layout): the layout
+begins as the empty grid of `bed.cols` x `bed.rows` cells (machine.yaml, 5 x 5 by default: a
+220 mm bed; set it for a bigger machine), with no bins, and what the bins collected, their
+counts and open bin changes are forgotten (the learnt packing stays). Resync or this check
+finds the bins and the tray again from the photo.
+
 The first run after sortering-pnp starts (Automatic, Sort once or One pick; also automatic
 mode carrying on after a restart) begins with a check, shown with a tick per step
 in the left menu, under Device (**Recheck** runs it alone, also while sorting). It is `run.startup_check`:
