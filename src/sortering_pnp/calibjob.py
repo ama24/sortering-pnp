@@ -24,6 +24,8 @@ from typing import Any
 
 import numpy as np
 
+from sortering_pnp.drawing import finite, pt
+
 log = logging.getLogger("sortering_pnp.calibjob")
 
 STILL_FRAMES = 4  # live frames in a row with the board in the same place: it holds still
@@ -278,11 +280,13 @@ class CalibrationJob:
             for j in range(gy):
                 for i in range(gx):
                     if self.grid[j, i] > 0:
-                        x0, y0 = int(i * w / gx), int(j * h / gy)
-                        x1, y1 = int((i + 1) * w / gx), int((j + 1) * h / gy)
-                        cv2.rectangle(tint, (x0, y0), (x1, y1), (60, 200, 60), -1)
+                        p0 = pt(i * w // gx, j * h // gy)
+                        p1 = pt((i + 1) * w // gx, (j + 1) * h // gy)
+                        cv2.rectangle(tint, p0, p1, (60, 200, 60), -1)
             out = cv2.addWeighted(tint, 0.25, out, 0.75, 0)
-        if self.seen is not None and self.running:
-            for x, y in self.seen:
-                cv2.circle(out, (int(x), int(y)), 4, (0, 230, 0), -1)
+        seen = self.seen  # set by the calibration thread meanwhile
+        if seen is not None and self.running:
+            for x, y in np.asarray(seen, dtype=float).reshape(-1, 2):
+                if finite(x, y):
+                    cv2.circle(out, pt(x, y), 4, (0, 230, 0), -1)
         return out

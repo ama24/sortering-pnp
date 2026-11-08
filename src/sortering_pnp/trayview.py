@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .drawing import poly as int_poly
+
 
 @dataclass
 class WorkArea:
@@ -66,9 +68,9 @@ def paint_outside(
     import cv2
 
     mask = np.zeros(image.shape[:2], np.uint8)
-    cv2.fillPoly(mask, [np.round(keep_px).astype(np.int32)], 255)
+    cv2.fillPoly(mask, [int_poly(keep_px)], 255)
     for h in holes_px:
-        cv2.fillPoly(mask, [np.round(h).astype(np.int32)], 0)
+        cv2.fillPoly(mask, [int_poly(h)], 0)
     if colour is None:
         floor = image[mask > 0]
         colour = tuple(int(v) for v in np.median(floor, axis=0)) if len(floor) else (200,) * 3
