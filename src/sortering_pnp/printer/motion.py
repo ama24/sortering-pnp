@@ -242,10 +242,21 @@ class Motion:
             self.move(z=tz)
         self.move(x=x, y=y)
 
+    def photo_z(self) -> float:
+        """The tip height at the photo position: travel_z for the fixed camera when
+        printer.photo_at_travel_z is on (the head only has to be out of the picture in X/Y),
+        else photo_position's Z (always for the head camera: its height sets the scale)."""
+        pc = self.m.printer
+        if pc.photo_at_travel_z and self.m.camera.source != "head":
+            return pc.travel_z
+        return pc.photo_position[2]
+
     def photo_position(self) -> None:
-        x, y, z = self.m.printer.photo_position
+        x, y, _ = self.m.printer.photo_position
+        z = self.photo_z()
         self.travel(x, y)
-        self.move(z=z)
+        if abs(self.current_tip()[2] - z) > 1e-6:
+            self.move(z=z)
         self.p.gcode("M400")
 
     def change_position(self) -> None:
@@ -301,7 +312,8 @@ class Motion:
         self.p.gcode("M400")
         self.pins.release()
         self.carrying = False
-        self.move(z=self.m.printer.travel_z)
+        if abs(self.current_tip()[2] - tz) > 1e-6:  # lowered to drop: back up
+            self.move(z=tz)
 
     def shake(self) -> None:
         """Quick back-and-forth moves of the bed (or head) to spread a clump of parts. They are

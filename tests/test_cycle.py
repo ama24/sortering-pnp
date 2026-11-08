@@ -78,3 +78,69 @@ def test_retired_settings_still_load(tmp_path):
     p.write_text("run:\n  pipeline: true\nstandby:\n  settle_s: 8\n", encoding="utf-8")
     m = config_mod.load(p)
     assert not hasattr(m.run, "pipeline") and not hasattr(m.standby, "settle_s")
+
+
+def _tip_z_after_each_line(machine, printer: SimPrinter) -> list[tuple[str, float]]:
+    """Each logged line with the tip Z after it (absolute G1 moves; offset added back)."""
+    oz = machine.tool.offset[2]
+    z = float("nan")
+    out = []
+    for line in printer.log:
+        if line.startswith("G1") or line.startswith("G0"):
+            for w in line.split()[1:]:
+                if w.startswith("Z"):
+                    z = float(w[1:]) + oz
+        out.append((line, z))
+    return out
+
+
+def test_no_rise_above_travel_z_after_a_drop(machine):
+    """After the drop the head parks for the next photo at the travel height: no extra Z."""
+    machine.run.shake.enabled = False
+    machine.run.scan_bins_on_start = machine.run.only_seen_bins = False
+    assert machine.printer.photo_position[2] > machine.printer.travel_z  # the old extra rise
+    runner, world, printer, vision = make(machine, n=2)
+    _log_photos(printer, vision)
+    runner.command("start", "sort")
+    runner.wait(60)
+    assert runner.state.status == "done", runner.state.message
+    lines = _tip_z_after_each_line(machine, printer)
+    first_drop = next(i for i, (line, _) in enumerate(lines) if line == "; pins release")
+    tz = machine.printer.travel_z
+    highest = max(z for _, z in lines[first_drop:] if z == z)
+    assert highest <= tz + 1e-3, highest
+    photos = [z for line, z in lines if line.startswith("; photo")]
+    assert photos and all(abs(z - tz) < 1e-3 for z in photos), photos
+
+
+def test_photo_position_moves_in_xy_only_at_travel_height(machine):
+    from sortering_pnp.printer.motion import Motion
+
+    printer = SimPrinter(machine, SimWorld(seed=1))
+    printer.gcode("G28")
+    motion = Motion(printer, machine)
+    tz = machine.printer.travel_z
+    motion.move(100.0, 100.0, tz)
+    printer.log.clear()
+    motion.photo_position()
+    assert motion.current_tip() == [*machine.printer.photo_position[:2], tz]
+    assert not any(" Z" in line for line in printer.log if line.startswith("G1")), printer.log
+    # from lower down it only rises to the travel height, never to photo_position's Z
+    motion.move(z=tz - 20)
+    motion.photo_position()
+    assert motion.current_tip()[2] == tz
+
+
+def test_photo_position_z_when_asked_and_for_the_head_camera(machine):
+    from sortering_pnp.printer.motion import Motion
+
+    pz = machine.printer.photo_position[2]
+    for keep, source in ((False, "overview"), (True, "head")):
+        machine.printer.photo_at_travel_z = keep
+        machine.camera.source = source
+        printer = SimPrinter(machine, SimWorld(seed=1))
+        printer.gcode("G28")
+        motion = Motion(printer, machine)
+        motion.move(100.0, 100.0, machine.printer.travel_z)
+        motion.photo_position()
+        assert motion.current_tip()[2] == pz, (keep, source)

@@ -161,6 +161,10 @@ class Printer:
     # step): head high and in the middle, bed out, so the head is easy to reach
     change_position: list[float] = field(default_factory=lambda: [110.0, 220.0, 100.0])
     travel_z: float = 50.0  # tip height for every move (above the bins)
+    # fixed camera: the head parks for photos at travel_z (out of the picture in X/Y only, no
+    # extra rise and fall each cycle); False: it also goes to photo_position's Z. The head
+    # camera always uses photo_position's Z (it sets the photo's scale)
+    photo_at_travel_z: bool = True
     feed_xy: float = 6000.0
     feed_z: float = 1200.0
     limits_x: list[float] = field(default_factory=lambda: [0.0, 220.0])
