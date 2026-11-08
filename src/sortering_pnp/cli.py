@@ -4,6 +4,7 @@ sortering-pnp serve              web page + sorter + printer-menu buttons (the n
 sortering-pnp serve --sim        the same with a simulated printer, parts and camera (try it on a PC)
 sortering-pnp run --strategy sort [--steps N]   sort without the web page (logs to the terminal)
 sortering-pnp check              is everything there? (config, layout, calibration, printer)
+sortering-pnp klipper            put sortering_pnp.cfg into Klipper, fix printer.cfg, restart Klipper
 sortering-pnp user add NAME      page account (new user or new password); user remove / list
 sortering-pnp print bin|baseplate|labels|all    write printable files
 sortering-pnp print catalogue --out prints      every bin size as full build plates, baseplates, labels
@@ -235,6 +236,26 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_klipper(args: argparse.Namespace) -> int:
+    """Klipper's side (klippercfg.py): install-pi.sh runs it; safe to run again."""
+    from . import klippercfg
+
+    m = _load(args)
+    folder = m.path(args.dir or m.paths.klipper_config)
+    assert folder is not None
+    source = Path(__file__).resolve().parents[2] / "klipper" / klippercfg.CFG_NAME
+    rep = klippercfg.install(folder, source)
+    for line in rep.done:
+        print(f"  done  {line}")
+    for line in rep.warnings:
+        print(f"  !!    {line}")
+    if not rep.done and not rep.warnings:
+        print("  ok    Klipper already reads sortering_pnp.cfg; nothing to change")
+    if rep.changed and not args.no_restart and (folder / "printer.cfg").is_file():
+        print("  " + klippercfg.restart(m.printer.url))
+    return 0
+
+
 def cmd_print(args: argparse.Namespace) -> int:
     from .layout import Bin, Layout
     from .printables import export
@@ -313,6 +334,10 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("check", help="check config, layout, calibration and printer")
     c.add_argument("--sim", action="store_true")
     c.set_defaults(func=cmd_check)
+    k = sub.add_parser("klipper", help="sortering_pnp.cfg into Klipper, printer.cfg fixed")
+    k.add_argument("--dir", default=None, help="Klipper's config folder (paths.klipper_config)")
+    k.add_argument("--no-restart", action="store_true", help="don't restart Klipper")
+    k.set_defaults(func=cmd_klipper)
     u = sub.add_parser("user", help="page accounts: add (or new password), remove, list")
     u.add_argument("action", choices=["add", "remove", "list"])
     u.add_argument("name", nargs="?", default="")

@@ -128,9 +128,13 @@ Pi 3B has too little memory for Klipper, the camera and the model together.
 ```bash
 git clone https://github.com/ama24/sortering-pnp.git ~/sortering-pnp
 ~/sortering-pnp/install-pi.sh --service      # --service: start sortering-pnp at every boot
-cp ~/sortering-pnp/klipper/sortering_pnp.cfg ~/printer_data/config/
-echo "[include sortering_pnp.cfg]" >> ~/printer_data/config/printer.cfg   # once
 ```
+
+The script also does Klipper's side (`sortering-pnp klipper`, [klippercfg.py](../src/sortering_pnp/klippercfg.py),
+`paths.klipper_config`): sortering_pnp.cfg next to printer.cfg, its include once and after your
+own sections (it sets `[stepper_y]` homing speeds, and the later value wins), `[safe_z_home]`
+commented out, the old picker include removed, backups kept, then FIRMWARE_RESTART unless
+Klipper prints. What can go wrong and what to do: README, *Klipper's config: what goes wrong*.
 
 **Everything is pinned**, so installing again in a year gives exactly the same programs:
 - [requirements-pi.lock.txt](../requirements-pi.lock.txt) lists every Python package with its
@@ -557,7 +561,7 @@ printer:
     accel_x: 3000       # mm/s^2 for the head (the X part of a move): the Ender 3's own
     accel_y: 200        # mm/s^2 for the bed (the Y part): long soft ramps, loose parts ride on it
     carrying: 0.6       # accel_x x this while the picker holds a part (1: no change)
-    profile: s_curve    # s_curve | trapezoid
+    profile: trapezoid  # trapezoid (one G1, a straight ramp) | s_curve (stepped)
     max_feed_x: null    # mm/min for the head (the X part); null: printer.feed_xy
     max_feed_y: 3000    # mm/min for the bed (the Y part); null: printer.feed_xy
     steps: 12           # s_curve: speed steps per ramp
@@ -575,23 +579,27 @@ and `max_feed` as `accel_y` and `max_feed_y`.
   the head, not on the bed). After the move it is set back
   to `printer.accel`, or else to Klipper's own value (read once), so other moves and macros keep
   it. It is never raised above that, and not sent when it is the same.
-- **`s_curve`:** the speed follows an S (smoothstep: no jump in acceleration at the start and end
-  of a ramp; its peak is `accel`). The move is split into short G1 steps along the same straight
+- **`trapezoid`** (the default): one G1 at the lowered acceleration. Klipper's own ramp: the
+  speed rises in a straight line (constant acceleration, as AccelStepper does) and falls the same
+  way; the bed reaches 50 mm/s in 0.25 s over 6.25 mm at 200 mm/s^2. Klipper's input shaper,
+  if set up in printer.cfg, rounds the corners of the ramp.
+- **`s_curve`** (not recommended): the speed follows an S (smoothstep: no jump in acceleration
+  at the start and end of a ramp; its peak is `accel`). Klipper runs each step as a move of its
+  own: it reaches the step's speed quickly and then holds it, so the S comes out as small
+  stairs. The move is split into short G1 steps along the same straight
   line, their speeds rising and falling along the S, and Klipper's lookahead runs them without
   stopping between them. A short move gets a lower top speed and fewer steps; under 4 mm (with
   `min_step_mm: 1`) it is one G1. The last G1 is the target itself, so the end point is exact. A 0 -> 200 mm travel at
   6000 mm/min with the bed at 1000 mm/s^2 and 8 steps becomes 7 steps up (F87 ... F5913 over
-  7.5 mm), one at F6000, 7 down. With the defaults the bed ramps like a mill's table: up to
-  50 mm/s in 0.375 s over 9.4 mm, in 9 steps.
+  7.5 mm), one at F6000, 7 down.
 - **No corners at speed for the bed:** Klipper takes a corner between two moves (e.g. lift in Z,
   then travel in Y) at up to its square corner velocity (5 mm/s): the bed would jump from rest
   to that speed with no ramp. Every move of the bed is sent with `SQUARE_CORNER_VELOCITY=0`
   (a full stop at both ends) and Klipper's own value is set back after it.
 - **Homing** runs at `accel_y` with no corners at speed too (the homing macro's moves included).
-  Homing Y still ends with the bed stopping at its switch: set a slow `homing_speed` for
-  `[stepper_y]` in printer.cfg (e.g. 20, `second_homing_speed: 5`), and leave
-  `standby.motors_off` false (the default), so automatic mode does not home before every round.
-- **`trapezoid`:** one G1 at the lowered acceleration.
+  Homing Y still ends with the bed stopping at its switch: sortering_pnp.cfg slows it
+  (`[stepper_y] homing_speed: 20`, `second_homing_speed: 5`), and `standby.motors_off` is false
+  by default, so automatic mode does not home before every round.
 - **Not shaped:** Z-only moves (up and down) and the shake (`run.shake`), whose quick moves are
   meant to be sharp (only when a clump is seen, `run.shake.enabled`).
 - **Still moving?** Lower `accel_y` further (100), or `max_feed_y` (2000); check that Klipper's

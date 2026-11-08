@@ -38,6 +38,10 @@ another repository.
   reaches the program through `action_call_remote_method("sortering_pnp", ...)`, received over
   Moonraker's websocket (`MenuListener`). `printer/sim.py` is a full simulator (printer, parts,
   camera) used by the tests and by `sortering-pnp serve --sim`.
+- **Klipper's config:** `klippercfg.py` (`sortering-pnp klipper`, run by install-pi.sh) copies
+  `klipper/sortering_pnp.cfg` and fixes printer.cfg: the include once, after the user's sections
+  (sortering_pnp.cfg overrides e.g. `[stepper_y]` homing speeds), no `[safe_z_home]`. Never put
+  SAVE_CONFIG-written sections (`[input_shaper]`, ...) in sortering_pnp.cfg.
 - **Motion safety:** every move goes through `printer/motion.py`, which applies the tool offset
   and the soft limits. `preflight()` refuses to move unless Klipper is ready, not printing, the
   hotend is cold, the axes are homed, and (for sorting, not for the Setup tab's watched moves)

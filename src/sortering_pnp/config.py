@@ -57,6 +57,9 @@ class Paths:
     todo: str = "../data/todo.json"  # the Setup tab's "On the machine" ticks
     captures: str = "../data/captures"  # calibration photos, locked camera settings
     sessions: str = "../data/real"  # real-photo sessions (Photos tab), the format screw-synth reads
+    klipper_config: str = (
+        "~/printer_data/config"  # Klipper's printer.cfg folder (`sortering-pnp klipper`)
+    )
 
 
 @dataclass
@@ -134,9 +137,9 @@ class XYMotion:
     accel_x: float = 3000.0  # mm/s^2 of the head (the X part of a move)
     accel_y: float = 200.0  # mm/s^2 of the bed (the Y part): long, soft ramps, loose parts on it
     carrying: float = 0.6  # accel_x x this while the picker holds a part (1: no change)
-    # s_curve: the speed rises and falls smoothly (the move split into short G1 steps whose
-    # speeds follow an S) | trapezoid: one G1, Klipper's own ramp
-    profile: str = "s_curve"
+    # trapezoid: one G1, Klipper's own ramp: the speed rises in a straight line (smooth) |
+    # s_curve: short G1 steps whose speeds follow an S (Klipper runs them as small stairs)
+    profile: str = "trapezoid"
     max_feed_x: float | None = None  # mm/min of the head (the X part); None = printer.feed_xy
     max_feed_y: float | None = 3000.0  # mm/min of the bed (the Y part); None = printer.feed_xy
     steps: int = 12  # s_curve: speed steps per ramp (up and down)
