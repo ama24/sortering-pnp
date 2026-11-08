@@ -31,6 +31,7 @@ class Motion:
         self.tip: list[float] | None = None  # last commanded tip position
         self.z_home_xy: tuple[float, float] | None = None  # tip X/Y for homing Z (set by runner)
         self._accel: float | None = None  # Klipper's acceleration, read once (0 = unknown)
+        self.carrying = False  # the picker holds a part (grab .. release): gentler X
 
     # ------------------------------------------------------------------ checks
     def preflight(self, home: bool = True, tool: bool | None = None) -> PrinterStatus:
@@ -82,6 +83,7 @@ class Motion:
         log.info("homing")
         self.p.gcode("\n".join([*lines, "G28"]))
         self.tip = None
+        self.carrying = False
 
     def motors_off(self) -> None:
         """Quiet standby: the axes lose their homing and are homed again before the next move."""
@@ -131,35 +133,53 @@ class Motion:
             return
         f = feed or (self.m.printer.feed_z if x is None and y is None else self.m.printer.feed_xy)
         last = f"G1 {' '.join(words)}"
-        if self.m.printer.y_motion.enabled and abs(ty - cur[1]) > 1e-6:
-            self.p.gcode("\n".join(["G90", *self._gentle_y(cur, [tx, ty, tz], f, last)]))
+        moves_xy = abs(tx - cur[0]) > 1e-6 or abs(ty - cur[1]) > 1e-6
+        if self.m.printer.xy_motion.enabled and moves_xy:
+            self.p.gcode("\n".join(["G90", *self._profiled(cur, [tx, ty, tz], f, last)]))
         else:
             self.p.gcode(f"G90\n{last} F{f:.0f}")
         self.tip = [tx, ty, tz]
 
     def _normal_accel(self) -> float | None:
-        """The acceleration X and Z keep: printer.accel, else Klipper's (read once: Motion
-        always sets it back after a bed move). None: unknown."""
+        """The printer's acceleration, which every X/Y move sets back and never goes above:
+        printer.accel, else Klipper's (read once: Motion always sets it back). None: unknown."""
         if self.m.printer.accel:
             return float(self.m.printer.accel)
         if self._accel is None:
             self._accel = self.p.status(None).max_accel
             if self._accel is None:
-                log.warning("the printer's acceleration is unknown: bed moves leave it lowered")
+                log.warning("the printer's acceleration is unknown: X/Y moves leave it lowered")
                 self._accel = 0.0
         return self._accel or None
 
-    def _gentle_y(self, cur: list[float], to: list[float], feed: float, last: str) -> list[str]:
-        """A move that moves the bed (printer.y_motion): lowered acceleration while it runs,
-        with `s_curve` split into straight G1 steps whose speeds follow an S; `last` (the
-        target, as a plain move would send it) ends it, so the end point is exact."""
-        ym = self.m.printer.y_motion
+    def xy_accel(self, dx: float, dy: float, dz: float = 0.0) -> float:
+        """The acceleration (mm/s^2) along a move of (dx, dy, dz): the largest that keeps its X
+        part within accel_x (x carrying while a part is held) and its Y part within accel_y,
+        never above the printer's own."""
+        return self._limits([dx, dy, dz], self.m.printer.feed_xy)[1]
+
+    def _limits(self, delta: list[float], feed: float) -> tuple[float, float]:
+        xm = self.m.printer.xy_motion
+        k = xm.carrying if self.carrying else 1.0  # the part hangs on the head: X only
+        length = math.sqrt(sum(d * d for d in delta))
+        f, a = smooth.path_limits(
+            length,
+            [(delta[0], xm.accel_x * k, xm.max_feed_x), (delta[1], xm.accel_y, xm.max_feed_y)],
+            feed,
+        )
+        normal = self._normal_accel()
+        return f, a if normal is None else min(a, normal)
+
+    def _profiled(self, cur: list[float], to: list[float], feed: float, last: str) -> list[str]:
+        """A move that changes X or Y (printer.xy_motion): the acceleration that keeps each axis
+        within its limit while it runs, with `s_curve` split into straight G1 steps whose speeds
+        follow an S; `last` (the target, as a plain move would send it) ends it, so the end
+        point is exact."""
+        ym = self.m.printer.xy_motion
         delta = [b - a for a, b in zip(cur, to, strict=True)]
         length = math.sqrt(sum(d * d for d in delta))
-        f, a = smooth.path_limits(length, delta[1], feed, ym.accel, ym.max_feed)
+        f, a = self._limits(delta, feed)
         normal = self._normal_accel()
-        if normal is not None:
-            a = min(a, normal)
         steps = (
             smooth.s_curve(length, f, a, ym.steps, ym.min_step_mm)
             if ym.profile == "s_curve"
@@ -229,6 +249,7 @@ class Motion:
         self.move(z=z, feed=pk.feed_z_slow)
         self.p.gcode("M400")  # the pins are not in Klipper's queue: wait for the moves first
         self.pins.grab()
+        self.carrying = True  # gentler X until it is let go
         self.move(z=z + pk.approach_mm, feed=pk.feed_z_slow)
         self.move(z=self.m.printer.travel_z)
 
@@ -245,11 +266,12 @@ class Motion:
             self.move(z=drop_z)
         self.p.gcode("M400")
         self.pins.release()
+        self.carrying = False
         self.move(z=self.m.printer.travel_z)
 
     def shake(self) -> None:
         """Quick back-and-forth moves of the bed (or head) to spread a clump of parts. They are
-        meant to be sharp: sent as they are, without printer.y_motion's gentle ramps."""
+        meant to be sharp: sent as they are, without printer.xy_motion's profile."""
         sh = self.m.run.shake
         axis = sh.axis.upper()
         self.photo_position()

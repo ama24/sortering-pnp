@@ -20,7 +20,7 @@ Settings are in [configs/machine.yaml](../configs/machine.yaml) (each has a comm
 - [Where a part is taken: grip point, direction, centre of mass](#where-a-part-is-taken-grip-point-direction-centre-of-mass)
 - [Tweezers on a Z rotation axis](#tweezers-on-a-z-rotation-axis)
 - [One cycle: photo, pick, drop, park](#one-cycle-photo-pick-drop-park)
-- [Gentle bed moves](#gentle-bed-moves)
+- [X/Y acceleration profile](#xy-acceleration-profile)
 - [Automatic mode](#automatic-mode)
 - [The start-up check](#the-start-up-check)
 - [Homing](#homing)
@@ -216,7 +216,8 @@ The steps below are the same work in more detail.
    Bins taken off the bed keep their rules and get them back when they return. Give the other
    bins rules (*holds*) or leave them wild. With a model loaded, Resync also does the start-up
    check's **Bins check** on the same photo (see [The start-up check](#the-start-up-check)).
-8. **Device tab**: pick a strategy and press **Sort once** or **Automatic**, or use the printer menu.
+8. **Device tab**: pick a strategy and press **Start automatic** (*Manual* has Sort once and One
+   pick), or use the printer menu.
 
 ## Models: upload over WiFi, keep the old ones
 
@@ -435,8 +436,9 @@ machine never stops for it: it keeps sorting everything else. When only the wait
 left, it waits, and still looks at the tray every `standby.interval_s`: parts thrown in
 meanwhile are sorted. The requests are kept across a restart.
 
-All bin changes are in one banner at the top of the Device tab, with one button that steps
-through them (or **Change bin** in the printer menu):
+All bin changes are on one line above the bed on the Device tab (the bins to change and the
+finished ones, with *Emptied*), with one button that steps through them (or **Change bin** in
+the printer menu, or the bin's own menu on the bed):
 1. **Park:** the machine finishes its move and parks (bed out, safe for your hands); also
    while automatic mode stands by;
 2. empty the bins, or put other (empty) bins in their place;
@@ -538,31 +540,41 @@ Klipper and the model together.
 - **The photo position must keep the head outside the working area in the picture**, ideally
   off the plate.
 - **Loose parts and quick bed moves:** the bed moves to the part, the bin and back, and fast
-  moves can nudge loose parts. `printer.y_motion` makes every bed move start and stop gently
-  ([Gentle bed moves](#gentle-bed-moves)); `printer.accel` lowers the acceleration of all axes
-  while sorting.
+  moves can nudge loose parts. `printer.xy_motion` gives each axis its own acceleration and
+  makes every X/Y move start and stop gently ([X/Y acceleration profile](#xy-acceleration-profile));
+  `printer.accel` lowers the acceleration of all axes while sorting.
 
-## Gentle bed moves
+## X/Y acceleration profile
 
-On a bed-slinger the loose parts ride on the Y axis. Klipper has one acceleration for all axes
-and only straight (trapezoid) ramps, so sortering-pnp shapes each move that changes Y itself
-(`printer/motion.py`, `printer/smooth.py`); X and Z moves are sent as before.
+On a bed-slinger the loose parts ride on the Y axis (the bed), while X moves only the head. Klipper
+has one acceleration for all axes and only straight (trapezoid) ramps, so sortering-pnp shapes
+each move that changes X or Y itself (`printer/motion.py`, `printer/smooth.py`). On by default.
 
 ```yaml
 printer:
-  y_motion:
-    enabled: true       # false: Y moves like X (one G1 at the printer's acceleration)
-    accel: 1000         # mm/s^2 for the bed (the Y part of a move)
+  xy_motion:
+    enabled: true       # false: plain moves (one G1 at the printer's acceleration)
+    accel_x: 3000       # mm/s^2 for the head (the X part of a move): the Ender 3's own
+    accel_y: 1000       # mm/s^2 for the bed (the Y part): gentle, loose parts ride on it
+    carrying: 0.6       # accel_x x this while the picker holds a part (1: no change)
     profile: s_curve    # s_curve | trapezoid
-    max_feed: null      # mm/min for the bed (the Y part); null: printer.feed_xy
+    max_feed_x: null    # mm/min for the head (the X part); null: printer.feed_xy
+    max_feed_y: null    # mm/min for the bed (the Y part); null: printer.feed_xy
     steps: 8            # s_curve: speed steps per ramp
     min_step_mm: 1.0    # s_curve: steps at least this long on average
 ```
 
-- **Acceleration:** before the move `SET_VELOCITY_LIMIT ACCEL=` lowers it so that the bed gets
-  `accel` (along a diagonal path a little more, so that its Y part gets `accel`); after the move
-  it is set back to `printer.accel`, or else to Klipper's own value (read once). It is never
-  raised above that.
+An older machine.yaml with `printer.y_motion` still loads: it is read as `xy_motion`, its `accel`
+and `max_feed` as `accel_y` and `max_feed_y`.
+
+- **Acceleration per axis:** before the move `SET_VELOCITY_LIMIT ACCEL=` sets the largest
+  acceleration whose X part stays within `accel_x` and whose Y part within `accel_y`:
+  min(accel_x / |ux|, accel_y / |uy|) for the move's direction u. A pure Y move gets 1000, a pure
+  X move 3000, a 100 x 150 mm diagonal 1202 (the bed binds). While the picker holds a part (grab
+  until release) the head's limit is x `carrying` (1800); the bed's stays (the part hangs on
+  the head, not on the bed). After the move it is set back
+  to `printer.accel`, or else to Klipper's own value (read once), so other moves and macros keep
+  it. It is never raised above that, and not sent when it is the same.
 - **`s_curve`:** the speed follows an S (smoothstep: no jump in acceleration at the start and end
   of a ramp; its peak is `accel`). The move is split into short G1 steps along the same straight
   line, their speeds rising and falling along the S, and Klipper's lookahead runs them without
@@ -570,13 +582,15 @@ printer:
   `min_step_mm: 1`) it is one G1. The last G1 is the target itself, so the end point is exact. A 0 -> 200 mm travel at
   6000 mm/min becomes 7 steps up (F87 ... F5913 over 7.5 mm), one at F6000, 7 down.
 - **`trapezoid`:** one G1 at the lowered acceleration.
-- **Not shaped:** moves that keep Y (Z up and down, X only) and the shake (`run.shake`), whose
-  quick moves are meant to be sharp.
+- **Not shaped:** Z-only moves (up and down) and the shake (`run.shake`), whose quick moves are
+  meant to be sharp.
 
 ## Automatic mode
 
-Press **Automatic** on the Device tab (or *Screw sorter → Automatic* on the printer). The machine
-then runs by itself until you press Stop:
+Press **Start automatic** on the Device tab (or *Screw sorter → Automatic* on the printer). The
+machine then runs by itself until you press Stop. The Device tab's header shows what really runs
+(*Automatic · waiting · next photo in 0:42*, *Sort once · sorting*, *Idle*), and only the buttons
+that apply then (Look now, Pause, Resume, Stop); *Manual* has Sort once and One pick:
 
 1. **Standby:** the bed stays all the way out at the photo position (`printer.photo_position`)
    and the motors are switched off, so it's quiet (`standby.motors_off`). Every minute
