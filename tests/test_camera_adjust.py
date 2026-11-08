@@ -192,3 +192,76 @@ def test_turning_back_reloads_the_nominal_camera_too(machine):
     assert seen == [True, False]
     runner.camera_orient("mirror")  # no quarter turn changes: nothing to reload
     assert seen == [True, False]
+
+
+IMX708 = {  # Camera Module 3: what Picamera2's camera_controls says (min, max, default)
+    "AfMode": (0, 2, 0),
+    "AnalogueGain": (1.1228070259094238, 16.0, 1.0),
+    "ExposureTime": (26, 220417486, 20000),
+    "LensPosition": (0.0, 15.0, 1.0),
+}
+
+
+def test_values_are_kept_inside_what_the_camera_can_do():
+    from sortering_pnp.camera import within_limits
+
+    v = within_limits({"AnalogueGain": 1.0, "ExposureTime": 10, "LensPosition": 3.0}, IMX708)
+    assert v["AnalogueGain"] == pytest.approx(1.1228070259094238)
+    assert v["ExposureTime"] == 26 and isinstance(v["ExposureTime"], int)
+    assert v["LensPosition"] == 3.0  # inside: untouched
+    assert within_limits({"AnalogueGain": 1.0}, {}) == {"AnalogueGain": 1.0}  # no limits known
+
+
+def test_a_gain_under_the_sensors_minimum_does_not_fail_every_photo(monkeypatch):
+    """The Pi said: settings drifted during capture: AnalogueGain: locked 1.0, camera reports
+    1.1228070259094238 (manual exposure from the page, gain 1.0: below the IMX708's minimum)."""
+    sets = []
+
+    class Request:
+        def make_array(self, name):
+            return np.zeros((4, 4, 3), np.uint8)
+
+        def get_metadata(self):  # what the sensor really runs at
+            return {
+                "ExposureTime": 20000,
+                "AnalogueGain": 1.1228070259094238,
+                "ColourGains": (2.0, 1.5),
+                "LensPosition": 3.0,
+            }
+
+        def release(self): ...
+
+    class FakePicam:
+        camera_controls = IMX708
+
+        def create_still_configuration(self, **kw):
+            return kw
+
+        def configure(self, cfg): ...
+        def set_controls(self, c):
+            sets.append(c)
+
+        def start(self): ...
+        def stop(self): ...
+        def close(self): ...
+        def capture_metadata(self):
+            return Request().get_metadata()
+
+        def capture_request(self):
+            return Request()
+
+    monkeypatch.setitem(sys.modules, "picamera2", types.SimpleNamespace(Picamera2=FakePicam))
+    monkeypatch.setattr("sortering_pnp.camera.time.sleep", lambda s: None)
+    from sortering_pnp.camera import Camera
+
+    locked = {
+        "ExposureTime": 20000,
+        "AnalogueGain": 1.3,
+        "ColourGains": [2.0, 1.5],
+        "LensPosition": 3.0,
+    }
+    adjust = CameraAdjust(exposure="manual", exposure_us=20000, gain=1.0)
+    cam = Camera(locked, adjust=adjust)  # verify() at start: passes now
+    assert sets[-1]["AnalogueGain"] == pytest.approx(1.1228070259094238)  # asked what it can do
+    img, md = cam.grab()  # no "settings drifted during capture"
+    assert img.shape == (4, 4, 3)

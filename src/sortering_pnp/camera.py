@@ -71,6 +71,28 @@ def settings_mismatch(locked: dict[str, Any], metadata: dict[str, Any]) -> list[
     return problems
 
 
+LIMITED = ("AnalogueGain", "ExposureTime", "LensPosition")  # kept inside what the camera can do
+
+
+def within_limits(values: dict[str, Any], limits: Any) -> dict[str, Any]:
+    """`values` with each of LIMITED clamped to the camera's range (Picamera2's camera_controls:
+    name -> (min, max, default)). The Camera Module 3's sensor has no gain under 1.12: asked for
+    1.0 it runs at 1.12, and every photo then failed the drift check (settings_mismatch)."""
+    out = dict(values)
+    for key in LIMITED:
+        lim = (limits or {}).get(key) if hasattr(limits, "get") else None
+        if key not in out or not isinstance(lim, (tuple, list)) or len(lim) < 2:
+            continue
+        lo, hi = lim[0], lim[1]
+        v = out[key]
+        if isinstance(v, (int, float)) and lo is not None and hi is not None and lo < hi:
+            c = min(max(float(v), float(lo)), float(hi))
+            if c != float(v):
+                log.info("camera: %s %s is outside %s..%s, using %s", key, v, lo, hi, c)
+            out[key] = int(round(c)) if isinstance(v, int) and not isinstance(v, bool) else c
+    return out
+
+
 IMAGE_KEYS = {
     "brightness": "Brightness",
     "contrast": "Contrast",
@@ -289,6 +311,7 @@ class Camera:
 
         self.locked_settings = dict(settings or {})
         self.adjust = _adj(adjust)
+        self.limits: Any = {}
         self.settings = merged_settings(self.locked_settings, self.adjust)
         self.turn90 = bool(turn90)
         extra: dict[str, Any] = {}
@@ -298,6 +321,8 @@ class Camera:
             extra["transform"] = Transform(hflip=int(hflip), vflip=int(vflip))
         self.locked = bool(self.settings)
         self.picam2 = Picamera2()
+        self.limits = getattr(self.picam2, "camera_controls", {}) or {}
+        self.settings = within_limits(self.settings, self.limits)  # what it can really run at
         try:
             mode = self.settings.get("sensor_mode") or {}
             cfg = self.picam2.create_still_configuration(
@@ -322,7 +347,7 @@ class Camera:
 
     def _controls(self) -> dict[str, Any]:
         has_af = "AfMode" in self.picam2.camera_controls
-        c = controls_for(self.locked_settings, self.adjust, has_af)
+        c = within_limits(controls_for(self.locked_settings, self.adjust, has_af), self.limits)
         if not has_af:
             c = {k: v for k, v in c.items() if k not in ("AfMode", "LensPosition")}
         return c
@@ -330,7 +355,9 @@ class Camera:
     def set_adjust(self, adjust: Any) -> None:
         """New adjustments from the page, applied at once (no reopening)."""
         self.adjust = _adj(adjust)
-        self.settings = merged_settings(self.locked_settings, self.adjust)
+        self.settings = within_limits(
+            merged_settings(self.locked_settings, self.adjust), self.limits
+        )
         self.picam2.set_controls(self._controls())
         time.sleep(0.5)  # a few frames with the new settings
 
