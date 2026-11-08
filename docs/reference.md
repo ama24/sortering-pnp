@@ -215,7 +215,7 @@ The steps below are the same work in more detail.
    another bin as the plate, give it the role *work*; Resync keeps your choice from then on.
    Bins taken off the bed keep their rules and get them back when they return. Give the other
    bins rules (*holds*) or leave them wild. With a model loaded, Resync also does the start-up
-   check's **Bins check** on the same photo (see [Start-up check](#start-up-check)).
+   check's **Bins check** on the same photo (see [The start-up check](#the-start-up-check)).
 8. **Device tab**: pick a strategy and press **Sort once** or **Automatic**, or use the printer menu.
 
 ## Models: upload over WiFi, keep the old ones
