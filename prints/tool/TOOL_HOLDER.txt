@@ -1,16 +1,20 @@
 Tool holder for the pneumatic tweezers' turning stepper (sortering-pnp print catalogue)
 
-The motor: NEMA 8 size, 20 x 20 x 30 mm, M2.5 holes on a 16 mm square, Ø15
-flange. The printer's interface: 2 x M3, 14 mm apart.
+The motor: NEMA 8 size, 20 x 20 x 30 mm, M2 holes on a 16 mm square, Ø15
+flange. The printer's interface: 2 x M3, 14 mm apart, into two 4.5 mm standoffs.
 
 Print as exported, standing on the motor plate (no supports), PETG or PLA, 0.4 mm nozzle,
 0.2 mm layers, 4 walls, 40 % infill or more.
 
 Fitting:
 - The motor stands on the motor plate inside the L, between the ribs; its flange goes down
-  through the Ø15.5 hole. 4 x M2.5 from below (the plate is 4 mm: M2.5 x 6-8,
-  checking the motor's thread depth).
-- The printer plate goes against the printer's interface: 2 x M3 from the front, 40.75 mm
-  above the motor plate's underside, so a hex key reaches them over the motor's top
-  (4 mm of room). The plate is 4 mm: M3 x 8 plus the interface's thickness.
-- Size: 26.2 wide, 26.6 deep, 46 high.
+  through the Ø15.5 hole. 4 x M2 x 5 from below, their heads flush in counterbores:
+  2.5 mm of plate under each head, 2.5 mm of thread in the motor.
+- The printer plate sits on the printer's two 4.5 mm standoffs: 2 x M3 from the front
+  through the plate (4 mm) into them, 41.25 mm above the motor plate's underside, so a
+  hex key reaches them over the motor's top (4 mm of room).
+- Two shims on the plate's back, 4.5 mm like the standoffs, rest on the head: one at the
+  top between the standoffs (the plate ends 7 mm above the screws), one 14.6 mm below
+  the screws. A push on the tool turns the plate about a shim and the screws hold it back.
+  If a shim keeps the plate off a standoff, sand the shim (or add a washer on the standoff).
+- Size: 26.2 wide, 27.3 deep, 48.2 high.

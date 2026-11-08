@@ -74,11 +74,14 @@ nozzle (`MIN_LINE`, `MIN_HOLE`): every wall one line or more across each layer.
 **Tool holder** for the tweezers' turning stepper is in [prints/tool/](../prints/tool/)
 ([printables/toolholder.py](../src/sortering_pnp/printables/toolholder.py), every size a
 `ToolHolder` field): an L bracket. The printer plate goes on the printer's interface (2 x M3,
-14 mm apart), and the motor plate sticks out at 90 deg from its foot. The motor (NEMA 8 size,
-20 x 20 x 30 mm, M2.5 on a 16 mm square) stands inside the L, its Ø15 flange down through the
-plate, and is held by 4 x M2.5 from below. The M3 screws sit above the motor's top (a hex key
-reaches them over it), and a rib on each side of the motor carries the bend. It prints standing
-on the motor plate, with no supports.
+14 mm apart, into two 4.5 mm standoffs), and the motor plate sticks out at 90 deg from its foot.
+Two 4.5 mm shims on the plate's back rest on the head (one at the top, inside the 7.4 mm above
+the screws, one in the 15 mm below them), so a push on the tool levers against the head instead
+of bending the standoffs. The motor (NEMA 8 size, 20 x 20 x 30 mm, M2 on a 16 mm square) stands
+inside the L, its Ø15 flange down through the plate, and is held by 4 x M2 x 5 from below, their
+heads flush in counterbores (`m2_clamp`, 2.5 mm of thread in the motor). The M3 screws sit above
+the motor's top (a hex key reaches them over it), and a rib on each side of the motor carries
+the bend. It prints standing on the motor plate, with no supports.
 
 - **Pins:** sortering-pnp switches them itself ([pins.py](../src/sortering_pnp/pins.py)); the
   picker is not in Klipper. GPIO12 (`picker.action_pin`) is a plain on/off output for a pump
