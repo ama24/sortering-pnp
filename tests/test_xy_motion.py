@@ -1,4 +1,5 @@
-"""Gentle bed moves (printer.y_motion): lowered acceleration and an S-shaped speed for Y moves."""
+"""The X/Y acceleration profile (printer.xy_motion): an acceleration limit per axis (the head X
+quicker, the bed Y gentle), the directional acceleration of each move, and an S-shaped speed."""
 
 from __future__ import annotations
 
@@ -115,28 +116,89 @@ def test_steps_stay_inside_the_limits(machine):
         assert 0.0 <= m["X"] <= 220.0 and 0.0 <= m["Y"] <= 220.0
 
 
-def test_x_and_z_moves_are_unchanged(machine):
+def accel_of(script: str) -> float | None:
+    """The acceleration a move runs at (its first SET_VELOCITY_LIMIT), None: the printer's."""
+    for ln in script.splitlines():
+        if ln.startswith("SET_VELOCITY_LIMIT ACCEL="):
+            return float(ln.split("=")[1])
+    return None
+
+
+def test_x_moves_get_the_heads_accel_and_an_s_curve(machine):
     fp = FakePrinter([10.0, 20.0, 50.0])
     mo = Motion(fp, machine)
-    mo.move(x=150.0)
-    assert fp.sent[-1] == "G90\nG1 X150.000 F6000"
-    mo.move(x=150.0, y=20.0)  # Y given but not changing
-    assert fp.sent[-1] == "G90\nG1 X150.000 Y20.000 F6000"
-    mo.move(z=10.0)
+    mo.move(x=150.0)  # accel_x 3000 = the printer's own: nothing to set, still an S
+    assert accel_of(fp.sent[-1]) is None
+    ms = moves(fp.sent[-1])
+    assert len(ms) > 1 and all(set(m) == {"X", "F"} for m in ms)
+    assert fp.sent[-1].splitlines()[-1].startswith("G1 X150.000 F")  # the exact end point
+    machine.printer.xy_motion.accel_x = 2000.0
+    mo.move(x=10.0, y=20.0)  # Y given but not changing: an X move
+    lines = fp.sent[-1].splitlines()
+    assert lines[1] == "SET_VELOCITY_LIMIT ACCEL=2000"
+    assert lines[-1] == "SET_VELOCITY_LIMIT ACCEL=3000"  # set back after the move
+
+
+def test_z_moves_are_unchanged(machine):
+    fp = FakePrinter([10.0, 20.0, 50.0])
+    Motion(fp, machine).move(z=10.0)
     assert fp.sent[-1] == "G90\nG1 Z10.000 F1200"
 
 
+@pytest.mark.parametrize(
+    ("dx", "dy", "want"),
+    [
+        (0.0, 150.0, 1000.0),  # pure Y: the bed's limit
+        (150.0, 0.0, 2000.0),  # pure X: the head's limit
+        (100.0, 150.0, 1000.0 * (100**2 + 150**2) ** 0.5 / 150.0),  # Y binds: 1202
+        (150.0, 10.0, 2000.0 * (150**2 + 10**2) ** 0.5 / 150.0),  # X binds: 2004
+    ],
+)
+def test_each_axis_stays_within_its_limit(machine, dx, dy, want):
+    machine.printer.xy_motion.accel_x = 2000.0
+    fp = FakePrinter([10.0, 20.0, 50.0], max_accel=10000.0)
+    mo = Motion(fp, machine)
+    assert mo.xy_accel(dx, dy) == pytest.approx(want)
+    mo.move(x=10.0 + dx, y=20.0 + dy)
+    a = accel_of(fp.sent[-1])
+    assert a == pytest.approx(want, abs=0.5)
+    length = (dx * dx + dy * dy) ** 0.5
+    assert a * dx / length <= 2000.0 + 0.5 and a * dy / length <= 1000.0 + 0.5
+
+
+def test_carrying_a_part_is_gentler(machine):
+    machine.printer.xy_motion.carrying = 0.6
+    pr = SimPrinter(machine, SimWorld())
+    pr.gcode("G28")
+    mo = Motion(pr, machine)
+    mo.move(z=50.0)
+    mo.pick(100.0, 100.0, 1.0)
+    assert mo.carrying
+    pr.log.clear()
+    mo.travel(100.0, 180.0)  # to the bin, with the part: 0.6 x 1000 for the bed
+    assert "SET_VELOCITY_LIMIT ACCEL=600" in pr.log
+    mo.drop(100.0, 180.0, 20.0)
+    assert not mo.carrying
+    pr.log.clear()
+    mo.travel(100.0, 100.0)  # back, empty
+    assert "SET_VELOCITY_LIMIT ACCEL=1000" in pr.log
+
+
 def test_disabled_is_the_old_single_move(machine):
-    machine.printer.y_motion.enabled = False
+    machine.printer.xy_motion.enabled = False
     fp = FakePrinter([10.0, 0.0, 50.0])
-    Motion(fp, machine).move(y=200.0)
+    mo = Motion(fp, machine)
+    mo.move(y=200.0)
     assert fp.sent[-1] == "G90\nG1 Y200.000 F6000"
+    mo.move(x=150.0, y=20.0)
+    assert fp.sent[-1] == "G90\nG1 X150.000 Y20.000 F6000"
+    assert not any("SET_VELOCITY_LIMIT" in s for s in fp.sent)
 
 
 def test_trapezoid_profile_and_max_feed(machine):
-    ym = machine.printer.y_motion
+    ym = machine.printer.xy_motion
     ym.profile = "trapezoid"
-    ym.max_feed = 3000.0
+    ym.max_feed_y = 3000.0
     fp = FakePrinter([10.0, 0.0, 50.0])
     Motion(fp, machine).move(y=200.0)
     assert fp.sent[-1].splitlines() == [
@@ -160,7 +222,7 @@ def test_printer_accel_is_the_one_restored(machine):
 
 
 def test_gentle_accel_never_above_the_normal_one(machine):
-    machine.printer.y_motion.accel = 5000.0
+    machine.printer.xy_motion.accel_y = 5000.0
     fp = FakePrinter([10.0, 0.0, 50.0])
     Motion(fp, machine).move(y=100.0)
     assert "SET_VELOCITY_LIMIT" not in fp.sent[-1]
@@ -187,10 +249,23 @@ def test_sim_follows_and_ends_exactly(machine):
 
 def test_config_checks_the_profile(tmp_path):
     p = tmp_path / "m.yaml"
-    p.write_text("printer:\n  y_motion:\n    profile: jerk\n", encoding="utf-8")
+    p.write_text("printer:\n  xy_motion:\n    profile: jerk\n", encoding="utf-8")
     with pytest.raises(config_mod.ConfigError, match="profile"):
         config_mod.load(p)
+    p.write_text("printer:\n  xy_motion:\n    carrying: 0\n", encoding="utf-8")
+    with pytest.raises(config_mod.ConfigError, match="carrying"):
+        config_mod.load(p)
+    p.write_text("printer:\n  xy_motion:\n    accel_x: 2500\n    accel_y: 600\n", encoding="utf-8")
+    xm = config_mod.load(p).printer.xy_motion
+    assert (xm.accel_x, xm.accel_y, xm.enabled) == (2500, 600, True)
+
+
+def test_an_old_y_motion_is_read_as_xy_motion(tmp_path):
+    p = tmp_path / "m.yaml"
     p.write_text(
-        "printer:\n  y_motion:\n    accel: 600\n    profile: trapezoid\n", encoding="utf-8"
+        "printer:\n  y_motion:\n    accel: 600\n    max_feed: 3000\n    profile: trapezoid\n",
+        encoding="utf-8",
     )
-    assert config_mod.load(p).printer.y_motion.accel == 600
+    xm = config_mod.load(p).printer.xy_motion
+    assert (xm.accel_y, xm.max_feed_y, xm.profile) == (600, 3000, "trapezoid")
+    assert xm.accel_x == 3000.0  # the head keeps its default

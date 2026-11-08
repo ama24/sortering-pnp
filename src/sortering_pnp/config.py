@@ -124,18 +124,27 @@ class Lights:
 
 
 @dataclass
-class YMotion:
-    """Gentle bed moves (Y on a bed-slinger): loose parts lie on the bed. Klipper has one
-    acceleration for all axes, so it is lowered for each move that moves Y and set back after."""
+class XYMotion:
+    """The X/Y acceleration profile: a limit per axis (the bed, Y on a bed-slinger, carries
+    the loose parts: gentle; the head, X, can be quicker). Klipper has one acceleration for all
+    axes, so each move that changes X or Y gets the largest one that keeps both its X and its Y
+    part within their limits, and it is set back after the move."""
 
-    enabled: bool = True  # False: Y moves like X (the printer's acceleration, one G1)
-    accel: float = 1000.0  # mm/s^2 of the bed (the Y part of a move); X and Z keep theirs
+    enabled: bool = True  # False: plain moves (one G1 at the printer's acceleration)
+    accel_x: float = 3000.0  # mm/s^2 of the head (the X part of a move)
+    accel_y: float = 1000.0  # mm/s^2 of the bed (the Y part of a move)
+    carrying: float = 0.6  # both limits x this while the picker holds a part (1: no change)
     # s_curve: the speed rises and falls smoothly (the move split into short G1 steps whose
-    # speeds follow an S) | trapezoid: one G1, Klipper's own ramp at `accel`
+    # speeds follow an S) | trapezoid: one G1, Klipper's own ramp
     profile: str = "s_curve"
-    max_feed: float | None = None  # mm/min of the bed (the Y part); None = printer.feed_xy
+    max_feed_x: float | None = None  # mm/min of the head (the X part); None = printer.feed_xy
+    max_feed_y: float | None = None  # mm/min of the bed (the Y part); None = printer.feed_xy
     steps: int = 8  # s_curve: speed steps per ramp (up and down)
     min_step_mm: float = 1.0  # s_curve: steps at least this long on average (short moves get fewer)
+
+
+# printer.y_motion (Y only) became printer.xy_motion: its keys under their new names
+Y_MOTION_KEYS = {"accel": "accel_y", "max_feed": "max_feed_y"}
 
 
 @dataclass
@@ -167,7 +176,8 @@ class Printer:
     # mm/s^2 while sorting (gentler bed moves: loose parts stay where the photo saw them);
     # None = the printer's own setting
     accel: float | None = None
-    y_motion: YMotion = field(default_factory=YMotion)  # gentle bed moves (docs/reference.md)
+    # the X/Y acceleration profile (docs/reference.md, X/Y acceleration profile)
+    xy_motion: XYMotion = field(default_factory=XYMotion)
 
 
 @dataclass
@@ -336,13 +346,18 @@ class Machine:
             raise ConfigError("run.order must be census, largest_group or nearest")
         if self.run.shake.axis.upper() not in ("X", "Y"):
             raise ConfigError("run.shake.axis must be X or Y")
-        ym = self.printer.y_motion
-        if ym.profile not in ("s_curve", "trapezoid"):
-            raise ConfigError("printer.y_motion.profile must be s_curve or trapezoid")
-        if ym.accel <= 0 or ym.steps < 1 or ym.min_step_mm <= 0:
-            raise ConfigError("printer.y_motion: accel, steps and min_step_mm must be above 0")
-        if ym.max_feed is not None and ym.max_feed <= 0:
-            raise ConfigError("printer.y_motion.max_feed must be above 0 (or null)")
+        xm = self.printer.xy_motion
+        if xm.profile not in ("s_curve", "trapezoid"):
+            raise ConfigError("printer.xy_motion.profile must be s_curve or trapezoid")
+        if min(xm.accel_x, xm.accel_y) <= 0 or xm.steps < 1 or xm.min_step_mm <= 0:
+            raise ConfigError(
+                "printer.xy_motion: accel_x, accel_y, steps and min_step_mm must be above 0"
+            )
+        if not 0 < xm.carrying <= 1:
+            raise ConfigError("printer.xy_motion.carrying must be above 0 and at most 1")
+        for key in ("max_feed_x", "max_feed_y"):
+            if getattr(xm, key) is not None and getattr(xm, key) <= 0:
+                raise ConfigError(f"printer.xy_motion.{key} must be above 0 (or null)")
 
 
 def _build(cls: type, data: Mapping[str, Any] | None, where: str) -> Any:
@@ -364,6 +379,22 @@ def _build(cls: type, data: Mapping[str, Any] | None, where: str) -> Any:
     return cls(**kwargs)
 
 
+def _renamed(raw: Mapping[str, Any], where: str) -> dict[str, Any]:
+    """An older machine.yaml: printer.y_motion read as printer.xy_motion (its accel and
+    max_feed are the bed's, i.e. accel_y and max_feed_y)."""
+    raw = dict(raw)
+    pr = raw.get("printer")
+    if isinstance(pr, Mapping) and "y_motion" in pr:
+        pr = dict(pr)
+        old = dict(pr.pop("y_motion") or {})
+        if "xy_motion" in pr:
+            raise ConfigError(f"{where}: printer has both y_motion and xy_motion: keep xy_motion")
+        pr["xy_motion"] = {Y_MOTION_KEYS.get(k, k): v for k, v in old.items()}
+        log.warning("%s: printer.y_motion is now printer.xy_motion (read as such)", where)
+        raw["printer"] = pr
+    return raw
+
+
 def load(path: str | Path | None = None) -> Machine:
     """Read machine.yaml (or defaults when `path` is None)."""
     if path is None:
@@ -373,7 +404,7 @@ def load(path: str | Path | None = None) -> Machine:
         raw = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
         if not isinstance(raw, Mapping):
             raise ConfigError(f"{p}: expected a mapping at the top")
-        m = _build(Machine, raw, p.name)
+        m = _build(Machine, _renamed(raw, p.name), p.name)
         m.base_dir = p.parent
     m.validate()
     return m

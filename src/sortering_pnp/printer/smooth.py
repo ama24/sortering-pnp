@@ -1,7 +1,8 @@
-"""Gentle bed moves: the speed profile of a move that moves Y (the bed of a bed-slinger).
+"""The X/Y acceleration profile: the speed profile of a move that changes X or Y.
 
-Klipper has one acceleration for all axes and only trapezoidal ramps. For a Y move Motion lowers
-the acceleration (SET_VELOCITY_LIMIT) and, with the `s_curve` profile, splits the straight move
+Klipper has one acceleration for all axes and only trapezoidal ramps. For an X/Y move Motion
+sets the acceleration that keeps each axis within its own limit (SET_VELOCITY_LIMIT) and, with
+the `s_curve` profile, splits the straight move
 into short G1 steps whose speeds follow a smooth S: v(t) = V * (3u^2 - 2u^3), u = t / T, so the
 speed starts and ends with no jump in acceleration. Klipper's lookahead runs the steps without
 stopping between them and ramps between their speeds at the lowered acceleration, which is the
@@ -26,14 +27,24 @@ def _ramp_distance(u: float) -> float:
 
 
 def path_limits(
-    length: float, dy: float, feed: float, accel: float, max_feed: float | None
+    length: float,
+    parts: list[tuple[float, float, float | None]],
+    feed: float,
 ) -> tuple[float, float]:
-    """Feed (mm/min) and acceleration (mm/s^2) along a straight move of `length` mm whose Y part
-    is `dy`, so that the bed (Y) gets at most `accel` and `max_feed`; X and Z share them."""
-    share = abs(dy) / length if length > 0 else 1.0
-    share = max(share, 1e-9)
-    a = accel / share
-    f = feed if max_feed is None else min(feed, max_feed / share)
+    """Feed (mm/min) and acceleration (mm/s^2) along a straight move of `length` mm, so that each
+    axis in `parts` (its part of the move in mm, its acceleration limit, its max feed or None)
+    stays within its limits: the path's acceleration is the largest whose part along every axis
+    is at most that axis' limit, i.e. min(limit / share) over the axes that move."""
+    a, f = math.inf, feed
+    for d, accel, max_feed in parts:
+        share = abs(d) / length if length > 0 else 0.0
+        if share < 1e-9:
+            continue
+        a = min(a, accel / share)
+        if max_feed is not None:
+            f = min(f, max_feed / share)
+    if math.isinf(a):  # no axis of `parts` moves
+        a = min(accel for _, accel, _ in parts)
     return f, a
 
 
