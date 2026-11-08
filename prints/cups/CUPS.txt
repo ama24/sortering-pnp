@@ -2,6 +2,8 @@ Suction cups for the suction picker (sortering-pnp print catalogue: prints/cups/
 
 Material: TPU 95A. 0.4 mm nozzle, 0.2 mm layers, 3 walls (or more: the folds are walls only),
 100 % infill, 20-25 mm/s, no supports. Stand it on the shank's end (as exported), tip up.
+Every wall is at least two lines of a 0.4 nozzle (the D skirt's edge one line), every hole at
+least Ø1.2: checked by slicing every cup (Bambu Studio, classic and Arachne walls).
 
 Fit: the Ø7 shank goes 7 mm into the picker's socket; 3 M3 screws, 120 deg apart, 3.5 mm from
 the socket's bottom, press into its blind holes (Ø2.6, 1 mm deep: they don't reach
@@ -14,14 +16,16 @@ Body: straight Ø7, bore Ø4.3 (the pump's tube; Ø3.2 in the shank,
 behind the screws). The folds go inwards: no channel is wider than 4.3 mm.
 
 Tips (every hole smaller than an M2's core, Ø1.57: no screw goes in):
-  AS  lip Ø4.4, 2 folds, hole Ø1 (sieve: 4 x Ø0.7), neck 28.8 mm: M2-M3 heads, flat faces
-  AM  lip Ø6.2, 2 folds, hole Ø1.4 (sieve: 4 x Ø0.9), neck 28.0 mm: M4-M5 heads, flat faces
-  DS  lip Ø5.2, 4 folds, hole Ø1 (sieve: 4 x Ø0.7), neck 23.9 mm: M2-M3, curved or tilted
-  DM  lip Ø7.6, 4 folds, hole Ø1.4 (sieve: 4 x Ø0.9), neck 22.5 mm: M3-M5, curved or tilted
-  DL  lip Ø10.6, 4 folds, hole Ø1.4 (sieve: 14 x Ø0.9), neck 20.4 mm: M5-M6 (M8), curved
+  AS  lip Ø4.4, 2 folds, hole Ø1.2 (no sieve), neck 29.1 mm: M2-M3 heads, flat faces
+  AM  lip Ø6.2, 2 folds, hole Ø1.4 (sieve: 3 x Ø1.2), neck 27.9 mm: M4-M5 heads, flat faces
+  DS  lip Ø5.2, 4 folds, hole Ø1.2 (no sieve), neck 24.0 mm: M2-M3, curved or tilted
+  DM  lip Ø7.6, 4 folds, hole Ø1.4 (sieve: 5 x Ø1.2), neck 22.4 mm: M3-M5, curved or tilted
+  DL  lip Ø10.6, 4 folds, hole Ø1.4 (sieve: 9 x Ø1.2), neck 20.3 mm: M5-M6 (M8), curved
 A: two stiff folds and a cone lip, for flat faces (pan, button, cheese and hex heads, nuts).
-D: four soft folds and a thin skirt (0.45 mm at the edge): a few mm of give, follows curved and
-   tilted faces (the side of a head, countersunk heads).
-_sieve: a dome with many small holes instead of one. The part rests on the dome's flat top,
-   0.4 mm below the lip, so the holes on its sides stay open: it can't plug the cup, more air
-   flows, and it lets go at once. Holding force is the same (vacuum x the lip's area).
+D: four soft folds and a thin skirt (0.45 mm at the edge, one line): a few mm of give, follows
+   curved and tilted faces (the side of a head, countersunk heads).
+_sieve (AM, DM, DL): a dome with a ring of holes instead of one. The part rests on the dome's
+   flat top, 0.4 mm below the lip, so the holes on its sides stay open: it can't plug the cup,
+   more air flows, and it lets go at once. Holding force is the same (vacuum x the lip's area).
+   AS and DS have none: a 0.4 nozzle can't print one in their Ø3 cup (and on AS the head rests
+   on the lip, well above the hole).
