@@ -31,6 +31,7 @@ class Motion:
         self.tip: list[float] | None = None  # last commanded tip position
         self.z_home_xy: tuple[float, float] | None = None  # tip X/Y for homing Z (set by runner)
         self._accel: float | None = None  # Klipper's acceleration, read once (0 = unknown)
+        self._scv: float | None = None  # Klipper's square corner velocity, read once
         self.carrying = False  # the picker holds a part (grab .. release): gentler X
 
     # ------------------------------------------------------------------ checks
@@ -81,7 +82,8 @@ class Motion:
                 f"SET_GCODE_VARIABLE MACRO={pc.home_macro} VARIABLE=z_home_y VALUE={y:.2f}",
             ]
         log.info("homing")
-        self.p.gcode("\n".join([*lines, "G28"]))
+        gentle, back = self._gentle_bed(self.m.printer.xy_motion.accel_y)
+        self.p.gcode("\n".join([*lines, *gentle, "G28", *back]))
         self.tip = None
         self.carrying = False
 
@@ -152,6 +154,32 @@ class Motion:
                 self._accel = 0.0
         return self._accel or None
 
+    def _corner_velocity(self) -> float:
+        """Klipper's square corner velocity (read once; 5 mm/s, its default, when unknown)."""
+        if self._scv is None:
+            scv = self.p.status(None).square_corner_velocity
+            self._scv = 5.0 if scv is None else float(scv)
+        return self._scv
+
+    def _gentle_bed(self, accel: float) -> tuple[list[str], list[str]]:
+        """Lines before and after moves of the bed: `accel` at most, and no corner taken at
+        speed (SQUARE_CORNER_VELOCITY=0): Klipper otherwise runs into a corner, e.g. Z then Y,
+        at up to its square corner velocity, a jump in the bed's speed with no ramp. Set back
+        after. Nothing when printer.xy_motion is off."""
+        if not self.m.printer.xy_motion.enabled:
+            return [], []
+        normal = self._normal_accel()
+        before, after = [], []
+        if normal is None or accel < normal - 1e-6:
+            before.append(f"SET_VELOCITY_LIMIT ACCEL={accel:.0f}")
+            if normal is not None:
+                after.append(f"SET_VELOCITY_LIMIT ACCEL={normal:.0f}")
+        scv = self._corner_velocity()
+        if scv > 0:
+            before.append("SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=0")
+            after.insert(0, f"SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY={scv:g}")
+        return before, after
+
     def xy_accel(self, dx: float, dy: float, dz: float = 0.0) -> float:
         """The acceleration (mm/s^2) along a move of (dx, dy, dz): the largest that keeps its X
         part within accel_x (x carrying while a part is held) and its Y part within accel_y,
@@ -186,8 +214,12 @@ class Motion:
             else [(length, f)]
         )
         lines = []
+        bed = abs(delta[1]) > 1e-6  # the bed moves: no corner at speed either
         if normal is None or a < normal - 1e-6:
             lines.append(f"SET_VELOCITY_LIMIT ACCEL={a:.0f}")
+        scv = self._corner_velocity() if bed else 0.0
+        if scv > 0:
+            lines.append("SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=0")
         ox, oy, oz = self.m.tool.offset
         axes = ((0, "X", ox), (1, "Y", oy), (2, "Z", oz))
         for dist, sf in steps[:-1]:
@@ -197,6 +229,8 @@ class Motion:
             words = [f"{n}{p[i] - o:.3f}" for i, n, o in axes if abs(delta[i]) > 1e-9]
             lines.append(f"G1 {' '.join(words)} F{max(sf, 1.0):.0f}")
         lines.append(f"{last} F{max(steps[-1][1], 1.0):.0f}")
+        if scv > 0:
+            lines.append(f"SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY={scv:g}")
         if normal is not None and a < normal - 1e-6:
             lines.append(f"SET_VELOCITY_LIMIT ACCEL={normal:.0f}")
         return lines

@@ -132,14 +132,14 @@ class XYMotion:
 
     enabled: bool = True  # False: plain moves (one G1 at the printer's acceleration)
     accel_x: float = 3000.0  # mm/s^2 of the head (the X part of a move)
-    accel_y: float = 1000.0  # mm/s^2 of the bed (the Y part of a move)
+    accel_y: float = 200.0  # mm/s^2 of the bed (the Y part): long, soft ramps, loose parts on it
     carrying: float = 0.6  # accel_x x this while the picker holds a part (1: no change)
     # s_curve: the speed rises and falls smoothly (the move split into short G1 steps whose
     # speeds follow an S) | trapezoid: one G1, Klipper's own ramp
     profile: str = "s_curve"
     max_feed_x: float | None = None  # mm/min of the head (the X part); None = printer.feed_xy
-    max_feed_y: float | None = None  # mm/min of the bed (the Y part); None = printer.feed_xy
-    steps: int = 8  # s_curve: speed steps per ramp (up and down)
+    max_feed_y: float | None = 3000.0  # mm/min of the bed (the Y part); None = printer.feed_xy
+    steps: int = 12  # s_curve: speed steps per ramp (up and down)
     min_step_mm: float = 1.0  # s_curve: steps at least this long on average (short moves get fewer)
 
 
@@ -260,7 +260,9 @@ class Run:
 class Standby:
     interval_s: float = 60.0  # automatic mode: look for new parts this often
     min_parts: int = 1  # start sorting from this many parts
-    motors_off: bool = True  # motors off while waiting (quiet; homes again before sorting)
+    # motors off while waiting: quiet, but it homes again before sorting, and homing Y stops
+    # the bed sharply at its switch with the parts on it
+    motors_off: bool = False
     max_errors: int = 3  # automatic mode switches itself off after this many errors in a row
 
 

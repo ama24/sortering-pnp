@@ -4,6 +4,7 @@ quicker, the bed Y gentle), the directional acceleration of each move, and an S-
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -32,6 +33,16 @@ class FakePrinter:
 
     def close(self) -> None:
         pass
+
+
+@pytest.fixture(autouse=True)
+def _figures(machine, monkeypatch, request):
+    """These tests check the maths with round figures: a bed of 1000 mm/s^2 at feed_xy, 8 steps
+    a ramp, and Klipper's corners left alone (but in the tests marked `corners`)."""
+    xm = machine.printer.xy_motion
+    xm.accel_y, xm.max_feed_y, xm.steps = 1000.0, None, 8
+    if "corners" not in request.node.name:
+        monkeypatch.setattr(Motion, "_corner_velocity", lambda self: 0.0)
 
 
 def g1(line: str) -> dict[str, float]:
@@ -272,3 +283,51 @@ def test_an_old_y_motion_is_read_as_xy_motion(tmp_path):
     xm = config_mod.load(p).printer.xy_motion
     assert (xm.accel_y, xm.max_feed_y, xm.profile) == (600, 3000, "trapezoid")
     assert xm.accel_x == 3000.0  # the head keeps its default
+
+
+def test_the_bed_ramps_like_a_mill_by_default(tmp_path):
+    """Defaults (and machine.yaml): long, soft ramps for the bed; the head as Klipper's."""
+    xm = config_mod.XYMotion()
+    assert (xm.accel_y, xm.max_feed_y, xm.steps, xm.accel_x) == (200.0, 3000.0, 12, 3000.0)
+    m = config_mod.load(Path(__file__).resolve().parents[1] / "configs" / "machine.yaml")
+    assert (m.printer.xy_motion.accel_y, m.printer.xy_motion.max_feed_y) == (200.0, 3000.0)
+    assert not m.standby.motors_off  # no homing (a sharp stop of the bed) between looks
+    # 50 mm/s at 200 mm/s^2 along an S: the ramp takes 0.375 s and 9.4 mm, in 9 steps
+    ramp = [f for _, f in s_curve(200.0, 3000.0, 200.0, 12, 1.0)][:9]
+    assert ramp == sorted(ramp) and ramp[-1] < 3000.0
+
+
+def test_bed_moves_take_no_corners_at_speed(machine):
+    """Z then Y: Klipper would run the corner at its square corner velocity, a jump in the
+    bed's speed; bed moves are sent with SQUARE_CORNER_VELOCITY=0 and it is set back after."""
+    pr = SimPrinter(machine, SimWorld())
+    pr.gcode("G28")
+    mo = Motion(pr, machine)
+    mo.move(z=50.0)
+    pr.log.clear()
+    mo.move(y=150.0)
+    log = pr.log
+    i0 = log.index("SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=0")
+    i1 = log.index("SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=5")
+    g1s = [i for i, ln in enumerate(log) if ln.startswith("G1 ")]
+    assert i0 < min(g1s) and i1 > max(g1s) and pr.scv == 5.0
+    pr.log.clear()
+    mo.move(x=150.0)  # the head alone: corners left as they are
+    assert not any("SQUARE_CORNER_VELOCITY" in ln for ln in pr.log)
+
+
+def test_homing_moves_the_bed_gently_corners(machine):
+    machine.printer.xy_motion.accel_y = 200.0
+    pr = SimPrinter(machine, SimWorld())
+    Motion(pr, machine).home()
+    log = pr.log
+    g28 = log.index("G28")
+    assert log[:g28] == [
+        "SET_VELOCITY_LIMIT ACCEL=200",
+        "SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=0",
+    ]
+    assert log[g28 + 1 :] == [
+        "SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=5",
+        "SET_VELOCITY_LIMIT ACCEL=3000",
+    ]
+    assert (pr.accel, pr.scv) == (3000.0, 5.0)

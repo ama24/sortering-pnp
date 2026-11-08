@@ -60,7 +60,7 @@ class Moonraker:
         if not st.ready:
             return st
         objs = {
-            "toolhead": "position,homed_axes,max_accel",
+            "toolhead": "position,homed_axes,max_accel,square_corner_velocity",
             "extruder": "temperature",
             "print_stats": "state",
         }
@@ -72,6 +72,8 @@ class Moonraker:
         st.homed = str(th.get("homed_axes", ""))
         st.position = [float(v) for v in (th.get("position") or [0, 0, 0, 0])[:3]]
         st.max_accel = None if th.get("max_accel") is None else float(th["max_accel"])
+        scv = th.get("square_corner_velocity")
+        st.square_corner_velocity = None if scv is None else float(scv)
         t = s.get("extruder", {}).get("temperature")
         st.hotend_c = None if t is None else float(t)
         st.printing = s.get("print_stats", {}).get("state") in ("printing", "paused")

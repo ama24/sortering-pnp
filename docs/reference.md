@@ -555,12 +555,12 @@ printer:
   xy_motion:
     enabled: true       # false: plain moves (one G1 at the printer's acceleration)
     accel_x: 3000       # mm/s^2 for the head (the X part of a move): the Ender 3's own
-    accel_y: 1000       # mm/s^2 for the bed (the Y part): gentle, loose parts ride on it
+    accel_y: 200        # mm/s^2 for the bed (the Y part): long soft ramps, loose parts ride on it
     carrying: 0.6       # accel_x x this while the picker holds a part (1: no change)
     profile: s_curve    # s_curve | trapezoid
     max_feed_x: null    # mm/min for the head (the X part); null: printer.feed_xy
-    max_feed_y: null    # mm/min for the bed (the Y part); null: printer.feed_xy
-    steps: 8            # s_curve: speed steps per ramp
+    max_feed_y: 3000    # mm/min for the bed (the Y part); null: printer.feed_xy
+    steps: 12           # s_curve: speed steps per ramp
     min_step_mm: 1.0    # s_curve: steps at least this long on average
 ```
 
@@ -569,8 +569,8 @@ and `max_feed` as `accel_y` and `max_feed_y`.
 
 - **Acceleration per axis:** before the move `SET_VELOCITY_LIMIT ACCEL=` sets the largest
   acceleration whose X part stays within `accel_x` and whose Y part within `accel_y`:
-  min(accel_x / |ux|, accel_y / |uy|) for the move's direction u. A pure Y move gets 1000, a pure
-  X move 3000, a 100 x 150 mm diagonal 1202 (the bed binds). While the picker holds a part (grab
+  min(accel_x / |ux|, accel_y / |uy|) for the move's direction u. A pure Y move gets 200, a pure
+  X move 3000, a 100 x 150 mm diagonal 240 (the bed binds). While the picker holds a part (grab
   until release) the head's limit is x `carrying` (1800); the bed's stays (the part hangs on
   the head, not on the bed). After the move it is set back
   to `printer.accel`, or else to Klipper's own value (read once), so other moves and macros keep
@@ -580,10 +580,22 @@ and `max_feed` as `accel_y` and `max_feed_y`.
   line, their speeds rising and falling along the S, and Klipper's lookahead runs them without
   stopping between them. A short move gets a lower top speed and fewer steps; under 4 mm (with
   `min_step_mm: 1`) it is one G1. The last G1 is the target itself, so the end point is exact. A 0 -> 200 mm travel at
-  6000 mm/min becomes 7 steps up (F87 ... F5913 over 7.5 mm), one at F6000, 7 down.
+  6000 mm/min with the bed at 1000 mm/s^2 and 8 steps becomes 7 steps up (F87 ... F5913 over
+  7.5 mm), one at F6000, 7 down. With the defaults the bed ramps like a mill's table: up to
+  50 mm/s in 0.375 s over 9.4 mm, in 9 steps.
+- **No corners at speed for the bed:** Klipper takes a corner between two moves (e.g. lift in Z,
+  then travel in Y) at up to its square corner velocity (5 mm/s): the bed would jump from rest
+  to that speed with no ramp. Every move of the bed is sent with `SQUARE_CORNER_VELOCITY=0`
+  (a full stop at both ends) and Klipper's own value is set back after it.
+- **Homing** runs at `accel_y` with no corners at speed too (the homing macro's moves included).
+  Homing Y still ends with the bed stopping at its switch: set a slow `homing_speed` for
+  `[stepper_y]` in printer.cfg (e.g. 20, `second_homing_speed: 5`), and leave
+  `standby.motors_off` false (the default), so automatic mode does not home before every round.
 - **`trapezoid`:** one G1 at the lowered acceleration.
 - **Not shaped:** Z-only moves (up and down) and the shake (`run.shake`), whose quick moves are
-  meant to be sharp.
+  meant to be sharp (only when a clump is seen, `run.shake.enabled`).
+- **Still moving?** Lower `accel_y` further (100), or `max_feed_y` (2000); check that Klipper's
+  console shows `SET_VELOCITY_LIMIT ACCEL=200` before the bed moves.
 
 ## Automatic mode
 
@@ -593,13 +605,14 @@ machine then runs by itself until you press Stop. The Device tab's header shows 
 that apply then (Look now, Pause, Resume, Stop); *Manual* has Sort once and One pick:
 
 1. **Standby:** the bed stays all the way out at the photo position (`printer.photo_position`)
-   and the motors are switched off, so it's quiet (`standby.motors_off`). Every minute
-   (`standby.interval_s`) the camera looks at the plate. With the motors off nothing moves:
-   the bed is still parked where the camera was calibrated. The page counts down to the next
+   with the motors on (`standby.motors_off: true` switches them off, quiet, but then it homes
+   before every round: the bed stops sharply at its switch with the parts on it). Every minute
+   (`standby.interval_s`) the camera looks at the plate: the bed is still parked where the
+   camera was calibrated. The page counts down to the next
    look ("next look in 45 s").
 2. **Parts seen:** it starts at once (parts on the plate don't move by themselves). **Resume**
    (or Start) while it waits looks now, without waiting for the next look.
-3. **Sorting:** it homes (see below), finds the bins, and sorts the largest group first, until
+3. **Sorting:** it homes when needed (see below), finds the bins, and sorts the largest group first, until
    the plate is empty. Then it goes back to standby, and complete bins are marked ready.
 4. **Stuck parts** (a clump that shaking can't spread) are left alone. It tries again as soon
    as they've been moved.

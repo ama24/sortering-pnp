@@ -20,6 +20,7 @@ class PrinterStatus:
     printing: bool = False
     tool: str | None = None  # the _SORTERING_TOOL macro's `tool` variable, None = not found
     max_accel: float | None = None  # mm/s^2, Klipper's current acceleration (None = unknown)
+    square_corner_velocity: float | None = None  # mm/s, Klipper's (None = unknown)
 
     @property
     def ready(self) -> bool:

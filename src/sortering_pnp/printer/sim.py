@@ -127,6 +127,7 @@ class SimPrinter:
         self.jaw_angle: float | None = None  # last tweezer rotation (SimPins)
         self.tool = "picker"  # TOOL_PICKER / TOOL_HOTEND
         self.accel = 3000.0  # SET_VELOCITY_LIMIT ACCEL= (Klipper's max_accel)
+        self.scv = 5.0  # SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=
 
     def _tip(self) -> list[float]:
         return [p + o for p, o in zip(self.pos, self.m.tool.offset, strict=True)]
@@ -158,8 +159,10 @@ class SimPrinter:
             elif word == self.m.printer.tool_hotend.upper():
                 self.tool = "hotend"
             elif word == "SET_VELOCITY_LIMIT":
-                m = re.search(r"ACCEL=(\d+(?:\.\d+)?)", line.upper())
+                m = re.search(r"(?<![_A-Z])ACCEL=(\d+(?:\.\d+)?)", line.upper())
                 self.accel = float(m.group(1)) if m else self.accel
+                m = re.search(r"SQUARE_CORNER_VELOCITY=(\d+(?:\.\d+)?)", line.upper())
+                self.scv = float(m.group(1)) if m else self.scv
             elif word in ("M84", "M18"):
                 self.homed = ""  # motors off: the axes are no longer homed
             elif self.m.picker.rotate_macro and word == self.m.picker.rotate_macro.upper():
@@ -182,6 +185,7 @@ class SimPrinter:
             hotend_c=24.0,
             tool=self.tool if tool_macro else None,
             max_accel=self.accel,
+            square_corner_velocity=self.scv,
         )
 
     def emergency_stop(self) -> None:
