@@ -2088,6 +2088,22 @@ class Runner:
         if reload is not None:
             reload()
 
+    def fresh_session(self) -> None:
+        """A new session (every start of the program on a real printer): no bins from before.
+        The layout keeps its settings on the configured grid (bed.cols x bed.rows) with no
+        bins; Resync or the start-up check finds them again. What the bins collected, their
+        counts and open bin changes go too; the learnt packing stays."""
+        lay = Layout.empty(self.m.bed.cols, self.m.bed.rows, self.layout())
+        lay.save(self.layout_path)
+        self._layout_cache = None
+        with self._claims_lock:
+            for d in (self.claims, self.bin_counts, self.bin_volume, self.bin_family):
+                d.clear()
+            self.requests.clear()
+            self.ready.clear()
+            self._save_claims()
+        self.say(f"new session: a {lay.cols}x{lay.rows} grid, no bins yet (Resync finds them)")
+
     def _load_claims(self) -> tuple[dict[int, str], dict[int, int], dict[int, float]]:
         """(what each wild bin collects, how many items each bin received, their volume);
         also the learnt packing and each bin's family."""

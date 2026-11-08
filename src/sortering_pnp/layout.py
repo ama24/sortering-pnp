@@ -377,6 +377,17 @@ class Layout:
         )
 
     @classmethod
+    def empty(cls, cols: int = 5, rows: int = 5, like: Layout | None = None) -> Layout:
+        """A grid of cols x rows cells and no bins (a new session). `like` gives the settings
+        that stay: pitch, grid origin, TPU sheet, bin floor and what wild bins collect."""
+        lay = cls(cols=cols, rows=rows)
+        if like is not None:
+            lay.pitch, lay.origin = like.pitch, list(like.origin)
+            lay.plate_thickness_mm, lay.bin_floor_mm = like.plate_thickness_mm, like.bin_floor_mm
+            lay.wild_by = like.wild_by
+        return lay
+
+    @classmethod
     def default(cls) -> Layout:
         """5x5 grid on a 220 mm bed: a 3x3 tray in the middle as the plate, 16 bins around it:
         unknown, unsure and overflow, and 13 wild bins that sort by themselves."""

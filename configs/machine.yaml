@@ -22,6 +22,10 @@ paths:
   captures: ../data/captures   # calibration photos and the locked camera settings
   sessions: ../data/real       # real-photo sessions (Photos tab)
 
+bed:                           # the Gridfinity grid; every start begins on it with no bins
+  cols: 5                      # cells along X (5 x 42 mm on a 220 mm bed)
+  rows: 5                      # cells along Y
+
 camera:
   settings: null               # locked camera settings json (locked focus/exposure); null: rpicam-still
   source: overview             # overview: fixed above the bed | head: on the tool head (docs/reference.md)
