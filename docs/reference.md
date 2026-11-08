@@ -61,10 +61,12 @@ The old names still work: `vacuum` = `suction`; `gripper`, `tweezers` and `both`
 
 **Suction cups** for `suction` are in [prints/cups/](../prints/cups/) (TPU 95A,
 [printables/cups.py](../src/sortering_pnp/printables/cups.py)): a straight Ø7 body held in the
-picker's 7 mm socket by 3 M3 screws in blind holes, a neck with a Ø4.3 bore (every cup 47 mm
+picker's 7 mm socket by 3 M3 screws in blind holes, a neck with a Ø4.3 bore (every cup 37 mm
 long, shank to lip: swapping keeps the tip height), folds that go
 inwards, and five tips (AS, AM: a short lip for flat faces; DS, DM, DL: a thin skirt for curved
-ones); AM, DM and DL also with a sieve (a ring of holes on a dome the part rests on). Every hole
+ones); AM, DM and DL also with a sieve (a ring of holes on a dome the part rests on). A second
+set, `_wide` (`Cup.wide`), has the same tips on a Ø9.5 bellows with 1.6 mm deep folds: softer
+(about 3.5 times along the axis), its inside a chamber wider than the tube. Every hole
 is smaller than the smallest head the tip picks (the head closes the cup). Soft: the folds and
 the lip one line of a 0.4 mm nozzle, the cup's wall `SOFT_WALL` (0.6 mm); sized for a 0.4 mm
 nozzle (`MIN_LINE`, `MIN_HOLE`): every wall one line or more across each layer.

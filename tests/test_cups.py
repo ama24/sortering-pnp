@@ -47,9 +47,16 @@ def test_the_body_is_straight_and_no_channel_is_wider_than_the_tube(cup):
     poly, marks = _profile(cup)
     neck = [r for r, z in poly if z <= marks["neck_top"] + 1e-9]
     assert max(neck) == pytest.approx(cup.body_d / 2)  # Ø7 straight, shank and neck
-    assert marks["neck_top"] - cup.shank_l >= 20.0
-    passage = [a for z, a, _ in walls(cup) if z <= marks["folds_top"]]  # the inside's radius
-    assert max(passage) <= cup.bore_d / 2 + 1e-9  # the folds go inwards
+    assert marks["neck_top"] - cup.shank_l >= cup.min_neck - 1e-9
+    assert cup.min_neck == (4.0 if cup.wide else 10.0)
+    rb = cup.bore_d / 2
+    inside = [(z, a) for z, a, _ in walls(cup) if z <= marks["folds_top"]]  # the inside's radius
+    assert max(a for z, a in inside if z <= marks["neck_top"]) <= rb + 1e-9  # the tube
+    if cup.wide:  # a chamber, not a channel: never narrower than the tube, wider in the folds
+        assert min(a for z, a in inside if z > marks["neck_top"]) >= rb - 1e-9
+        assert max(a for _, a in inside) > rb + 1.0
+    else:
+        assert max(a for _, a in inside) <= rb + 1e-9  # the folds go inwards
     assert cup.fix_depth < (cup.body_d - cup.shank_bore_d) / 2 - 0.5  # blind: no leak
 
 
@@ -81,18 +88,21 @@ def test_the_head_covers_the_hole_and_the_sieve_lets_more_air_by(name):
 def test_the_files_and_notes():
     files = dict(cup_files())
     assert sorted(files) == sorted(
-        [f"cup_{n}.stl" for n in TIPS]
-        + [f"cup_{n}_sieve.stl" for n in ("AM", "DM", "DL")]
+        [f"cup_{n}{w}.stl" for n in TIPS for w in ("", "_wide")]
+        + [f"cup_{n}_sieve{w}.stl" for n in ("AM", "DM", "DL") for w in ("", "_wide")]
         + ["CUPS.txt"]
     )
     notes = files["CUPS.txt"].decode()
     assert "TPU 95A" in notes and "M3" in notes and all(n in notes for n in TIPS)
+    assert "37 mm" in notes and all(f"{n}_wide" in notes for n in TIPS)
 
 
 def test_every_cup_is_the_same_length():
     """Swapping cups must not change the tip height: every lip at the same distance."""
     rims = {c.name: _profile(c)[1]["rim"] for c in all_cups()}
-    assert all(r == pytest.approx(Cup(TIPS["AS"]).length) for r in rims.values()), rims
+    assert Cup(TIPS["AS"]).length == 37.0  # 10 mm shorter than the first ones
+    assert all(r == pytest.approx(37.0) for r in rims.values()), rims
+    assert len(rims) == 16  # 8 normal, 8 wide
     for c in all_cups():
         assert build(c).bounding_box()[5] == pytest.approx(c.length)
 
@@ -138,3 +148,29 @@ def test_a_04_nozzle_prints_the_sieve(cup):
         assert rho - d / 2 >= cup.plateau_r + cup.web / 3 - 1e-9  # the plateau stays whole
         assert rho + d / 2 <= _inside(cup)[0] - cup.web / 3 + 1e-9  # off the cup's wall
     assert 2 * cup.plateau_r >= TWO_LINES  # the top the part rests on: two lines
+
+
+@pytest.mark.parametrize("cup", [c for c in all_cups() if c.wide], ids=lambda c: c.name)
+def test_the_wide_set_has_a_wider_deeper_bellows(cup):
+    """The same tip on a wider bellows with deeper folds: softer (a fold's axial rate goes with
+    D x t^3 / depth^3), the same walls, holes and length as the normal cup."""
+    normal = Cup(cup.tip, cup.sieve)
+    (pn, mn), (pw, mw) = _profile(normal), _profile(cup)
+
+    def bellows_out(poly, marks):
+        return max(r for r, z in poly if marks["neck_top"] < z < marks["folds_top"])
+
+    assert bellows_out(pw, mw) == pytest.approx(cup.wide_d / 2)
+    assert bellows_out(pw, mw) > bellows_out(pn, mn) + 1.0
+    assert bellows_out(pw, mw) > cup.body_d / 2  # wider than the neck
+    assert cup.wide_amp > 1.5 * cup.tip.amp  # deeper folds
+    assert cup.wide_amp <= cup.wide_pitch / 2 + 1e-9  # 45 deg
+    assert mw["rim"] == pytest.approx(mn["rim"])
+    if cup.sieve:
+        assert holes(cup) == holes(normal)
+
+    def tip(poly, marks):  # the cup above the folds
+        top = marks["folds_top"]
+        return sorted((round(r, 6), round(z - top, 6)) for r, z in poly if z > top + 1e-9)
+
+    assert tip(pw, mw) == tip(pn, mn)

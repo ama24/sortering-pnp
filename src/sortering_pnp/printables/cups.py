@@ -3,8 +3,17 @@ ones also with a sieve.
 
 The body: a Ø7 shank that goes 7 mm into the picker's socket, held by 3 M3 screws at 120 deg
 that press into blind holes (blind: a hole through to the bore would leak), then a straight Ø7
-neck of 20 mm with the Ø4.3 bore of the pump's tube. No channel is wider than 4.3 mm: the folds
-of the bellows go inwards (the passage narrows to Ø2.6 there, as wide as the tip's hole).
+neck of 10 mm or more with the Ø4.3 bore of the pump's tube. No channel is wider than 4.3 mm:
+the folds of the bellows go inwards (the passage narrows to Ø2.6 there, as wide as the tip's
+hole). Every cup is 37 mm long, shank's end to lip.
+
+`wide` (a second set, `_wide`): the same tips on a wider bellows, Ø9.5 outside with folds 1.6 mm
+deep (the normal ones: Ø5.2, 0.85 mm), out from the neck and back in at 45 deg. The bellows is a
+chamber, not a channel: inside it is Ø5.4 at its narrowest, the shank, the neck and every hole
+stay as they are. Same walls, same length; softer: a fold's axial rate goes with
+D x t^3 / depth^3, so twice the depth beats the bigger diameter (about 3.5 times softer along the
+axis, 1.7 times sideways, as stiff to tilt). The vacuum pulls it shut on a sealed part
+(about 2.6 N at -60 kPa on its 7.5 mm mean diameter): it lifts the part by its few mm of travel.
 
 The folds and the cup are soft: the folds one line thick (0.45 mm), the cup's wall 0.6 mm
 thinning to a one-line lip, the floor 0.6 mm (thicker ones, 0.9-1 mm, did not compress and felt
@@ -88,10 +97,13 @@ class Cup:
     sieve: bool = False
     body_d: float = 7.0  # shank and neck: straight
     shank_l: float = 7.0  # into the picker's 7 mm socket
-    neck_l: float = 20.0  # below the socket, at least (longer to make every cup `length` long)
-    length: float = (
-        47.0  # shank's end to the lip, the same for every cup: swap without recalibrating
-    )
+    wide: bool = False  # the wide bellows (folds out from the neck), else folds inwards
+    neck_l: float = 10.0  # below the socket, at least (longer to make every cup `length` long)
+    wide_neck_l: float = 4.0  # the same with the wide bellows (it takes 6.6-7.5 mm more)
+    length: float = 37.0  # shank's end to the lip, the same for every cup: swap, no recalibrating
+    wide_d: float = 9.5  # the wide bellows' outside
+    wide_amp: float = 1.6  # how far its folds go in (inside Ø5.4 at the narrowest)
+    wide_pitch: float = 3.2  # mm per fold (2 x amp: 45 deg)
     bore_d: float = 4.3  # the pump tube's inside: no channel wider
     shank_bore_d: float = 3.2  # narrower in the shank: wall left behind the screws' holes
     fix_z: float = 3.5  # the M3 screws' axis, from the shank's end (the socket's bottom)
@@ -105,7 +117,15 @@ class Cup:
 
     @property
     def name(self) -> str:
-        return f"cup_{self.tip.name}" + ("_sieve" if self.sieve else "")
+        return (
+            f"cup_{self.tip.name}"
+            + ("_sieve" if self.sieve else "")
+            + ("_wide" if self.wide else "")
+        )
+
+    @property
+    def min_neck(self) -> float:
+        return self.wide_neck_l if self.wide else self.neck_l
 
 
 def _inside(c: Cup) -> tuple[float, float, float]:
@@ -122,13 +142,13 @@ def _inside(c: Cup) -> tuple[float, float, float]:
 def _profile(c: Cup) -> tuple[list[tuple[float, float]], dict[str, float]]:
     """The half section, its neck made longer so the lip is at `length` (the same for every cup:
     the tip height stays when the cup is swapped)."""
-    _, marks = _profile_at(c, c.neck_l)
+    _, marks = _profile_at(c, c.min_neck)
     extra = c.length - marks["rim"]
     if extra < -1e-9:
         raise ValueError(
             f"{c.name}: {marks['rim']:.2f} mm long with the shortest neck, over {c.length:g}"
         )
-    return _profile_at(c, c.neck_l + extra)
+    return _profile_at(c, c.min_neck + extra)
 
 
 def _profile_at(c: Cup, neck_l: float) -> tuple[list[tuple[float, float]], dict[str, float]]:
@@ -139,14 +159,29 @@ def _profile_at(c: Cup, neck_l: float) -> tuple[list[tuple[float, float]], dict[
     R, rb, rs = c.body_d / 2, c.bore_d / 2, c.shank_bore_d / 2
     z_neck = c.shank_l + neck_l
     r_fold = rb + t.fold_t  # the folds' outside, before folding in
-    outer = [(R, 0.0), (R, z_neck), (r_fold, z_neck + (R - r_fold))]
-    z = z_neck + (R - r_fold)
-    inner = [(rs, 0.0), (rs, c.shank_l), (rb, c.shank_l + rb - rs), (rb, z)]
-    for _ in range(t.folds):  # each fold in, then out: 45 deg at most (amp <= pitch / 2)
-        h = t.pitch / 2
-        outer += [(r_fold - t.amp, z + h), (r_fold, z + 2 * h)]
-        inner += [(rb - t.amp, z + h), (rb, z + 2 * h)]
-        z += 2 * h
+    inner = [(rs, 0.0), (rs, c.shank_l), (rb, c.shank_l + rb - rs)]
+    if c.wide:  # out at 45 deg to the wide bellows, its folds, back in at 45 deg
+        rw, amp, h = c.wide_d / 2, c.wide_amp, c.wide_pitch / 2
+        z = z_neck + (R - r_fold)  # the bore widens from z_neck: the wall thins to one line
+        outer = [(R, 0.0), (R, z), (rw, z + (rw - R))]
+        z += rw - R
+        inner += [(rb, z_neck), (rw - t.fold_t, z)]  # the inside: the outside less one line
+        for _ in range(t.folds):
+            outer += [(rw - amp, z + h), (rw, z + 2 * h)]
+            inner += [(rw - t.fold_t - amp, z + h), (rw - t.fold_t, z + 2 * h)]
+            z += 2 * h
+        z += rw - r_fold  # back in to the normal folds' top
+        outer.append((r_fold, z))
+        inner.append((rb, z))
+    else:
+        outer = [(R, 0.0), (R, z_neck), (r_fold, z_neck + (R - r_fold))]
+        z = z_neck + (R - r_fold)
+        inner.append((rb, z))
+        for _ in range(t.folds):  # each fold in, then out: 45 deg at most (amp <= pitch / 2)
+            h = t.pitch / 2
+            outer += [(r_fold - t.amp, z + h), (r_fold, z + 2 * h)]
+            inner += [(rb - t.amp, z + h), (rb, z + 2 * h)]
+            z += 2 * h
     z_b = z
     ci, wall, rim_in = _inside(c)
     marks = {"neck_top": z_neck, "folds_top": z_b}
@@ -270,7 +305,14 @@ def cup_mesh(c: Cup) -> Mesh:
 
 
 def all_cups() -> list[Cup]:
-    return [Cup(t, s) for t in TIPS.values() for s in (False, True) if t.sieve_d > 0 or not s]
+    """The normal set, then the wide one: every tip, with a sieve where there is room."""
+    return [
+        Cup(t, s, wide=w)
+        for w in (False, True)
+        for t in TIPS.values()
+        for s in (False, True)
+        if t.sieve_d > 0 or not s
+    ]
 
 
 CUP_NOTES = """Suction cups for the suction picker (sortering-pnp print catalogue: prints/cups/)
@@ -285,11 +327,21 @@ Fit: the Ø7 shank goes 7 mm into the picker's socket; 3 M3 screws, 120 deg apar
 the socket's bottom, press into its blind holes (Ø{fix_d:g}, {fix_depth:g} mm deep: they don't reach
 the bore, nothing leaks). Snug them, don't crush the TPU.
 
-Length: every cup is {length:g} mm from the shank's end to the lip (the neck makes up the
-difference, {neck:g} mm or more below the socket): swap cups without measuring the tip height again.
+Length: every cup, normal or wide, is {length:g} mm from the shank's end to the lip (the neck
+makes up the difference, {neck:g} mm or more below the socket, {wide_neck:g} mm or more with the
+wide bellows): swap cups without measuring the tip height again.
 
 Body: straight Ø7, bore Ø4.3 (the pump's tube; Ø3.2 in the shank,
-behind the screws). The folds go inwards: no channel is wider than 4.3 mm.
+behind the screws). The normal set's folds go inwards: no channel is wider than 4.3 mm.
+
+Wide set (_wide): the same tips and holes on a wider bellows, Ø{wide_d:g} outside, folds
+{wide_amp:g} mm deep every {wide_pitch:g} mm (the normal ones Ø5.2, 0.85 mm every 2.4 mm), out from the
+neck and back in at 45 deg, the same one-line walls. The bellows is a chamber, not a channel:
+inside it is Ø{wide_in:g} at its narrowest (wider than the tube); the shank, the neck and the holes are
+the same. About 3.5 times softer along the axis (a fold's rate goes with diameter x wall^3 /
+depth^3: the deeper folds win over the bigger diameter), 1.7 times softer sideways, as stiff
+to tilt. On a sealed part the vacuum pulls it shut (about 2.6 N at -60 kPa, against 0.7 N on
+the normal bellows): it lifts the part by a few mm and holds it on its closed folds.
 
 Tips (each hole smaller than the smallest head the tip picks: the head lies on the lip and
 closes the cup, nothing goes in):
@@ -316,9 +368,10 @@ def cup_files() -> list[tuple[str, bytes]]:
             t = c.tip
             sv = f"sieve: {len(holes(Cup(t, True)))} x Ø{t.sieve_d:g}" if t.sieve_d else "no sieve"
             _, marks = _profile(c)
+            bellows = f"Ø{c.wide_d:g} bellows" if c.wide else "Ø5.2 bellows"
             rows.append(
-                f"  {t.name}  lip Ø{t.lip_d:g}, {t.folds} folds, hole Ø{t.hole_d:g} "
-                f"({sv}), neck {marks['neck_top'] - c.shank_l:.1f} mm: {t.use}"
+                f"  {c.name[4:]:8s} lip Ø{t.lip_d:g}, {t.folds} folds, {bellows}, hole "
+                f"Ø{t.hole_d:g} ({sv}), neck {marks['neck_top'] - c.shank_l:.1f} mm: {t.use}"
             )
     c0 = Cup(TIPS["AS"])
     notes = CUP_NOTES.format(
@@ -326,6 +379,11 @@ def cup_files() -> list[tuple[str, bytes]]:
         fix_d=c0.fix_d,
         fix_depth=c0.fix_depth,
         neck=c0.neck_l,
+        wide_neck=c0.wide_neck_l,
+        wide_d=c0.wide_d,
+        wide_amp=c0.wide_amp,
+        wide_pitch=c0.wide_pitch,
+        wide_in=round(c0.wide_d - 2 * (c0.wide_amp + c0.tip.fold_t), 2),
         length=c0.length,
         min_hole=MIN_HOLE,
         soft=SOFT_WALL,
