@@ -215,7 +215,8 @@ The steps below are the same work in more detail.
    another bin as the plate, give it the role *work*; Resync keeps your choice from then on.
    Bins taken off the bed keep their rules and get them back when they return. Give the other
    bins rules (*holds*) or leave them wild.
-8. **Device tab**: pick a strategy and press **Sort once** or **Automatic**, or use the printer menu.
+8. **Device tab**: pick a strategy and press **Start automatic** (*Manual* has Sort once and One
+   pick), or use the printer menu.
 
 ## Models: upload over WiFi, keep the old ones
 
@@ -434,8 +435,9 @@ machine never stops for it: it keeps sorting everything else. When only the wait
 left, it waits, and still looks at the tray every `standby.interval_s`: parts thrown in
 meanwhile are sorted. The requests are kept across a restart.
 
-All bin changes are in one banner at the top of the Device tab, with one button that steps
-through them (or **Change bin** in the printer menu):
+All bin changes are on one line above the bed on the Device tab (the bins to change and the
+finished ones, with *Emptied*), with one button that steps through them (or **Change bin** in
+the printer menu, or the bin's own menu on the bed):
 1. **Park:** the machine finishes its move and parks (bed out, safe for your hands); also
    while automatic mode stands by;
 2. empty the bins, or put other (empty) bins in their place;
@@ -574,8 +576,10 @@ printer:
 
 ## Automatic mode
 
-Press **Automatic** on the Device tab (or *Screw sorter → Automatic* on the printer). The machine
-then runs by itself until you press Stop:
+Press **Start automatic** on the Device tab (or *Screw sorter → Automatic* on the printer). The
+machine then runs by itself until you press Stop. The Device tab's header shows what really runs
+(*Automatic · waiting · next photo in 0:42*, *Sort once · sorting*, *Idle*), and only the buttons
+that apply then (Look now, Pause, Resume, Stop); *Manual* has Sort once and One pick:
 
 1. **Standby:** the bed stays all the way out at the photo position (`printer.photo_position`)
    and the motors are switched off, so it's quiet (`standby.motors_off`). Every minute

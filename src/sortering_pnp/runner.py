@@ -105,6 +105,7 @@ class Runner:
         self._stop = threading.Event()
         self._now = threading.Event()  # automatic mode: Resume / Start, look and sort now
         self._in_auto = False
+        self._mode = ""  # what the sorter thread runs: auto, sort, step or task (Resync, ...)
         self._next_look: float | None = None  # automatic mode: when it looks again (time.time)
         self._shot_t: float | None = None  # when the photo on the page was taken
         self.startup = Checklist()  # the start-up check (startup.py), shown on the Device tab
@@ -262,7 +263,7 @@ class Runner:
             "requests": [r.to_dict() for r in self.requests],
             "mask_margin_mm": self.m.camera.mask_margin_mm,
             "swap_phase": self.swap_phase,
-            "auto": self.saved_mode()[0],
+            **self.mode(),
             "tip_offset_z": self.m.tool.offset[2],
             "timing": self.state.timing,
             "phase": self.state.phase,
@@ -284,6 +285,15 @@ class Runner:
                 "missing": self.setup.missing(),
             },
         }
+
+    def mode(self) -> dict[str, Any]:
+        """What really runs now, for the page (never what is only remembered): mode = auto
+        (automatic mode, also while it waits), sort (Sort once), step (One pick), task (a
+        Resync, check or bin change done for you) or "" (idle). auto_saved: automatic mode
+        was on at the last stop and comes back at the next start."""
+        alive = self._thread is not None and self._thread.is_alive()
+        mode = ("auto" if self._in_auto else self._mode) if alive else ""
+        return {"mode": mode, "auto": mode == "auto", "auto_saved": self.saved_mode()[0]}
 
     # ------------------------------------------------------------------ commands
     def command(self, cmd: str, strategy: str | None = None) -> str:
@@ -316,6 +326,7 @@ class Runner:
                 failed_picks=0,
                 counts={},
             )
+            self._mode = cmd if cmd == "step" else "sort"
             self._thread = threading.Thread(
                 target=self._run,
                 args=(strat, 1 if cmd == "step" else None),
@@ -341,6 +352,7 @@ class Runner:
                 failed_picks=0,
                 counts={},
             )
+            self._mode = "auto"
             self._thread = threading.Thread(
                 target=self._auto, args=(strat,), name="sorter", daemon=True
             )
@@ -456,6 +468,7 @@ class Runner:
             else:
                 self._set(status="idle", message=done or f"{label}: done")
 
+        self._mode = "task"
         self._thread = threading.Thread(target=run, name="sorter", daemon=True)
         self._thread.start()
         return f"{label}: stopping the current move first" if old is not None else label
@@ -1217,7 +1230,7 @@ class Runner:
                 self._next_look = time.time() + sb.interval_s  # the page counts down to it
                 self._set(
                     status=status,
-                    message=f"{msg} · next look in {round(sb.interval_s)} s (Resume: now)",
+                    message=f"{msg} · next look in {round(sb.interval_s)} s (Look now: at once)",
                 )
                 stopped = self._wait(sb.interval_s, wake=True)
                 self._next_look = None

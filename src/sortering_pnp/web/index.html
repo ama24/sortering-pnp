@@ -76,8 +76,14 @@ td small{display:block;color:var(--mut);font-size:12.5px}
 #startup .done{color:var(--ink)}#startup .done .mk{background:var(--ok);color:#fff}#startup .failed{color:var(--bad)}#startup .failed .mk{background:var(--bad);color:#fff}
 #startup .skipped .mk{background:var(--warn-soft);color:var(--warn)}#startup .running{color:var(--acc)}#startup .running .mk{background:var(--acc-soft);color:var(--acc);animation:supulse 1s ease-in-out infinite}@keyframes supulse{50%{opacity:.45}}
 #startup .re{align-self:flex-start;margin:3px 0 2px;background:none;border:1px solid var(--line);border-radius:6px;padding:1px 8px;font:inherit;font-size:12px;color:var(--mut);cursor:pointer;width:auto}#startup .re:hover{color:var(--ink);border-color:var(--mut)}#startup .re:disabled{opacity:.5;cursor:default}
-.bc{display:flex;flex-direction:column;gap:6px}.bc .row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bc .steps{font-size:12.5px;color:var(--mut)}.bc .steps b{color:var(--ink)}
-.bc ul{margin:0;padding:0 0 0 18px}.bc button:disabled{opacity:.6;cursor:default}
+.runst{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:999px;background:var(--line2);color:var(--mut);font-size:14px;white-space:nowrap}
+.runst.on{background:var(--ok-soft);color:var(--ink)}.runst span:not(.dot){color:var(--mut)}
+#runbox{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+details.man{position:relative}details.man summary{cursor:pointer;list-style:none;color:var(--mut);font-size:13px;padding:8px 10px;border-radius:8px}
+details.man summary::-webkit-details-marker{display:none}details.man summary:hover{color:var(--acc)}details.man summary::after{content:" \25BE"}
+details.man[open]>div{position:absolute;right:0;top:100%;z-index:20;display:flex;gap:6px;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.08);white-space:nowrap}
+.bchg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 8px 7px 12px;margin-bottom:10px;border-radius:var(--r2);background:var(--warn-soft);border:1px solid #ecdcbc;font-size:13px}
+.bchg>b{color:var(--warn)}.bchg button:disabled{opacity:.6;cursor:default}
 .lights{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-start}.lpick{display:flex;gap:8px;align-items:center}
 .lpick input[type=color]{width:44px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}.lpick #lhex{width:86px;font-family:ui-monospace,monospace}
 .lsw{width:34px;height:34px;border-radius:50%;border:1px solid var(--line)}.lsl{display:grid;gap:4px;min-width:260px}
@@ -139,7 +145,7 @@ ul.plain{margin:8px 0 0;padding-left:18px}
 .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--mut);font-size:13.5px;text-align:center;padding:20px}
 .tline{margin-top:10px;font-size:13.5px;color:var(--mut);min-height:22px}.tline b{color:var(--ink)}
 .bedsvg{width:100%;height:auto;display:block}
-#bedbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#bedbar .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 #bedbar .req{display:flex;align-items:center;gap:8px;border-radius:999px;padding:4px 5px 4px 12px;font-size:13px;border:1px solid}
 #bedbar .req.chg{background:var(--warn-soft);border-color:#ecdcbc}#bedbar .req.fin{background:var(--ok-soft);border-color:#d3e6d7}
 #bedbar .req button{border:0;border-radius:999px;padding:4px 12px;font:inherit;font-weight:600;cursor:pointer;color:#fff}
@@ -269,20 +275,20 @@ button.p{font-weight:600}button.big{padding:11px 18px}
 
 <section id="device" class="on">
  <div class="phead"><div class="pt"><h1>Device</h1><p>The tray, the bins and what the machine does, live</p><div id="msg" class="note"></div></div>
-  <div class="acts"><button class="b p big" onclick="cmd('auto')" title="Standby: looks for parts every minute and sorts them, until Stop. Stays on after a restart.">Automatic</button><button class="b big" onclick="cmd('start')">Sort once</button><button class="b big" onclick="cmd('step')">One pick</button><button class="b big" onclick="cmd('pause')">Pause</button><button class="b big" onclick="cmd('resume')">Resume</button><button class="b big" onclick="cmd('stop')">Stop</button></div></div>
+  <div class="acts"><div id="runbox"></div><details class="man" id="runman"><summary>Manual</summary><div><button class="b s" onclick="manual('start')" title="Sort what lies in the tray now, then stop">Sort once</button><button class="b s" onclick="manual('step')" title="One part, then stop">One pick</button></div></details></div></div>
  <div id="attn"></div>
  <div class="dgrid">
   <div class="card dcard">
    <div class="chead"><h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Camera</h2><span class="note" id="camnote"></span>
     <span class="seg sm"><label><input type="checkbox" id="showlab" checked onchange="drawOverlay()">names</label><label><input type="checkbox" id="showout" checked onchange="drawOverlay()">outlines</label><label><input type="checkbox" id="showcode" checked onchange="drawOverlay()">codes</label></span></div>
-   <div class="camwrap"><img id="view" alt="" onload="drawOverlay()"><svg id="ov"></svg><div id="camempty" class="empty"><span>No photo yet: press <b>One pick</b> or <b>Sort once</b>.</span></div></div>
+   <div class="camwrap"><img id="view" alt="" onload="drawOverlay()"><svg id="ov"></svg><div id="camempty" class="empty"><span>No photo yet: <b>Start automatic</b> takes one.</span></div></div>
    <div id="target" class="tline"></div>
   </div>
   <div class="card dcard">
    <div class="chead"><h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Bed</h2>
     <div class="row"><select id="strategy" title="How the parts are sorted"></select><button class="b s" onclick="scan()" title="Photo: where the baseplate lies, which bins stand where and which way round; the biggest bin becomes the tray unless you chose one">Resync</button><button class="b s" onclick="openSettings()" title="Grid size, where it lies, what a wild bin collects">Settings</button></div></div>
-   <svg id="grid" class="bedsvg"></svg>
    <div id="bedbar"></div>
+   <svg id="grid" class="bedsvg"></svg>
    <div id="pending" class="pending" hidden><span id="pendtext"></span><span class="grow"></span><button class="b s" onclick="discard()">Discard</button><button class="b p s" onclick="applyChanges()">Apply</button></div>
    <ul id="problems" class="plain bad"></ul><span id="laymsg" class="note"></span>
    <div class="legend"><span><i class="sw" style="border-style:dashed"></i>free wild bin</span><span><i class="sw"></i>collecting</span><span><i class="sw" style="background:var(--ok-soft);border-color:var(--ok)"></i>finished</span><span><i class="sw" style="background:var(--warn-soft);border-color:var(--warn)"></i>to change</span><span><i class="sw" style="background:var(--work);border-color:#c9d6db"></i>tray</span><span><i class="sw" style="background:var(--cell);border-color:var(--line)"></i>no bin</span><span class="note">⋯ or right-click: options</span></div>
@@ -433,15 +439,15 @@ async function changePw(){try{await api("api/users/password",{old:$("oldpw").val
 async function cmd(c){try{const j=await api("api/command",{command:c,strategy:$("strategy").value});flash("msg",j.result);}catch(e){flash("msg",e.message,1);}poll();}
 async function binFull(m){closeMenu();try{const j=await api("api/bins/full",{marker:m});Object.assign(S,j);flash("laymsg","noted: it is asked to be changed, and the estimates learn from it");poll();}catch(e){flash("laymsg",e.message,1);}}
 async function emptied(m){closeMenu();try{const j=await api("api/bins/emptied",{marker:m});Object.assign(S,j);renderBed();}catch(e){flash("laymsg",e.message,1);}}
-async function askChange(m){closeMenu();try{const j=await api("api/bins/change",{marker:m});Object.assign(S,j);renderAttention();poll();}catch(e){flash("laymsg",e.message,1);}}
+async function askChange(m){closeMenu();try{const j=await api("api/bins/change",{marker:m});Object.assign(S,j);renderBed();poll();}catch(e){flash("laymsg",e.message,1);}}
 function readyMap(){const r={};for(const x of S.ready||[])r[x.marker]=x;return r;}
 function swapMap(){const r={};for(const x of S.requests||[])r[x.marker]=x;return r;}
 let shownView="";
 async function poll(){try{S=await api("api/state");}catch(e){$("status").innerHTML='<span class="dot bad"></span>no connection';return;}
  const cls={running:"ok",done:"ok",standby:"ok",error:"bad",stuck:"warn",waiting:"warn",parked:"warn",paused:"warn",stopping:"warn"}[S.status]||"";
- $("status").innerHTML=`<span class="dot ${cls}"></span><b>${esc(S.status)}</b>${S.auto?" · automatic":""}${S.driver==="sim"?" · simulation":""}`;
+ $("status").innerHTML=`<span class="dot ${cls}"></span><b>${esc(S.status)}</b>${S.mode==="auto"?" · automatic":""}${S.driver==="sim"?" · simulation":""}`;
  NEXT=S.next_look_s==null?null:Date.now()+S.next_look_s*1000;SHOT_T=S.shot_age_s==null?null:Date.now()-S.shot_age_s*1000;
- $("msg").textContent=live(S.message);renderStartup();
+ $("msg").textContent=live(S.message);renderStartup();renderRun();
  const st=$("strategy");if(!st.options.length){for(const[k,v]of Object.entries(S.strategies)){const o=document.createElement("option");o.value=k;o.textContent=v;st.appendChild(o);}st.value=S.strategy;}
  const img=S.view||S.shot;if(img&&img!==shownView){shownView=img;$("view").src="runs/"+encodeURIComponent(img);}
  $("camempty").hidden=!!img;drawOverlay();renderStats();renderActivity();
@@ -462,7 +468,22 @@ function ago(s){return s<5?"just now":s<60?`${s} s ago`:s<3600?`${Math.floor(s/6
 // automatic mode: "next look in 45 s", counted down here between polls
 function live(t){if(NEXT==null||!t)return t;const s=Math.max(0,Math.round((NEXT-Date.now())/1000));
  return t.replace(/next look in \d+ s/,"next look in "+(s>=60?`${Math.floor(s/60)} min ${String(s%60).padStart(2,"0")} s`:`${s} s`));}
-setInterval(()=>{if(S)camNote();if(NEXT!=null&&S){$("msg").textContent=live(S.message);renderActivity();$("nowline").textContent=live(S.message);}},1000);
+setInterval(()=>{if(S)camNote();if(NEXT!=null&&S){renderRun();$("msg").textContent=live(S.message);renderActivity();$("nowline").textContent=live(S.message);}},1000);
+// run control: what really runs (S.mode from the runner), never a button lit before it is pressed
+function runState(){const m=S.mode||"",st=S.status,t=NEXT!=null?mmss(Math.max(0,Math.round((NEXT-Date.now())/1000))):null;
+ const warn={error:"bad",stuck:"warn",paused:"warn",parked:"warn",waiting:"warn",stopping:"warn"}[st]||"ok";
+ if(m==="auto")return{on:1,title:"Automatic",sub:st==="standby"?(t?`waiting · next photo in ${t}`:"waiting"):st==="stuck"?"parts need a hand":st==="paused"?"paused":st==="error"?"error: trying again":st==="parked"||st==="waiting"?"bin change":st==="stopping"?"stopping…":"sorting",cls:warn};
+ if(m==="sort")return{on:1,title:"Sort once",sub:st==="paused"?"paused":st==="stopping"?"stopping…":st==="parked"||st==="waiting"?"bin change":"sorting",cls:warn};
+ if(m==="step")return{on:1,title:"One pick",sub:st==="stopping"?"stopping…":"",cls:warn};
+ if(m==="task")return{on:1,title:"Busy",sub:S.message||"",cls:warn};
+ return{on:0,title:"Idle",sub:st==="error"?S.message:"",cls:st==="error"?"bad":""};}
+function renderRun(){const r=runState(),m=S.mode||"",st=S.status,b=(c,l,t="")=>`<button class="b big" onclick="cmd('${c}')"${t?` title="${t}"`:""}>${l}</button>`;
+ let h=`<span class="runst${r.on?" on":""}"><span class="dot ${r.cls}"></span><b>${esc(r.title)}</b>${r.sub?`<span>${esc(r.sub)}</span>`:""}</span>`;
+ if(m==="auto")h+=(st==="standby"||st==="stuck"?b("resume","Look now","Take a photo and sort what lies there, now"):st==="paused"?b("resume","Resume"):st==="running"?b("pause","Pause"):"")+b("stop","Stop","Automatic mode off, after the move in progress");
+ else if(m)h+=(st==="paused"?b("resume","Resume"):st==="running"&&m==="sort"?b("pause","Pause"):"")+b("stop","Stop");
+ else h+=b("auto","Start automatic","Looks for parts every minute and sorts them, until Stop. Stays on after a restart.");
+ if($("runbox").innerHTML!==h)$("runbox").innerHTML=h;$("runman").hidden=!!m;}
+function manual(c){$("runman").open=false;cmd(c);}
 // the start-up check (startup.py): homing, layout check, bins check, ready
 function renderStartup(){const su=S.startup||{},steps=su.steps||[],box=$("startup");if(!box)return;
  const icon={done:"✓",failed:"✗",skipped:"–",running:"•",pending:""},run=steps.some(s=>s.state==="running");
@@ -558,21 +579,20 @@ function renderBed(){const L=draft;if(!L)return;const W=L.cols*CELL,H=L.rows*CEL
  $("pending").hidden=!pending.length;$("pendtext").innerHTML=pending.length?`<b>${pending.length} change${pending.length===1?"":"s"} queued</b> · ${pending.map(esc).join(" · ")}`:"";
  renderBedBar();}
 const WARN_ICO='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.5"/></svg>';
-function renderAttention(){const reqs=S.requests||[],parked=S.swap_phase==="parked",su=S.setup||{},left=(su.missing||[]).length;
- const why=x=>x.why==="full"?"is full":x.why==="asked"?"is to be changed":`is needed for ${esc(x.for_kind||"a new kind")}`;
- $("attn").innerHTML=(su.required&&left?`<div class="attn w">${WARN_ICO}<span class="tx"><b>Setup is not finished</b> <span>· ${left} step${left===1?"":"s"} left: ${esc((su.missing||[]).join(", "))}. Until then the machine only moves when you ask.</span></span><button onclick="go('setup')">Open Setup</button></div>`:"")+
-  binChange(reqs);}
-// bin changes: 1 Park, 2 swap or empty them by hand, 3 Done (a photo checks them)
-function binChange(reqs){const ph=S.swap_phase||"";if(!reqs.length&&!ph)return "";
- const why=x=>x.why==="full"?"full":x.why==="asked"?"change":`for ${esc(x.for_kind||"a new kind")}`;
- const step=ph==="parked"?2:ph==="parking"?1:0,lab=["Park","Parking…","Done"][step];
- const st=["Park","Swap or empty","Done"].map((t,i)=>i===step?`<b>${i+1} ${t}</b>`:`${i+1} ${t}`).join(" · ");
- return `<div class="attn w bc">${WARN_ICO}<span class="tx"><b>Bin change</b><ul>${reqs.map(x=>`<li><b>${esc(x.cell)}</b> ${why(x)} · ${esc(x.what)} (${x.count})</li>`).join("")||"<li>bins of your choice</li>"}</ul><span class="steps">${st}</span></span>`+
-  `<button onclick="cmd('change')" ${step===1?"disabled":""}>${lab}</button></div>`;}
-function renderBedBar(){const reqs=S.requests||[],parked=S.swap_phase==="parked",L=draft;
+function renderAttention(){const su=S.setup||{},left=(su.missing||[]).length;
+ $("attn").innerHTML=(su.required&&left?`<div class="attn w">${WARN_ICO}<span class="tx"><b>Setup is not finished</b> <span>· ${left} step${left===1?"":"s"} left: ${esc((su.missing||[]).join(", "))}. Until then the machine only moves when you ask.</span></span><button onclick="go('setup')">Open Setup</button></div>`:"");}
+// bin changes and finished bins, together above the bed: one line, one button (1 Park, 2 swap
+// or empty them by hand, 3 Done: a photo checks them); a bin's own actions are in its menu
+const SWAP=["Park","Parking…","Done"],SWAPTIP=["the bed comes out; then swap or empty them","parking…","swap or empty them, then Done"];
+function swapStep(){const ph=S.swap_phase||"";return ph==="parked"?2:ph==="parking"?1:0;}
+function why(x){return x.why==="full"?"full":x.why==="asked"?"to change":`for ${x.for_kind||"a new kind"}`;}
+function renderBedBar(){const reqs=S.requests||[],L=draft,step=swapStep();
  const cell=m=>{const b=L&&L.bins.find(b=>b.marker===m);return b?cellName(b.x,b.y):String(m);};
- $("bedbar").innerHTML=
-  (S.ready||[]).filter(x=>!reqs.some(r=>r.marker===x.marker)).map(x=>`<span class="req fin"><b>${esc(cell(x.marker))}</b> ${esc(x.what)} <span class="mut">${x.count} · finished</span><button onclick="emptied(${x.marker})">Emptied</button></span>`).join("");}
+ const fin=(S.ready||[]).filter(x=>!reqs.some(r=>r.marker===x.marker));
+ const head=reqs.length||S.swap_phase?`<div class="bchg"><b>${reqs.length?`${reqs.length} bin${reqs.length===1?"":"s"} to change`:"Bin change"}</b><span class="mut">${SWAPTIP[step]}</span><span class="grow"></span><button class="b s" onclick="cmd('change')" ${step===1?"disabled":""}>${SWAP[step]}</button></div>`:"";
+ const chips=reqs.map(x=>`<span class="req chg"><b>${esc(x.cell||cell(x.marker))}</b> ${esc(x.what)} <span class="mut">${x.count} · ${esc(why(x))}</span></span>`).join("")+
+  fin.map(x=>`<span class="req fin"><b>${esc(cell(x.marker))}</b> ${esc(x.what)} <span class="mut">${x.count} · finished</span><button onclick="emptied(${x.marker})">Emptied</button></span>`).join("");
+ const h=head+(chips?`<div class="chips">${chips}</div>`:"");if($("bedbar").innerHTML!==h)$("bedbar").innerHTML=h;}
 // menus
 function closeMenu(){$("menu").hidden=true;}
 document.addEventListener("click",e=>{if(!$("menu").contains(e.target))closeMenu();});
@@ -581,7 +601,7 @@ function showMenu(html,e){const m=$("menu");m.innerHTML=html;m.hidden=false;cons
 function binMenu(m,e){const b=draft.bins.find(b=>b.marker===m);if(!b)return;const f=(S.fill||{})[m]||{},claim=(S.claims||{})[m],q=swapMap()[m],r=readyMap()[m],n=f.count||0;
  const what=b.role==="work"?"the tray":claim||b.label||b.holds.join(", ")||(b.role==="wild"?"free wild bin":b.role);
  showMenu(`<div class="mh"><b>${cellName(b.x,b.y)} · bin ${m}</b><br>${esc(what)}${n?` · ${n} part${n===1?"":"s"}${f.share!=null&&b.role!=="work"?`, ~${Math.round(Math.min(1,f.share)*100)} % full`:""}`:""}</div>`+
-  (q?`<div class="mh">Change asked: see the top of the page</div>`:(b.role!=="work"?`<button onclick="askChange(${m})">Change</button>`:""))+
+  (q?`<div class="mh">To change: ${esc(why(q))} · ${esc(SWAPTIP[swapStep()])}</div><button onclick="closeMenu();cmd('change')" ${swapStep()===1?"disabled":""}>${SWAP[swapStep()]}</button>`:(b.role!=="work"?`<button onclick="askChange(${m})">Change</button>`:""))+
   `<button onclick="editBin(${m})">Edit role, rules, size…</button>`+
   (b.role!=="work"?`<button onclick="makeTray(${m})">Make it the tray</button>`:"")+
   `<button onclick="turnBin(${m})">Turn 90°</button>`+
