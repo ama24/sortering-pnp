@@ -59,6 +59,13 @@ second micro-controller (its Linux "host" MCU):
 
 The old names still work: `vacuum` = `suction`; `gripper`, `tweezers` and `both` = `servo_tweezers`.
 
+**Suction cups** for `suction` are in [prints/cups/](../prints/cups/) (TPU 95A,
+[printables/cups.py](../src/sortering_pnp/printables/cups.py)): a straight Ø7 body held in the
+picker's 7 mm socket by 3 M3 screws in blind holes, a 20 mm neck with a Ø4.3 bore, folds that go
+inwards, and five tips (AS, AM: a short lip for flat faces; DS, DM, DL: a thin skirt for curved
+ones), each also with a sieve (small holes on a dome the part rests on). Every hole is smaller
+than an M2's core.
+
 - **Pins:** sortering-pnp switches them itself ([pins.py](../src/sortering_pnp/pins.py)); the
   picker is not in Klipper. GPIO12 (`picker.action_pin`) is a plain on/off output for a pump
   (gpiozero, part of Raspberry Pi OS) or a servo; GPIO13 (`picker.turn_pin`) the turning servo.

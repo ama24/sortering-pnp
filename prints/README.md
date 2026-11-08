@@ -118,6 +118,20 @@ board lying in the tray, at the height the parts will lie.
   Your printer's sizes differ? Measure the reach (and, only for a lower camera on a post, the
   bar's height above the plate) and make your own in the web page (Print bins → Holders for the top bar) or with
   `sortering-pnp print mounts --reach … --bar-height …`. See [mounts/MOUNTS.txt](mounts/MOUNTS.txt).
+- **Suction cups** ([cups/](cups/)), TPU 95A, for the suction picker. A straight Ø7 body: the
+  shank goes 7 mm into the picker's socket and is held by 3 M3 screws (120° apart) in blind
+  holes; a 20 mm neck with the pump tube's Ø4.3 bore; the folds go inwards (no channel wider
+  than 4.3 mm). Five tips, each also as `_sieve`:
+  - [cup_AS.stl](cups/cup_AS.stl), [cup_AM.stl](cups/cup_AM.stl): two stiff folds and a short
+    lip (Ø4.4 / Ø6.2) for flat faces: pan, button, cheese and hex heads, nuts (M2-M3 / M4-M5).
+  - [cup_DS.stl](cups/cup_DS.stl), [cup_DM.stl](cups/cup_DM.stl), [cup_DL.stl](cups/cup_DL.stl):
+    four soft folds and a thin skirt (Ø5.2 / Ø7.6 / Ø10.6) for curved or tilted faces
+    (M2-M3 / M3-M5 / M5-M6, M8 at a pinch).
+  - `_sieve`: a dome with 4 to 14 small holes on its sides instead of one hole; the part rests on
+    the dome's top, 0.4 mm below the lip, so it can't plug them.
+
+  Every hole is smaller than an M2's core (Ø1.57): no screw goes in. Print standing on the
+  shank, no supports. See [cups/CUPS.txt](cups/CUPS.txt).
 - **Labels** ([labels/](labels/)): paper codes for plain bins. Print at 100 % and glue them on
   the shelf.
 

@@ -215,6 +215,10 @@ def catalogue(out: Path, log: Callable[[str], None] = print) -> list[Path]:
 
     for name, data in mount_files():  # screen holder and camera arm for the top bar
         put(f"mounts/{name}", data)
+    from .cups import cup_files
+
+    for name, data in cup_files():  # suction cups (TPU) for the suction picker
+        put(f"cups/{name}", data)
     for size in SIZES:
         cols, rows = plate_grid(size)
         per = cols * rows
