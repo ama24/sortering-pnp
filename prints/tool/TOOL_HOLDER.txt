@@ -1,0 +1,16 @@
+Tool holder for the pneumatic tweezers' turning stepper (sortering-pnp print catalogue)
+
+The motor: NEMA 8 size, 20 x 20 x 30 mm, M2.5 holes on a 16 mm square, Ø15
+flange. The printer's interface: 2 x M3, 14 mm apart.
+
+Print as exported, standing on the motor plate (no supports), PETG or PLA, 0.4 mm nozzle,
+0.2 mm layers, 4 walls, 40 % infill or more.
+
+Fitting:
+- The motor stands on the motor plate inside the L, between the ribs; its flange goes down
+  through the Ø15.5 hole. 4 x M2.5 from below (the plate is 4 mm: M2.5 x 6-8,
+  checking the motor's thread depth).
+- The printer plate goes against the printer's interface: 2 x M3 from the front, 40.75 mm
+  above the motor plate's underside, so a hex key reaches them over the motor's top
+  (4 mm of room). The plate is 4 mm: M3 x 8 plus the interface's thickness.
+- Size: 26.2 wide, 26.6 deep, 46 high.

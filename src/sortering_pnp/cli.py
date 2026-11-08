@@ -8,7 +8,8 @@ sortering-pnp klipper            put sortering_pnp.cfg into Klipper, fix printer
 sortering-pnp user add NAME      page account (new user or new password); user remove / list
 sortering-pnp print bin|baseplate|labels|all    write printable files
 sortering-pnp print catalogue --out prints      every bin size as full build plates, baseplates, labels,
-                                                 the top bar's holders and the suction cups
+                                                 the top bar's holders, the suction cups and
+                                                 the tool holder
 sortering-pnp print mounts --reach 135 --bar-height 364   screen holder + camera arms (+ ring light) for the top bar
 """
 
