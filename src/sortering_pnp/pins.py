@@ -29,6 +29,27 @@ SERVO_PERIOD_NS = 20_000_000  # 50 Hz
 SERVO_MIN_NS, SERVO_MAX_NS = 500_000, 2_500_000  # 0 and 180 degrees
 PWM_CHANNEL = {12: 0, 13: 1, 18: 0, 19: 1}  # GPIO -> PWM channel (pwm-2chan overlay)
 TURN_S = 0.35  # a turn of the tweezers takes this long
+PERMS_WAIT_S = 3.0  # udev hands a newly exported channel's files to the gpio group within this
+
+
+def _write(path: Path, value: str, sleep: Callable[[float], None] = time.sleep) -> None:
+    """Write one sysfs file. Just after an export the channel's files exist but are still
+    root's: udev (Raspberry Pi OS's 99-com.rules, and install-pi.sh's own rule) gives them to
+    the gpio group a moment later, so a refusal is tried again for a few seconds."""
+    step, waited = 0.05, 0.0
+    while True:
+        try:
+            path.write_text(value)
+            return
+        except PermissionError:
+            if waited >= PERMS_WAIT_S:
+                raise PrinterError(
+                    f"no permission to write {path}: run install-pi.sh again (it puts the user "
+                    "in the gpio group and adds the udev rule that gives the gpio group the PWM "
+                    "channels), then reboot once"
+                ) from None
+            sleep(step)
+            waited += step
 
 
 class Pins(Protocol):
@@ -51,23 +72,27 @@ class Pins(Protocol):
 class _Servo:
     """One hardware PWM channel in /sys/class/pwm/pwmchipN, as a hobby servo."""
 
-    def __init__(self, chip: Path, channel: int) -> None:
+    def __init__(
+        self, chip: Path, channel: int, sleep: Callable[[float], None] = time.sleep
+    ) -> None:
         self.dir = chip / f"pwm{channel}"
+        self._sleep = sleep
         if not self.dir.is_dir():
-            (chip / "export").write_text(str(channel))
-            for _ in range(50):  # udev gives the gpio group access a moment later
+            _write(chip / "export", str(channel), sleep)
+            for _ in range(50):  # the channel's folder appears a moment later
                 if (self.dir / "enable").exists():
                     break
-                time.sleep(0.02)
-        (self.dir / "period").write_text(str(SERVO_PERIOD_NS))
+                sleep(0.02)
+        # its files are still root's for a moment more: _write waits for udev
+        _write(self.dir / "period", str(SERVO_PERIOD_NS), sleep)
         self.enabled = False
 
     def angle(self, deg: float) -> None:
         a = min(max(float(deg), 0.0), 180.0)
         ns = SERVO_MIN_NS + (SERVO_MAX_NS - SERVO_MIN_NS) * a / 180.0
-        (self.dir / "duty_cycle").write_text(str(int(ns)))
+        _write(self.dir / "duty_cycle", str(int(ns)), self._sleep)
         if not self.enabled:
-            (self.dir / "enable").write_text("1")
+            _write(self.dir / "enable", "1", self._sleep)
             self.enabled = True
 
 
@@ -116,7 +141,7 @@ class PiPins:
         if gpio not in self._servos:
             if gpio not in PWM_CHANNEL:
                 raise PrinterError(f"GPIO{gpio} has no hardware PWM: servos go on GPIO12/13")
-            self._servos[gpio] = _Servo(self._chip(), PWM_CHANNEL[gpio])
+            self._servos[gpio] = _Servo(self._chip(), PWM_CHANNEL[gpio], self._sleep)
         return self._servos[gpio]
 
     def _open(self) -> None:
