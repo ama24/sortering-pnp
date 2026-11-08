@@ -67,7 +67,7 @@ def test_preflight_refuses(machine, kw, text):
 def test_preflight_homes_when_needed(machine):
     fp = FakePrinter(ready(homed="xy"))
     Motion(fp, machine).preflight()
-    assert fp.sent == ["G28"]
+    assert len(fp.sent) == 1 and "G28" in fp.sent[0].splitlines()  # gently: see test_xy_motion
     machine.printer.auto_home = False
     with pytest.raises(PrinterError, match="not homed"):
         Motion(FakePrinter(ready(homed="")), machine).preflight()

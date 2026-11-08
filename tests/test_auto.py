@@ -35,6 +35,7 @@ def until(cond, timeout: float = 30.0) -> bool:
 
 def test_automatic_mode_sorts_waits_and_sorts_new_parts(machine):
     machine.standby.interval_s = 0.2
+    machine.standby.motors_off = True  # (off by default: homing stops the bed sharply)
     machine.run.shake.enabled = False
     runner, world, printer, lay = make(machine)
     assert runner.command("auto", "sort").startswith("automatic")
