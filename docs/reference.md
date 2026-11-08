@@ -64,8 +64,9 @@ The old names still work: `vacuum` = `suction`; `gripper`, `tweezers` and `both`
 picker's 7 mm socket by 3 M3 screws in blind holes, a neck with a Ø4.3 bore (every cup 47 mm
 long, shank to lip: swapping keeps the tip height), folds that go
 inwards, and five tips (AS, AM: a short lip for flat faces; DS, DM, DL: a thin skirt for curved
-ones), each also with a sieve (small holes on a dome the part rests on). Every hole is smaller
-than an M2's core.
+ones); AM, DM and DL also with a sieve (a ring of holes on a dome the part rests on). Every hole
+is smaller than an M2's core. Sized for a 0.4 mm nozzle (`MIN_WALL`, `MIN_HOLE`): every wall two
+lines or more across each layer, except the D skirt's one-line edge.
 
 - **Pins:** sortering-pnp switches them itself ([pins.py](../src/sortering_pnp/pins.py)); the
   picker is not in Klipper. GPIO12 (`picker.action_pin`) is a plain on/off output for a pump
