@@ -22,6 +22,7 @@ from typing import Any
 
 import numpy as np
 
+from .drawing import poly, pt
 from .layout import Bin, Layout
 from .parts import Part
 from .startup import CODE_KEEPOUT_MM, floor_rect, parts_in_bin
@@ -128,7 +129,7 @@ def draw(
 
     def px_plate(pts: np.ndarray) -> np.ndarray:
         p = np.c_[np.asarray(pts, dtype=float).reshape(-1, 2), np.ones(len(pts))] @ H.T
-        return (p[:, :2] / p[:, 2:3]).round().astype(np.int32)
+        return poly(p[:, :2] / p[:, 2:3])
 
     def px_bed(pts: Sequence[Sequence[float]]) -> np.ndarray:
         return px_plate(Ti.apply(np.asarray(pts, dtype=float)))
@@ -136,8 +137,8 @@ def draw(
     def label(at: Sequence[float], text: str, bg: tuple[int, int, int]) -> int:
         """A label with its top-left corner at `at`; returns the y just below it."""
         (w, h), base = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fs, 1)
-        x = max(0, min(int(at[0]), img.shape[1] - w - 6))
-        y = max(0, int(at[1]))
+        x, y = pt(at[0], at[1])
+        x, y = max(0, min(x, img.shape[1] - w - 6)), max(0, y)
         cv2.rectangle(img, (x, y), (x + w + 6, y + h + base + 6), bg, -1)
         cv2.putText(img, text, (x + 3, y + h + 3), cv2.FONT_HERSHEY_SIMPLEX, fs, (255, 255, 255), 1)
         return y + h + base + 8
@@ -157,13 +158,13 @@ def draw(
     cv2.addWeighted(shade, 0.25, img, 0.75, 0, dst=img)
 
     for p in dropped:  # on a code: crossed out, faint
-        poly = px_plate(p.polygon) if len(p.polygon) > 2 else None
-        if poly is not None:
-            cv2.polylines(img, [poly], True, (150, 150, 150), lw, cv2.LINE_AA)
-            x0, y0 = poly.min(axis=0)
-            x1, y1 = poly.max(axis=0)
-            cv2.line(img, (int(x0), int(y0)), (int(x1), int(y1)), (60, 60, 200), lw, cv2.LINE_AA)
-            cv2.line(img, (int(x0), int(y1)), (int(x1), int(y0)), (60, 60, 200), lw, cv2.LINE_AA)
+        outline = px_plate(p.polygon) if len(p.polygon) > 2 else None
+        if outline is not None:
+            cv2.polylines(img, [outline], True, (150, 150, 150), lw, cv2.LINE_AA)
+            x0, y0 = outline.min(axis=0)
+            x1, y1 = outline.max(axis=0)
+            cv2.line(img, pt(x0, y0), pt(x1, y1), (60, 60, 200), lw, cv2.LINE_AA)
+            cv2.line(img, pt(x0, y1), pt(x1, y0), (60, 60, 200), lw, cv2.LINE_AA)
 
     by_marker = {lk.marker: lk for lk in looks}
     for b in layout.bins:

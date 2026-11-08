@@ -19,6 +19,8 @@ import cv2
 import numpy as np
 
 from sortering_pnp.calib.geometry import Camera, nominal_camera, roi_camera_matrix, roi_for_area
+from sortering_pnp.drawing import finite, pt
+from sortering_pnp.drawing import poly as int_poly
 from sortering_pnp.naming import UNKNOWN
 
 from .classical import classical_keypoints, to_gray
@@ -375,7 +377,7 @@ def draw(scene: Scene, result: Mapping[str, Any], max_side: int = 2048) -> np.nd
     """Visualisation: outlines, classes, lengths and keypoints on the ROI image."""
     img = scene.image.copy()
     for o in result["objects"]:
-        poly = np.round(np.asarray(o["polygon"])).astype(np.int32)
+        poly = int_poly(o["polygon"])
         colour = (
             (180, 0, 180)
             if o.get("unknown")
@@ -392,7 +394,7 @@ def draw(scene: Scene, result: Mapping[str, Any], max_side: int = 2048) -> np.nd
                 if L["length_mm"] is not None
                 else f" ~{L['length_raw_mm']:.1f}"
             )
-        x0, y0 = int(o["box"][0]), int(o["box"][1])
+        x0, y0 = pt(o["box"][0], o["box"][1])
         cv2.putText(
             img, label, (x0, max(20, y0 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 1.0, colour, 2, cv2.LINE_AA
         )
@@ -405,7 +407,9 @@ def draw(scene: Scene, result: Mapping[str, Any], max_side: int = 2048) -> np.nd
                 ("bearing", (0, 255, 0)),
                 ("tip", (255, 0, 0)),
             ):
-                cv2.circle(img, (int(round(kp[name][0])), int(round(kp[name][1]))), 6, c, -1)
+                xy = kp.get(name)
+                if xy is not None and len(xy) >= 2 and finite(xy[0], xy[1]):
+                    cv2.circle(img, pt(xy[0], xy[1]), 6, c, -1)
     s = max_side / max(img.shape[:2])
     if s < 1:
         img = cv2.resize(
