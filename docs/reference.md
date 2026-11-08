@@ -221,7 +221,8 @@ The steps below are the same work in more detail.
    printer) and clamp it with binder clips, or on the Prusa stick it onto a spare steel sheet.
 4. Put the picker on and press **OK** (Setup tab, Picker). Set `tool.offset` in
    [configs/machine.yaml](../configs/machine.yaml) if the picker tip is not where the nozzle was.
-5. Set `printer.photo_position`: where the head waits during photos, out of the picture.
+5. Set `printer.photo_position`: where the head waits during photos, out of the picture (in X/Y:
+   with `printer.photo_at_travel_z` on, the default, it stays at `travel_z` there).
 6. **Camera calibration** (Camera Calibration tab, *Camera calibration*): lay the ChArUco board **in the
    tray**, where the parts will lie. Its surface is the height everything is measured from.
    **Setup tab, Camera to printer**: take a photo, then jog the tip onto the centre of 3 or more markers
@@ -544,7 +545,8 @@ through Klipper, so set `picker.rotate_macro: SORTERING_ROTATE` (and for B
 
 ## One cycle: photo, pick, drop, park
 
-1. **Photo:** the head is parked at the photo position (`printer.photo_position`), the picker
+1. **Photo:** the head is parked at the photo position (`printer.photo_position`; with the fixed
+   camera at `travel_z`, not that Z, while `printer.photo_at_travel_z` is on), the picker
    empty, and the photo is taken and analysed. It also shows whether the last pick worked: if
    that part is still on the plate, the pick failed and is tried again.
 2. **Pick** the part chosen from that photo and lift it.
