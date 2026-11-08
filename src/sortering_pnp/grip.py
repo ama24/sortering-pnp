@@ -9,6 +9,9 @@ A suction cup or a magnet takes a screw by its head instead (head_grip): the mid
 seen from above; headless parts (set screws, rod, standoffs) at their centre.
 Everything else (nuts, washers, brackets, unknown parts): the centre and the long axis of the
 outline, from its area moments.
+Washers by a suction cup or a magnet (ring_grip): not the centre, which is the hole (the cup
+would suck air, the magnet touch nothing), but the middle of the ring, between the hole (the
+standard clearance hole of its thread size) and the outside (from the outline).
 """
 
 from __future__ import annotations
@@ -19,6 +22,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
+WASHER_FAMILIES = ("DIN125", "DIN127", "DIN433", "DIN6340", "DIN9021", "ISO7089", "ISO7090")
+WASHER_FAMILIES += ("ISO7092", "ISO7093")
+# the hole of a washer (ISO 7089 / DIN 125 d1, the same for DIN 9021 / ISO 7093), by thread size
+WASHER_HOLE = {2.0: 2.2, 2.5: 2.7, 3.0: 3.2, 4.0: 4.3, 5.0: 5.3, 6.0: 6.4, 8.0: 8.4, 10.0: 10.5}
+WASHER_HOLE |= {12.0: 13.0, 14.0: 15.0, 16.0: 17.0, 20.0: 21.0}
+MIN_RING_MM = 0.6  # a ring narrower than this (or no hole found): the centre after all
 THREAD_FILL = 0.85  # a threaded shank weighs about this share of a smooth one
 SOCKET_FILL = 0.85  # socket heads: the hex socket takes some of the head away
 
@@ -106,6 +115,46 @@ def outline_grip(poly: np.ndarray) -> Grip | None:
     ixy = ((x * y1 + 2 * x * y + 2 * x1 * y1 + x1 * y) * c).sum() / 24 - a * cx * cy
     axis = math.degrees(0.5 * math.atan2(2 * ixy, ixx - iyy)) % 180.0
     return Grip((float(cx), float(cy)), axis, (float(cx), float(cy)), "outline")
+
+
+def washer_hole_d(cls: str) -> float | None:
+    """The hole of a washer class (e.g. DIN125A_M4 -> 4.3), None for anything else."""
+    import re
+
+    if not cls.startswith(WASHER_FAMILIES):
+        return None
+    m = re.search(r"_M(\d+(?:\.\d+)?)", cls)
+    if not m:
+        return None
+    d = float(m.group(1))
+    return WASHER_HOLE.get(d, round(d * 1.06 + 0.1, 2))
+
+
+def ring_grip(poly: np.ndarray, hole_d: float, toward_deg: float = 0.0) -> Grip | None:
+    """Washer by a cup or a magnet: on the middle of the ring, between the hole (hole_d) and the
+    outside (the outline's equivalent circle), on the side `toward_deg` (plate frame). None if
+    the outline is not a ring around that hole."""
+    g = outline_grip(poly)
+    if g is None:
+        return None
+    p = np.asarray(poly, dtype=float).reshape(-1, 2)
+    x, y = p[:, 0], p[:, 1]
+    area = abs(float((x * np.roll(y, -1) - np.roll(x, -1) * y).sum())) / 2
+    r_out, r_in = math.sqrt(area / math.pi), hole_d / 2
+    if r_out - r_in < MIN_RING_MM:
+        return None
+    r = (r_in + r_out) / 2
+    a = math.radians(toward_deg)
+    cx, cy = g.com
+    return Grip((cx + r * math.cos(a), cy + r * math.sin(a)), g.axis_deg, g.com, "ring")
+
+
+def ring_width(poly: np.ndarray, hole_d: float) -> float:
+    """How wide a washer's ring is (outside radius - hole radius), mm."""
+    p = np.asarray(poly, dtype=float).reshape(-1, 2)
+    x, y = p[:, 0], p[:, 1]
+    area = abs(float((x * np.roll(y, -1) - np.roll(x, -1) * y).sum())) / 2
+    return math.sqrt(area / math.pi) - hole_d / 2
 
 
 def jaw_angle(axis_deg: float, offset_deg: float = 0.0) -> float:
