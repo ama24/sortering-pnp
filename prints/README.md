@@ -136,6 +136,13 @@ board lying in the tray, at the height the parts will lie.
   nozzle**: every wall is two lines or more (the D skirt's edge one), every hole Ø1.2 or more,
   checked by slicing each cup. Print standing on the shank, no supports. See
   [cups/CUPS.txt](cups/CUPS.txt).
+- **Tool holder** ([tool/tool_holder.stl](tool/tool_holder.stl)) for the pneumatic tweezers'
+  turning stepper (NEMA 8 size, 20 x 20 x 30 mm, M2.5 on a 16 mm square, Ø15 flange): an L
+  bracket, 26 x 27 x 46 mm. The printer plate takes the printer's interface (2 x M3, 14 mm
+  apart, above the motor's top so a hex key reaches them). The motor stands inside the L on
+  the motor plate, its flange down through it, held by 4 x M2.5 from below, with a rib on each
+  side. PETG or PLA, standing on the motor plate, no supports. See
+  [tool/TOOL_HOLDER.txt](tool/TOOL_HOLDER.txt).
 - **Labels** ([labels/](labels/)): paper codes for plain bins. Print at 100 % and glue them on
   the shelf.
 

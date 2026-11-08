@@ -68,6 +68,15 @@ ones); AM, DM and DL also with a sieve (a ring of holes on a dome the part rests
 is smaller than an M2's core. Sized for a 0.4 mm nozzle (`MIN_WALL`, `MIN_HOLE`): every wall two
 lines or more across each layer, except the D skirt's one-line edge.
 
+**Tool holder** for the tweezers' turning stepper is in [prints/tool/](../prints/tool/)
+([printables/toolholder.py](../src/sortering_pnp/printables/toolholder.py), every size a
+`ToolHolder` field): an L bracket. The printer plate goes on the printer's interface (2 x M3,
+14 mm apart), and the motor plate sticks out at 90 deg from its foot. The motor (NEMA 8 size,
+20 x 20 x 30 mm, M2.5 on a 16 mm square) stands inside the L, its Ø15 flange down through the
+plate, and is held by 4 x M2.5 from below. The M3 screws sit above the motor's top (a hex key
+reaches them over it), and a rib on each side of the motor carries the bend. It prints standing
+on the motor plate, with no supports.
+
 - **Pins:** sortering-pnp switches them itself ([pins.py](../src/sortering_pnp/pins.py)); the
   picker is not in Klipper. GPIO12 (`picker.action_pin`) is a plain on/off output for a pump
   (gpiozero, part of Raspberry Pi OS) or a servo; GPIO13 (`picker.turn_pin`) the turning servo.
