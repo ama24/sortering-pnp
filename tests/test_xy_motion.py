@@ -166,22 +166,25 @@ def test_each_axis_stays_within_its_limit(machine, dx, dy, want):
     assert a * dx / length <= 2000.0 + 0.5 and a * dy / length <= 1000.0 + 0.5
 
 
-def test_carrying_a_part_is_gentler(machine):
+def test_carrying_a_part_is_gentler_on_x_only(machine):
+    """The part hangs on the head (X): only accel_x is lowered while it is held."""
     machine.printer.xy_motion.carrying = 0.6
+    machine.printer.accel = 3000.0
     pr = SimPrinter(machine, SimWorld())
     pr.gcode("G28")
     mo = Motion(pr, machine)
     mo.move(z=50.0)
     mo.pick(100.0, 100.0, 1.0)
     assert mo.carrying
+    assert mo.xy_accel(80.0, 0.0) == pytest.approx(1800.0)  # head: 0.6 x 3000
+    assert mo.xy_accel(0.0, 80.0) == pytest.approx(1000.0)  # bed: unchanged
     pr.log.clear()
-    mo.travel(100.0, 180.0)  # to the bin, with the part: 0.6 x 1000 for the bed
-    assert "SET_VELOCITY_LIMIT ACCEL=600" in pr.log
+    mo.travel(100.0, 180.0)  # to the bin along Y, with the part: the bed's own 1000
+    assert "SET_VELOCITY_LIMIT ACCEL=1000" in pr.log
+    assert "SET_VELOCITY_LIMIT ACCEL=600" not in pr.log
     mo.drop(100.0, 180.0, 20.0)
     assert not mo.carrying
-    pr.log.clear()
-    mo.travel(100.0, 100.0)  # back, empty
-    assert "SET_VELOCITY_LIMIT ACCEL=1000" in pr.log
+    assert mo.xy_accel(80.0, 0.0) == pytest.approx(3000.0)
 
 
 def test_disabled_is_the_old_single_move(machine):

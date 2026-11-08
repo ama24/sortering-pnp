@@ -553,7 +553,7 @@ printer:
     enabled: true       # false: plain moves (one G1 at the printer's acceleration)
     accel_x: 3000       # mm/s^2 for the head (the X part of a move): the Ender 3's own
     accel_y: 1000       # mm/s^2 for the bed (the Y part): gentle, loose parts ride on it
-    carrying: 0.6       # both x this while the picker holds a part (1: no change)
+    carrying: 0.6       # accel_x x this while the picker holds a part (1: no change)
     profile: s_curve    # s_curve | trapezoid
     max_feed_x: null    # mm/min for the head (the X part); null: printer.feed_xy
     max_feed_y: null    # mm/min for the bed (the Y part); null: printer.feed_xy
@@ -568,7 +568,8 @@ and `max_feed` as `accel_y` and `max_feed_y`.
   acceleration whose X part stays within `accel_x` and whose Y part within `accel_y`:
   min(accel_x / |ux|, accel_y / |uy|) for the move's direction u. A pure Y move gets 1000, a pure
   X move 3000, a 100 x 150 mm diagonal 1202 (the bed binds). While the picker holds a part (grab
-  until release) both limits are x `carrying` (bed 600, head 1800). After the move it is set back
+  until release) the head's limit is x `carrying` (1800); the bed's stays (the part hangs on
+  the head, not on the bed). After the move it is set back
   to `printer.accel`, or else to Klipper's own value (read once), so other moves and macros keep
   it. It is never raised above that, and not sent when it is the same.
 - **`s_curve`:** the speed follows an S (smoothstep: no jump in acceleration at the start and end

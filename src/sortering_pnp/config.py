@@ -133,7 +133,7 @@ class XYMotion:
     enabled: bool = True  # False: plain moves (one G1 at the printer's acceleration)
     accel_x: float = 3000.0  # mm/s^2 of the head (the X part of a move)
     accel_y: float = 1000.0  # mm/s^2 of the bed (the Y part of a move)
-    carrying: float = 0.6  # both limits x this while the picker holds a part (1: no change)
+    carrying: float = 0.6  # accel_x x this while the picker holds a part (1: no change)
     # s_curve: the speed rises and falls smoothly (the move split into short G1 steps whose
     # speeds follow an S) | trapezoid: one G1, Klipper's own ramp
     profile: str = "s_curve"

@@ -31,7 +31,7 @@ class Motion:
         self.tip: list[float] | None = None  # last commanded tip position
         self.z_home_xy: tuple[float, float] | None = None  # tip X/Y for homing Z (set by runner)
         self._accel: float | None = None  # Klipper's acceleration, read once (0 = unknown)
-        self.carrying = False  # the picker holds a part (grab .. release): gentler X/Y
+        self.carrying = False  # the picker holds a part (grab .. release): gentler X
 
     # ------------------------------------------------------------------ checks
     def preflight(self, home: bool = True, tool: bool | None = None) -> PrinterStatus:
@@ -154,17 +154,17 @@ class Motion:
 
     def xy_accel(self, dx: float, dy: float, dz: float = 0.0) -> float:
         """The acceleration (mm/s^2) along a move of (dx, dy, dz): the largest that keeps its X
-        part within accel_x and its Y part within accel_y (x carrying while a part is held),
+        part within accel_x (x carrying while a part is held) and its Y part within accel_y,
         never above the printer's own."""
         return self._limits([dx, dy, dz], self.m.printer.feed_xy)[1]
 
     def _limits(self, delta: list[float], feed: float) -> tuple[float, float]:
         xm = self.m.printer.xy_motion
-        k = xm.carrying if self.carrying else 1.0
+        k = xm.carrying if self.carrying else 1.0  # the part hangs on the head: X only
         length = math.sqrt(sum(d * d for d in delta))
         f, a = smooth.path_limits(
             length,
-            [(delta[0], xm.accel_x * k, xm.max_feed_x), (delta[1], xm.accel_y * k, xm.max_feed_y)],
+            [(delta[0], xm.accel_x * k, xm.max_feed_x), (delta[1], xm.accel_y, xm.max_feed_y)],
             feed,
         )
         normal = self._normal_accel()
@@ -249,7 +249,7 @@ class Motion:
         self.move(z=z, feed=pk.feed_z_slow)
         self.p.gcode("M400")  # the pins are not in Klipper's queue: wait for the moves first
         self.pins.grab()
-        self.carrying = True  # gentler X/Y until it is let go
+        self.carrying = True  # gentler X until it is let go
         self.move(z=z + pk.approach_mm, feed=pk.feed_z_slow)
         self.move(z=self.m.printer.travel_z)
 
