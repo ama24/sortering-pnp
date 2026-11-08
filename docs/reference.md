@@ -108,7 +108,11 @@ the bend. It prints standing on the motor plate, with no supports.
   `picker.release_angle` in `configs/machine.yaml` override them.
 - **Where it aims:** a cup or a magnet goes onto the middle of the screw's head (seen from above);
   tweezers close on the shank at the centre of gravity. Headless parts are taken in the middle,
-  nuts and washers at the centre of their outline.
+  nuts at the centre of their outline. A washer's centre is its hole, so a cup or a magnet takes
+  it on the middle of the ring instead (between the standard clearance hole of its thread size
+  and the outside the camera sees), on the side away from its nearest neighbour; tweezers still
+  close across it. A cup only seals if its lip fits on the ring: DIN 125 rings are 2.3 mm (M3)
+  to 3.8 mm (M8) wide, DIN 9021 ones 2.9 mm to 7.8 mm.
 
 ### Lights
 

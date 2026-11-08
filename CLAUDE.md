@@ -103,7 +103,9 @@ another repository.
   tab's Lights step sets colour and brightness (kept in `paths.machine`).
 - **Grip:** `grip.py`. Screws: axis and centre of mass from the three keypoints (head_top,
   bearing, tip) plus head sizes from parts.json (`vision.shapes_from_parts`); the grip point is
-  on the shank. Other parts: area moments of the outline. `Part.grip_bed` is where the tool goes;
+  on the shank. Other parts: area moments of the outline; washers by a cup or a magnet on the
+  middle of the ring (`ring_grip`: hole by thread size, outside from the outline, the side away
+  from the nearest part), not on the hole. `Part.grip_bed` is where the tool goes;
   the tweezers' angle = `jaw_angle(axis)` (jaws close across the part; 0 deg = along X).
 - **Console:** `Runner.say()`: one short line per decision (seen, pick, drop, missed, complete).
 - **Picking order:** `run.order: census` (default): the most numerous class first, finished

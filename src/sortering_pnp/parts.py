@@ -31,7 +31,7 @@ class Part:
     # where to take it (grip.py): grip point and centre of mass, plate mm and printer X/Y
     grip_plate: tuple[float, float] | None = None
     com_plate: tuple[float, float] | None = None
-    grip_method: str = "centre"  # axis (keypoints) | outline | centre
+    grip_method: str = "centre"  # axis (keypoints) | head | ring (washer) | outline | centre
     grip_height_mm: float | None = None  # height above the plate to close at (the shank's middle)
     grip_bed: tuple[float, float] = (0.0, 0.0)
     com_bed: tuple[float, float] = (0.0, 0.0)

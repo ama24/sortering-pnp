@@ -7,6 +7,7 @@ the sorter then keeps only the parts inside the working area: parts inside bins 
 from __future__ import annotations
 
 import logging
+import math
 import re
 import subprocess
 import tempfile
@@ -21,7 +22,7 @@ import numpy as np
 
 from .analysis import Analyzer, ModelChoice
 from .config import Machine
-from .grip import Shape, axis_grip, head_grip, outline_grip
+from .grip import Shape, axis_grip, head_grip, outline_grip, ring_grip, washer_hole_d
 from .markers import MarkerPose, detect, marker_pose
 from .models import ModelStore
 from .parts import Part
@@ -103,8 +104,10 @@ def parts_from_result(
 ) -> list[Part]:
     """Inference output (measure/infer.py) -> Parts (outline in plate mm at the part's mid height), with
     grip point, centre of mass and long axis (grip.py). `aim`: "centre" (tweezers: the centre
-    of gravity, on the shank) or "head" (suction cup, magnet: the screw's head)."""
+    of gravity, on the shank) or "head" (suction cup, magnet: the screw's head; a washer's
+    ring, on the side away from its nearest neighbour)."""
     out = []
+    rings: list[tuple[int, np.ndarray, float]] = []  # (index in out, outline, hole) of washers
     for o in result.get("objects", []):
         cls = str(o["class"])
         hr = head_radius(cls)
@@ -119,6 +122,9 @@ def parts_from_result(
             pts = to_plate(np.array([kp[n] for n in ("head_top", "bearing", "tip")]), sh.d / 2)
             kpm = dict(zip(("head_top", "bearing", "tip"), pts[:, :2], strict=True))
             g = head_grip(kpm, sh) if aim == "head" else axis_grip(kpm, sh)
+        hole = washer_hole_d(cls) if aim == "head" else None
+        if g is None and len(poly) and hole is not None:
+            rings.append((len(out), poly, hole))  # the side is chosen once all are known
         if g is None and len(poly):
             g = outline_grip(poly)
         out.append(
@@ -142,6 +148,17 @@ def parts_from_result(
         )
         if g is not None:
             out[-1].plate_angle = g.axis_deg  # the axis from keypoints / area moments
+    for i, poly, hole in rings:  # washers: on the ring, away from the nearest other part
+        p = out[i]
+        cx, cy = p.grip_plate or p.plate_xy
+        others = [q.plate_xy for j, q in enumerate(out) if j != i]
+        toward = 0.0
+        if others:
+            nx, ny = min(others, key=lambda o: (o[0] - cx) ** 2 + (o[1] - cy) ** 2)
+            toward = math.degrees(math.atan2(cy - ny, cx - nx))
+        g = ring_grip(poly, hole, toward)
+        if g is not None:
+            p.grip_plate, p.com_plate, p.grip_method = g.point, g.com, g.method
     return out
 
 
