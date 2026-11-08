@@ -2,28 +2,45 @@ Suction cups for the suction picker (sortering-pnp print catalogue: prints/cups/
 
 Material: TPU 95A. 0.4 mm nozzle, 0.2 mm layers, 3 walls (or more: the folds are walls only),
 100 % infill, 20-25 mm/s, no supports. Stand it on the shank's end (as exported), tip up.
-Every wall is at least two lines of a 0.4 nozzle (the D skirt's edge one line), every hole at
-least Ø1.2: checked by slicing every cup (Bambu Studio, classic and Arachne walls).
+The folds and the lip are one line of a 0.4 nozzle (they must give), the cup's wall 0.6 mm,
+every hole at least Ø1.2: checked by slicing every cup (Bambu Studio, classic and Arachne
+walls). Slow down for the folds (15-20 mm/s) if the slicer allows.
 
 Fit: the Ø7 shank goes 7 mm into the picker's socket; 3 M3 screws, 120 deg apart, 3.5 mm from
 the socket's bottom, press into its blind holes (Ø2.6, 1 mm deep: they don't reach
 the bore, nothing leaks). Snug them, don't crush the TPU.
 
-Length: every cup is 47 mm from the shank's end to the lip (the neck makes up the
-difference, 20 mm or more below the socket): swap cups without measuring the tip height again.
+Length: every cup, normal or wide, is 37 mm from the shank's end to the lip (the neck
+makes up the difference, 10 mm or more below the socket, 4 mm or more with the
+wide bellows): swap cups without measuring the tip height again.
 
 Body: straight Ø7, bore Ø4.3 (the pump's tube; Ø3.2 in the shank,
-behind the screws). The folds go inwards: no channel is wider than 4.3 mm.
+behind the screws). The normal set's folds go inwards: no channel is wider than 4.3 mm.
 
-Tips (every hole smaller than an M2's core, Ø1.57: no screw goes in):
-  AS  lip Ø4.4, 2 folds, hole Ø1.2 (no sieve), neck 29.1 mm: M2-M3 heads, flat faces
-  AM  lip Ø6.2, 2 folds, hole Ø1.4 (sieve: 3 x Ø1.2), neck 27.9 mm: M4-M5 heads, flat faces
-  DS  lip Ø5.2, 4 folds, hole Ø1.2 (no sieve), neck 24.0 mm: M2-M3, curved or tilted
-  DM  lip Ø7.6, 4 folds, hole Ø1.4 (sieve: 5 x Ø1.2), neck 22.4 mm: M3-M5, curved or tilted
-  DL  lip Ø10.6, 4 folds, hole Ø1.4 (sieve: 9 x Ø1.2), neck 20.3 mm: M5-M6 (M8), curved
-A: two stiff folds and a cone lip, for flat faces (pan, button, cheese and hex heads, nuts).
-D: four soft folds and a thin skirt (0.45 mm at the edge, one line): a few mm of give, follows
-   curved and tilted faces (the side of a head, countersunk heads).
+Wide set (_wide): the same tips and holes on a wider bellows, Ø9.5 outside, folds
+1.6 mm deep every 3.2 mm (the normal ones Ø5.2, 0.85 mm every 2.4 mm), out from the
+neck and back in at 45 deg, the same one-line walls. The bellows is a chamber, not a channel:
+inside it is Ø5.4 at its narrowest (wider than the tube); the shank, the neck and the holes are
+the same. About 3.5 times softer along the axis (a fold's rate goes with diameter x wall^3 /
+depth^3: the deeper folds win over the bigger diameter), 1.7 times softer sideways, as stiff
+to tilt. On a sealed part the vacuum pulls it shut (about 2.6 N at -60 kPa, against 0.7 N on
+the normal bellows): it lifts the part by a few mm and holds it on its closed folds.
+
+Tips (each hole smaller than the smallest head the tip picks: the head lies on the lip and
+closes the cup, nothing goes in):
+  AS       lip Ø4.4, 3 folds, Ø5.2 bellows, hole Ø2.2 (no sieve), neck 18.2 mm: M2-M3 heads, flat faces
+  AM       lip Ø6.2, 3 folds, Ø5.2 bellows, hole Ø2.5 (sieve: 3 x Ø1.5), neck 17.2 mm: M4-M5 heads, flat faces
+  DS       lip Ø5.2, 4 folds, Ø5.2 bellows, hole Ø2.2 (no sieve), neck 14.8 mm: M2-M3, curved or tilted
+  DM       lip Ø7.6, 4 folds, Ø5.2 bellows, hole Ø2.5 (sieve: 4 x Ø1.5), neck 13.3 mm: M3-M5, curved or tilted
+  DL       lip Ø10.6, 4 folds, Ø5.2 bellows, hole Ø2.5 (sieve: 8 x Ø1.5), neck 11.2 mm: M5-M6 (M8), curved
+  AS_wide  lip Ø4.4, 3 folds, Ø9.5 bellows, hole Ø2.2 (no sieve), neck 12.4 mm: M2-M3 heads, flat faces
+  AM_wide  lip Ø6.2, 3 folds, Ø9.5 bellows, hole Ø2.5 (sieve: 3 x Ø1.5), neck 11.4 mm: M4-M5 heads, flat faces
+  DS_wide  lip Ø5.2, 4 folds, Ø9.5 bellows, hole Ø2.2 (no sieve), neck 8.2 mm: M2-M3, curved or tilted
+  DM_wide  lip Ø7.6, 4 folds, Ø9.5 bellows, hole Ø2.5 (sieve: 4 x Ø1.5), neck 6.7 mm: M3-M5, curved or tilted
+  DL_wide  lip Ø10.6, 4 folds, Ø9.5 bellows, hole Ø2.5 (sieve: 8 x Ø1.5), neck 4.6 mm: M5-M6 (M8), curved
+A: three folds and a cone lip, for flat faces (pan, button, cheese and hex heads, nuts).
+D: four folds and a skirt flaring to a one-line edge: a few mm of give, follows curved and
+   tilted faces (the side of a head, countersunk heads).
 _sieve (AM, DM, DL): a dome with a ring of holes instead of one. The part rests on the dome's
    flat top, 0.4 mm below the lip, so the holes on its sides stay open: it can't plug the cup,
    more air flows, and it lets go at once. Holding force is the same (vacuum x the lip's area).
