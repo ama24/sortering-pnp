@@ -1,0 +1,18 @@
+Ear-tip holder for the suction picker (sortering-pnp print catalogue: prints/cups/)
+
+tip_eartip_pla.stl carries an earphone's silicone ear tip as the suction cup.
+
+Material: PLA. 0.4 mm nozzle, 0.2 mm layers (0.12 for a cleaner barb), 3 walls, 100 % infill,
+no supports, fan on. Stand it on the shank's end (as exported), collar up.
+
+Fit: the Ø7 shank goes 7 mm into the picker's socket like the TPU cups; the 3 M3
+screws, 3.5 mm from the socket's bottom, press into its blind holes (Ø2.6, 0.6 mm
+deep). Snug, not tight: PLA cracks.
+
+Bore: Ø4.2 all the way. The barb at the end: groove Ø5.5, 2 mm long, between the
+body's shoulder (Ø7) and a collar Ø7.5 (1 mm straight, then a 45 deg lead-in).
+Push the ear tip's sleeve over the collar until its inner lip clicks into the groove. The
+groove's wall is 0.65 mm: let the slicer print it as one wide line (Arachne).
+
+Length: 30 mm to the collar's top, the ear tip adds its own (often 6-8 mm). Different
+from the cups' 37 mm: after fitting it, do Setup's tip step again (tip height).
