@@ -219,6 +219,10 @@ def catalogue(out: Path, log: Callable[[str], None] = print) -> list[Path]:
 
     for name, data in cup_files():  # suction cups (TPU) for the suction picker
         put(f"cups/{name}", data)
+    from .eartip import eartip_files
+
+    for name, data in eartip_files():  # PLA tip that carries an earphone's silicone ear tip
+        put(f"cups/{name}", data)
     from .toolholder import holder_files
 
     for name, data in holder_files():  # the tweezers' turning stepper on the printer
