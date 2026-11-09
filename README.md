@@ -9,14 +9,14 @@ printer's firmware) and you use it from a web page on your phone or PC, or from 
 display.
 
 ![The Device tab](docs/images/device.png)
-*The Device tab, the page you land on. On the left the sections of the page, grouped by what
-you do (operate, prepare, library), and below them the machine: its state, what it is doing and
-the STOP button. Anything that needs you, like a full bin, shows as an orange banner at the top
-with its button. Top left the camera: the latest photo with every part
-outlined and named, and the part picked next boxed in red. Top right the bed, live: every bin with
-what it collects and how full it is; one bin waits for a change (amber), two are finished (green).
-Bottom left what lies in the tray, by class and length; bottom right what the machine is doing.
-(Pictures from the built-in simulator, which draws the bed instead of photographing it.)*
+*The Device tab, the page you land on. On the left the sections of the page, the start-up check
+(homing, layout, bins, ready) and, at the bottom, the machine's state and the STOP button. Top
+right what runs (here automatic mode, paused) with only the buttons that apply. The camera shows
+the latest photo with every part outlined and named and the next part boxed in red; the bed shows
+every bin with what it collects and how full it is. Above the bed, on one line, the bins that need
+you: D1 is full (amber, **Park**), A1 and E1 are finished (green, **Emptied**). Below, what lies
+in the tray by class and length, and every step the machine takes. (Pictures from the built-in
+simulator, which draws the bed instead of photographing it.)*
 
 It is one of three projects that work together:
 
@@ -33,30 +33,25 @@ project works without the others.
 
 ### What's new
 
-- **The Pi needs only sortering-pnp** (renamed from screwpick). The camera, calibration and
-  measuring code now live here; the trained model, with its class list and parts table, comes as
-  one package you upload in the Models tab. The sibling projects are now called screw-synth and
-  training-synth.
-- **The picker needs no Klipper set-up:** sortering-pnp switches the Raspberry Pi's pins itself,
-  so there is no second Klipper board, no `make menuconfig` and nothing to install for it.
-- **Four pickers to choose from** in the Setup tab: servo tweezers, suction cup, magnet,
-  pneumatic tweezers. Each with its wiring to the Raspberry Pi drawn on the page.
-  [The picker](#the-picker).
-- **New look:** the sections are in a sidebar on the left, grouped by what you do, with the
-  machine's state and the STOP button always at its bottom. Every page has a title, and a full
-  bin or unfinished setup shows as an orange banner at the top of Device.
-  [Finding your way around the page](#finding-your-way-around-the-page).
-- **Device tab:** one page with the live camera (every part outlined, the next one boxed), the
-  live bed with a menu on every bin, what lies in the tray, and what the machine is doing.
-  [See below](#first-time-setup).
-- **Change bin:** a full bin turns amber and gets a *Change bin* button, on the page and on the
-  printer. The machine keeps sorting the rest meanwhile. [Everyday use](#everyday-use).
-- **Queued bin changes:** edit, add, turn or take off bins, then *Apply* them all at once, even
-  while sorting.
-- **Camera calibration and real photos from the page** (Calibrate and Real photos tabs): sortering-pnp is
-  the only program that moves the printer.
-- **Files tab:** one row per file from the other projects, each with its drop area.
-- **Faster page:** the Pi answers on IPv6 and IPv4 and no longer re-reads files every second.
+- **One install script does everything:** packages at exact versions, the Pi's pins (PWM for
+  servos, SPI for the LEDs, the permissions for both) and Klipper's config.
+  [Install](#install).
+- **Lights:** an LED ring (WS2812B) on the Pi, with its colour and brightness set in the Setup
+  tab, lit always or only for photos. [The lights](#the-lights).
+- **Start-up check:** after every start the machine homes, finds the bins and looks into each one
+  before it sorts, and ticks it off in the sidebar. Every start begins with an empty grid, so
+  bins moved while it was off are found again.
+- **Device tab shows what really runs:** a state chip (*Automatic · next look in 0:42*,
+  *Sort once · sorting*, *Idle*), only the buttons that apply, and bin changes on one line above
+  the bed with one **Park** / **Done** button.
+- **Printed suction cups and a tool holder:** soft TPU cups for a 0.4 mm nozzle, in two bellows
+  sizes, and an L bracket for the pneumatic tweezers' motor. [Printed parts](#printed-parts).
+- **Washers by cup or magnet** are taken on their ring, not on the hole.
+- **Gentle bed:** the bed (Y) ramps up slowly and never takes a corner at speed, so the parts in
+  the tray stay where they are. Carrying a part lowers only the head's (X) acceleration.
+- **Camera Calibration tab:** a live picture, one **Calibrate** button, *Skip for now*,
+  rotate / mirror, and focus, white balance, exposure and image controls (kept inside what the
+  sensor can do).
 
 ---
 
@@ -88,13 +83,13 @@ project works without the others.
    the model, so the bins around it can't confuse it.
 3. **Recognising.** The model outlines every part and names it (for example `DIN912_M4`, a socket
    head screw M4). For screws it also measures the length (`DIN912_M4x16`).
-4. **Deciding.** sortering-pnp counts what is in the tray and starts with the most numerous kind. Each
-   kind goes to the bin you assigned it, or claims a free bin by itself.
-5. **Picking.** The printer moves the picker (tweezers, a gripper or a small suction cup) over the
-   part, at the right angle, takes it and drops it into its bin. While it carries the part, the Pi
-   already looks at the next photo.
+4. **Deciding.** sortering-pnp counts what is in the tray and starts with the most numerous kind.
+   Each kind goes to the bin you assigned it, or claims a free bin by itself.
+5. **Picking.** The printer moves the picker (tweezers, a suction cup or a magnet) over the part,
+   at the right angle, takes it, drops it into its bin and parks out of the picture for the next
+   photo.
 6. **Again**, until the tray is empty. Bins that are full or finished are shown on the page and on
-   the printer display; you empty or swap them and press **Change bin**.
+   the printer display; you empty or swap them and the machine carries on.
 
 ---
 
@@ -109,23 +104,28 @@ project works without the others.
   | Picker | Holds the part with | Aims at | Turns |
   |---|---|---|---|
   | **Servo tweezers** | a servo closing the tweezers | the centre of gravity (on the shank) | yes, a second servo, 0–180° |
-  | **Suction cup** | a vacuum pump, switched by a MOSFET module | the head | no |
-  | **Magnet** | a servo pressing a magnet against an iron rod | the head | no |
-  | **Pneumatic tweezers** | a pump, switched by a MOSFET module | the centre of gravity | yes, a servo, 0–180° |
-- A **Raspberry Pi 4 or 5** with 4 GB or more, running 64-bit Raspberry Pi OS. It runs Klipper,
-  the camera, the model and the web page together.
+  | **Suction cup** | a vacuum pump, switched by a MOSFET module | the head (a washer: its ring) | no |
+  | **Magnet** | a servo pressing a magnet against an iron rod | the head (a washer: its ring) | no |
+  | **Pneumatic tweezers** | a pump, switched by a MOSFET module | the centre of gravity | yes, a servo or a small stepper, 0–180° |
+- A **Raspberry Pi 4 or 5** with 4 GB or more, running **64-bit Raspberry Pi OS** (Bookworm or
+  Trixie). It runs Klipper, the camera, the model and the web page together.
 - A **Raspberry Pi Camera Module 3** about 300 mm above the bed, looking straight down.
-- Even **lighting** over the bed (an LED strip under a simple shroud works well).
+- Even **lighting** over the bed: an LED ring round the lens (WS2812B, e.g. the LumenPnP top ring,
+  driven by the Pi) or an LED strip under a simple shroud.
 - A **matte TPU sheet** (blue or green), cut to the tray's floor: parts don't bounce on it and the
   camera sees them clearly.
+- A small **5 V buck converter** on the printer's 24 V supply for the servos and the LEDs (never
+  the Pi's own 5 V pins).
 
 **Printed parts** (all ready in [prints/](prints/), or made for your own layout in the page's
 *Print bins* tab):
 
 - a Gridfinity **baseplate** for the bed (thin versions that clamp to a whole Ender 3 or MK3 bed),
 - the **tray** (3 × 3 or 4 × 4 cells) and **bins**, with their codes,
-- a **camera arm** (plain, or with an LED ring light round the lens) and a **screen holder** for
-  the printer's top bar (for the Pi with a 7" screen).
+- a **camera arm** (plain, or with the LED ring round the lens) and a **screen holder** for
+  the printer's top bar (for the Pi with a 7" screen),
+- **suction cups** in TPU and a **tool holder** for the pneumatic tweezers (see
+  [Printed parts](#printed-parts)).
 
 See [prints/README.md](prints/README.md) for which files to print and how.
 
@@ -134,7 +134,7 @@ See [prints/README.md](prints/README.md) for which files to print and how.
 ## Install
 
 1. **Install Klipper, Moonraker and Mainsail** (skip this if you flashed the MainsailOS image: they
-   are already there). On a fresh Raspberry Pi OS, with [KIAUH](https://github.com/dw-0/kiauh):
+   are already there). On a fresh 64-bit Raspberry Pi OS, with [KIAUH](https://github.com/dw-0/kiauh):
 
    ```bash
    sudo apt-get install -y git
@@ -170,12 +170,25 @@ See [prints/README.md](prints/README.md) for which files to print and how.
    ```bash
    git clone https://github.com/ama24/sortering-pnp.git ~/sortering-pnp
    ~/sortering-pnp/install-pi.sh --service
+   sudo reboot
    ```
 
-   The script installs everything in one go, with **exact, checked versions** of every package,
-   so an install today and one next year give the same program. Nothing else is downloaded: the
-   camera, calibration and measuring code are part of sortering-pnp.
-   `--service` starts sortering-pnp at every boot.
+   The script checks the system (64-bit, Python 3.11 or 3.13, 4 GB), then, in one go:
+
+   | Step | What it does |
+   |---|---|
+   | System packages | Picamera2, rpicam-apps, gpiozero/lgpio, git (from apt) |
+   | The picker's pins | turns on hardware PWM on GPIO12/13 in `config.txt` (servos), and a udev rule that gives every PWM channel to the `gpio` group, so no sudo is needed |
+   | The LEDs | turns on SPI (`dtparam=spi=on`), fixes the Pi 4's core clock so the LEDs' timing doesn't drift, adds you to the `spi` group |
+   | Python packages | a venv in the clone with **exact, checked versions** of every package (`requirements-pi.lock.txt`, with hashes): an install today and one next year give the same program. It then checks that OpenCV, the CPU build of torch and the rest load |
+   | Klipper's config | `sortering-pnp klipper` (see step 3) |
+   | `--service` | a systemd service that starts sortering-pnp at every boot (and resumes automatic mode if it was on) |
+
+   Nothing else is downloaded: the camera, calibration and measuring code are part of
+   sortering-pnp, and the model is uploaded later in the web page. **Reboot once** after the first
+   install: the PWM and SPI settings are read at boot.
+   `~/sortering-pnp/.venv/bin/sortering-pnp check` tests the set-up; `journalctl -u sortering-pnp -f`
+   shows the log.
 3. **Klipper is set up by the script too** (its step "Klipper: sortering_pnp.cfg and
    printer.cfg"; on its own: `~/sortering-pnp/.venv/bin/sortering-pnp klipper`, safe to run
    again). It:
@@ -191,13 +204,13 @@ See [prints/README.md](prints/README.md) for which files to print and how.
 
    Lines marked **!!** are what it can't fix: see
    [Klipper's config: what goes wrong](#klippers-config-what-goes-wrong). Mainsail should then
-   say *Ready*. That is all Klipper needs: the picker isn't in Klipper at all, sortering-pnp
-   switches the Pi's pins itself (see [The picker](#the-picker) below).
+   say *Ready*. That is all Klipper needs: the picker and the lights aren't in Klipper at all,
+   sortering-pnp switches the Pi's pins itself.
 4. **Open the page:** `http://<your-pi>:8080` on your phone or PC. The first visit asks you to
    create an account.
 
-From now on **sortering-pnp is the only program that moves the printer**. Even the camera calibration
-photos are taken from its page.
+From now on **sortering-pnp is the only program that moves the printer**. Even the camera
+calibration photos are taken from its page.
 
 ### Klipper's config: what goes wrong
 
@@ -222,15 +235,23 @@ and warns about the rest; Mainsail's console shows Klipper's own message.
 
 Never edit printer.cfg's `#*#` block by hand: Klipper's SAVE_CONFIG writes it.
 
+### When the Pi's pins or the camera complain
+
+| You see | Do |
+|---|---|
+| *the Pi's pins cannot be used: Permission denied: /sys/class/pwm/...* | run `./install-pi.sh --service` again (it adds the PWM udev rule), then reboot once |
+| The page says PWM or SPI is missing | reboot once after the install: `config.txt` is read at boot |
+| *settings drifted during capture: AnalogueGain ...* | update: sortering-pnp now keeps gain, exposure and focus inside what the sensor can do (the Camera Module 3 has no gain below 1.12) |
+
 ### Finding your way around the page
 
 The sections are in the sidebar on the left, grouped by what you do:
 
 | Group | Section | What it's for |
 |---|---|---|
-| Operate | **Device** | the machine live: camera, bed, what's in the tray, what it's doing. You land here. |
+| Operate | **Device** | the machine live: camera, bed, what's in the tray, what it's doing. You land here. Under it, the start-up check. |
 | Prepare | **Setup** | the steps to do once, in order, before the machine moves by itself |
-| | **Calibrate** | the camera, the camera to the printer, and the picker tip |
+| | **Camera Calibration** | the live camera, its settings, the calibration and what the model gets to see |
 | | **Print bins** | the bins, trays, baseplates and holders to print |
 | Library | **Models** | the models that find and measure the parts |
 | | **Files** | files from the other projects (calibration, parts table) |
@@ -252,7 +273,7 @@ Until the setup is complete, the machine only makes the moves you ask for on the
 
 ![The Setup tab](docs/images/setup.png)
 
-Go through the seven steps once, in order:
+Go through the eight steps once, in order:
 
 1. **Printer:** sortering-pnp asks Klipper a few questions (is `sortering_pnp.cfg` included, is the
    hotend cold). Nothing moves.
@@ -260,20 +281,23 @@ Go through the seven steps once, in order:
    middle of the tray, never over a bin.
 3. **Machine:** the bed limits, the travel height, the **photo position** (bed all the way out,
    head out of the picture) and the **picker-change position** (head high and in the middle).
-   *Show me* drives to each so you can check. *Confirm* then sends the head to
-   the picker-change position, ready for the next step.
-4. **Picker:** choose yours and wire it as the page shows (sortering-pnp switches the Pi's pins
-   itself, see [The picker](#the-picker)). *Grab* and *Release* try it if you like. Put it on the
-   head and press **OK**: from then on sorting may move it.
+   *Show me* drives to each so you can check. *Confirm* then sends the head to the
+   picker-change position, ready for the next step.
+4. **Picker:** choose yours and wire it as the page shows (see [The picker](#the-picker)).
+   *Grab* and *Release* try it if you like. Put it on the head and press **OK**: from then on
+   sorting may move it.
 5. **Tip height:** *Go to centre*, then jog the tip down with the Z buttons on the same row
-   until a sheet of paper just drags, and press *Set height*. Every height
-   sortering-pnp uses counts from here.
-6. **Camera to printer:** *Take photo* shows what the camera sees, with every code it reads
+   until a sheet of paper just drags, and press *Set height*. Every height sortering-pnp uses
+   counts from here.
+6. **Lights:** *Use lights* and pick the colour and brightness (shown live on the LEDs), or
+   *No lights*. See [The lights](#the-lights).
+7. **Camera to printer:** *Take photo* shows what the camera sees, with every code it reads
    circled and named (no model needed). Jog the tip onto the centre of three codes far apart,
-   press *Tip is here* on each, then *Fit*. Do the **Camera calibration** (Camera Calibration tab, step 3
-   below) before it.
-7. **Layout:** *Find bins*: one photo finds the grid, every bin and which way it faces (see
-   step 2 below).
+   press *Tip is here* on each, then *Fit*. *Move tip here* goes back to a recorded point, to
+   check it. Do the **camera calibration** ([step 3 below](#3-the-camera)) before it, or skip it
+   for now.
+8. **Layout:** *Find bins*: one photo finds the grid, every bin and which way it faces (see
+   [step 2 below](#2-bins-on-the-bed)).
 
 A step un-checks itself when something it depends on changes, so the setup can't silently go
 stale.
@@ -288,14 +312,17 @@ In the **Setup tab → Picker**, choose one of four (numbered in this order):
 2. **Suction cup:** a vacuum pump, switched on and off by a MOSFET module.
 3. **Magnet:** a servo presses a magnet against an iron rod; the rod's tip holds the screw. Steel
    only.
-4. **Pneumatic tweezers:** a pump closes them, a servo turns them up to 180°.
+4. **Pneumatic tweezers:** a pump closes them, a servo turns them up to 180° (or a small stepper
+   through a Klipper macro, `picker.rotate_macro`).
 
-The cup and the magnet are put on the screw's **head**. Both tweezers close at the **centre of
-gravity**, on the shank, turned across the part.
+The cup and the magnet are put on the screw's **head**; a **washer** is taken on the middle of
+its **ring** (between the hole and the outside, on the side away from its nearest neighbour),
+since its centre is the hole. Both tweezers close at the **centre of gravity**, on the shank,
+turned across the part.
 
 Every signal comes from the **Raspberry Pi**, never from the printer's board, so the wiring is
-the same on any printer. sortering-pnp runs on that Pi and switches the pins itself: nothing to
-set up in Klipper. The page draws the wiring for the type you chose:
+the same on any printer. sortering-pnp switches the pins itself: nothing to set up in Klipper.
+The page draws the wiring for the type you chose:
 
 | Pi pin | Does |
 |---|---|
@@ -314,69 +341,98 @@ Power comes straight from the printer's 24 V supply, as part of the conversion:
   switches them under its heater safety checks.
 
 The page says whether the pins are ready. A pump is a plain on/off pin and needs nothing more.
-Servos use the Pi's hardware PWM, which `install-pi.sh` turns on (one line in `config.txt`;
-reboot once after the first install). Try *Grab* and *Release*, and for tweezers *Turn to 0°*
-and *90°*: at 0° the jaws must close left–right; if they don't, set the offset. Parts are let
-go at the travel height; tick *Lower over the bin before letting go* to go down to `drop_mm`
-above the bin's rim first (`picker.lower_to_drop`). Then put the
-picker on the head (it waits at the picker-change position) and press **OK**. Servo angles and
-pins can be changed in `configs/machine.yaml` (`picker:`).
+Servos use the Pi's hardware PWM, which `install-pi.sh` turns on (reboot once after the first
+install). Try *Grab* and *Release*, and for tweezers *Turn to 0°* and *90°*: at 0° the jaws must
+close left–right; if they don't, set the offset. Parts are let go at the travel height; tick
+*Lower over the bin before letting go* to go down to `drop_mm` above the bin's rim first
+(`picker.lower_to_drop`). Then put the picker on the head (it waits at the picker-change
+position) and press **OK**. Servo angles and pins can be changed in `configs/machine.yaml`
+(`picker:`).
+
+### The lights
+
+![The Lights step in the Setup tab](docs/images/lights.png)
+
+An addressable LED ring (WS2812B, e.g. the 8-LED LumenPnP top ring, which the `camera_arm_ring`
+print holds round the lens) lights the tray evenly. sortering-pnp writes to it over the Pi's SPI,
+with nothing else to install:
+
+| Pi pin | Goes to |
+|---|---|
+| 19 (GPIO10, SPI0 MOSI) | the ring's DIN |
+| 20 (GND) | the ring's GND and the 5 V converter's minus |
+
+The ring's 5 V comes from a buck converter on the printer's 24 V supply (set it to 5.0 V with a
+meter first), not from the Pi. In the **Lights** step choose the colour (picker, hex or R/G/B)
+and the intensity: the LEDs follow live. **Always on** keeps them lit while sortering-pnp runs;
+off, they light only while a photo is taken. **No lights** completes the step without them. If
+the LEDs flicker or show wrong colours, put a 74AHCT125 level shifter between pin 19 and DIN.
 
 ### 2. Bins on the bed
 
 ![The Print bins tab](docs/images/print-bins.png)
-*The Print bins tab starts with the corner bins (codes 50–99): the code sits on a square post
-that goes straight down to the floor, so no part can get trapped under it. The post is in the
-back-right corner; the pictures draw it in the far corner so you can see it. The shelf bins
-(codes 100–239) follow below.*
+*The Print bins tab: each bin size has its own range of codes, so the camera knows a bin's size
+from its code. The corner bins (codes 50–99) carry their code on a square post that goes straight
+down to the floor, so no part can get trapped under it (best for the tray). The shelf bins
+(codes 100–239) carry it on a shelf along the back. Below: baseplates, the holders for the top
+bar and every bin of this layout.*
 
-Print the baseplate, a corner tray (codes 90–94) and some bins (the *Print bins* tab, or the ready-made files in
-`prints/`). Bins come as two-colour files: white bin, black code. With a single-colour printer, add
-a colour change at the rim height.
+Print the baseplate, a corner tray (codes 90–94) and some bins (the *Print bins* tab, or the
+ready-made files in `prints/`). Bins come as two-colour files: white bin, black code. With a
+single-colour printer, add a colour change at the rim height.
 
-Put the baseplate anywhere on the bed, the tray and the bins anywhere on it, turned any way. Then
-on the **Device** tab press **Resync** (next to the bed): one photo finds the grid, every bin and
-which way it faces, and makes the biggest bin the tray.
+Put the baseplate anywhere on the bed, the tray and the bins anywhere on it, turned any way.
+Every time sortering-pnp starts it begins with an empty grid (5 × 5 cells, `bed:` in
+machine.yaml), and the **start-up check** finds the bins: it homes, takes one photo of the bed
+(the grid, every bin and which way it faces; the biggest bin becomes the tray), and looks into
+each bin: a wild bin that already holds parts goes on collecting their kind, an empty one is
+free. **Resync** (next to the bed on the Device tab) does the same at any time.
 
 <img src="docs/images/bin-menu.png" alt="A bin's menu" width="420" align="right">
 
 Each bin shows its grid name (A1 is front-left), its code, what it collects, how many parts went
-in and a bar for how full it is. Click a bin (or its **⋯**, or right-click it) for its menu: edit
-its rules, make it the tray, turn it, ask for it to be changed, mark it full or emptied, print
-it. A grey square is a cell without a bin; its ⋯ puts one there.
+in and a bar for how full it is. Click a bin (or its **⋯**, or right-click it) for its menu: ask
+for it to be changed or park for it, edit its rules, make it the tray, turn it, mark it full or
+emptied, print it, take it off the layout. A grey square is a cell without a bin; its ⋯ puts one
+there.
 
 Leave a bin without rules and it is **wild**: it is claimed by the first new kind of part that
 needs a bin. A layout of only wild bins sorts by itself.
 
 Changes are **queued**: they show dashed, a bar lists them, and **Apply** saves them all at once
 (even while the machine sorts: they count from its next pick). **Discard** forgets them.
-**Settings** next to Resync holds the grid size and what a wild bin collects.
+**Settings** next to Resync holds the grid size and what a wild bin collects (part, class or
+family).
 <br clear="right">
 
 ### 3. The camera
 
-![The Camera Calibration tab](docs/images/calibrate.png)
+![The Calibration card of the Camera Calibration tab](docs/images/calibrate.png)
 
 In the **Camera Calibration** tab:
 
-1. **Camera:** the live picture from the camera, at the top. **Rotate 90°** / **Mirror** turn
-   the picture (photos too); then do Camera to printer again. Focus, white balance, exposure and
-   the image's look are set below it (Auto or Manual; **Autofocus** focuses once). The picture starts turned 180° (`camera.hflip`/`vflip: true`), for a camera
-   mounted the other way round.
-2. **Camera calibration** teaches the program how the camera sees. Download and print the small
-   tray board, home the printer, empty the tray, then press **Calibrate**: one button. It parks
-   the bed, locks the camera (measures the light and focus once and freezes them), then asks you
-   to move the board slowly under the camera. Each time it holds still somewhere new, a photo is
-   taken by itself, and the covered part of the live picture turns green. Then it asks you to
-   lay the board flat in the tray, measures where the camera stands, and saves the result.
+1. **Camera:** the live picture from the camera, at the top. **Rotate 90°** / **Mirror** turn the
+   picture (photos too); then do Camera to printer again. **Park bed** brings the bed out.
+   Below it: focus (Auto, Manual lens position, or **Autofocus** once), white balance, exposure
+   (shutter and gain), and brightness, contrast, sharpness and saturation, applied at once and
+   kept. The picture starts turned 180° (`camera.hflip`/`vflip: true`), for a camera mounted the
+   other way round.
+2. **Calibration** teaches the program how the camera sees. Download and print the board
+   (**Board PDF**), glue it flat on card, home the printer, empty the tray, then press
+   **Calibrate**: one button. It parks the bed, locks the camera (measures the light and focus
+   once and freezes them), then asks you to move the board slowly under the camera. Each time it
+   holds still somewhere new, a photo is taken by itself, and the covered part of the live
+   picture turns green. Then it asks you to lay the board flat in the tray, measures where the
+   camera stands, and saves the result.
    **Skip for now:** enter the lens' height above the tray floor instead. The camera is then
    taken as looking straight down at the picture's centre; fine for trying things, less exact
    near the picture's edge. Calibrate later.
-3. **Camera cropping:** the live picture next to what the model gets. Only the tray's inside goes
-   to the model (YOLO); the rest is painted over with one colour (the tray floor's own, or one you
-   pick). The bins and codes are always read from the whole photo. Set it once Camera to printer
-   and the bins are done, and trim the edge with − / + until no wall is left.
-4. **Camera to printer** is step 6 of the Setup tab: take a photo, jog the tip onto the centre
+3. **Camera cropping:** the camera's picture next to what the model gets. Only the tray's inside
+   goes to the model; the rest is painted over with one colour (the tray floor's own, or one you
+   pick), the picture keeping its size. The bins and codes are always read from the whole photo.
+   Set it once Camera to printer and the bins are done, and trim the edge with − / + until no
+   wall is left.
+4. **Camera to printer** is step 7 of the Setup tab: take a photo, jog the tip onto the centre
    of three codes, press *Tip is here* on each, then *Fit*. Now the program knows where every
    pixel is on the printer.
 
@@ -384,10 +440,16 @@ None of these needs a model: the photos only read the codes. The model is needed
 
 ### 4. The model and the files
 
+![The Models tab](docs/images/models.png)
+
 Download a trained model package (a `.zip` from training-synth, for example from its releases
-page) and upload it in the **Models** tab (drag the file onto the page; old models are kept, so you
-can switch back). The package also brings the class list and the parts table it was trained with. The **Files** tab takes the other files sortering-pnp can use. Each card says
-where to find the file, what it's for and what happens without it:
+page) and drop it in the **Models** tab. Every upload is kept in its own folder, so you can switch
+back; one model is in use per role (finding the parts, measuring screws, classifying). The
+package also brings the class list and the parts table it was trained with. On the Pi a package
+with an NCNN export runs fastest.
+
+The **Files** tab takes the other files sortering-pnp can use. Each card says where to find the
+file, what it's for and what happens without it:
 
 ![The Files tab](docs/images/files.png)
 
@@ -402,28 +464,53 @@ program notices; they never block sorting.
 
 ![On the machine](docs/images/on-the-machine.png)
 
+### Printed parts
+
+Besides the bins and holders, [prints/](prints/) has the parts for the pickers:
+
+![The suction cups, cut in half](docs/images/cups.png)
+
+- **Suction cups** ([prints/cups/](prints/cups/)), TPU 95A, made for a 0.4 mm nozzle: the folds
+  and the lip are one line wide so they give, and every cup is 37 mm long, so swapping cups keeps
+  the tip height. **A** tips (three folds, a cone lip) are for flat faces: pan, cheese and hex
+  heads, nuts. **D** tips (four folds, a skirt flaring to a thin edge) follow curved and tilted
+  faces. S, M and L are the lip sizes (about M2–M3, M3–M5, M5–M8); `_sieve` versions end in a
+  dome with a ring of holes, so a part can't plug the cup and lets go at once. The `_wide` set
+  has the same tips on a wider, softer bellows (about 3.5 times softer along the axis). Which
+  cup for which part: [prints/cups/CUPS.txt](prints/cups/CUPS.txt).
+
+![The tool holder](docs/images/tool-holder.png)
+
+- **Tool holder** ([prints/tool/](prints/tool/)) for the pneumatic tweezers' turning motor
+  (NEMA 8 size, 20 × 20 × 30 mm): an L bracket that goes on the printer head's two M3 standoffs,
+  with two shims behind it so a push on the tool levers against the head. The motor is held by
+  4 × M2 × 5 from below. PETG or PLA, no supports.
+
+Details in [prints/README.md](prints/README.md).
+
 ---
 
 ## Everyday use
 
 1. **Throw the parts into the tray** and spread them a little with your hand.
-2. Press **Start automatic** on the Device tab (or *Screw sorter → Automatic* on the printer's display).
-   The machine waits until nothing moves any more, sorts until the tray is empty, then waits
-   again: just keep throwing parts in. It looks again every minute, with the motors off so it's
-   quiet. **Manual → Sort once** sorts what's there and stops.
-3. **Watch the Device tab** if you like: the photo with the next part boxed, the bed, what lies
-   in the tray, and a line for everything the machine does (parking, taking a photo, running the
-   model, picking X, leaving X in bin Y).
-4. **When a bin is full**, or a new kind needs a bin and none is free, the bin turns amber on the
-   bed and an orange banner with a **Change bin E1** button appears at the top of the Device tab
-   (and on the printer's display). The
-   machine **keeps sorting everything else**.
-   - Press **Change bin E1**: the machine parks with the bed out, so your hands are safe.
-   - Empty the bin, or put an empty bin in its place, and press **Bin E1 changed**. A photo checks
-     what is there now (the same bin emptied, another bin, or nothing) and sorting goes on.
+2. Press **Start automatic** on the Device tab (or *Screw sorter → Automatic* on the printer's
+   display). After a start, the start-up check runs first. The machine sorts until the tray is
+   empty, then waits and looks again every minute (*next look in 0:42*, **Look now** to look at
+   once): just keep throwing parts in. Under **Manual**, **Sort once** sorts what's there and
+   stops, **One pick** takes a single part.
+3. **Watch the Device tab** if you like: every photo as soon as it is taken, with the next part
+   boxed, the bed, what lies in the tray (kept while the next photo is taken), and a line for
+   everything the machine does (parking, taking a photo, running the model, picking X, leaving X
+   in bin Y).
+4. **When a bin is full**, or a new kind needs a bin and none is free, the bin turns amber and
+   appears on the line above the bed (and on the printer's display). The machine **keeps sorting
+   everything else**.
+   - Press **Park**: the machine parks with the bed out, so your hands are safe.
+   - Empty the bin, or put an empty bin in its place, and press **Done**. A photo checks what is
+     there now (the same bin emptied, another bin, or nothing) and sorting goes on.
    - You can also ask for any bin to be changed from its ⋯ menu.
 5. **Finished bins** (nothing left in the tray goes there) are green, with an **Emptied** button
-   under the bed. Take them out, empty them and press it.
+   on the same line. Take them out, empty them and press it.
 6. **STOP**, at the bottom of the sidebar, stops the printer at once.
 
 Everything on the page can also be done from the printer's display: **Screw sorter** in its
@@ -451,22 +538,29 @@ kind that claims it. Unknown parts go to the *unknown* bin, parts the model isn'
 finished or which is nearly full.
 
 **Picking.** For a screw the model finds the top of the head, the underside of the head and the
-tip, so sortering-pnp knows which way it lies, how long it is and where its centre of mass is. Tweezers
-turn to close across the shank at that point; a suction cup or a magnet goes onto the head. If a pick fails (the part is still there on the next
+tip, so sortering-pnp knows which way it lies, how long it is and where its centre of mass is
+(the head's size comes from the parts table). Tweezers turn to close across the shank at that
+point; a suction cup or a magnet goes onto the head, or onto a washer's ring. Other parts are
+taken at the centre of their outline. If a pick fails (the part is still there on the next
 photo) it tries again; if parts are stuck in a clump, it shakes the bed to spread them.
 
-**Photo, pick, drop, park.** Each cycle the machine takes a photo with the head parked at the photo
-position and the picker empty, picks the part chosen from it, leaves it in its bin and parks again
-for the next photo.
+**Photo, pick, drop, park.** Each cycle the machine takes a photo with the head parked at the
+photo position (at the travel height, so it never climbs higher than it must) and the picker
+empty, picks the part chosen from it, leaves it in its bin and parks again for the next photo.
+
+**Moving gently.** The tray rides on the bed, so the bed (Y) moves like a mill: low acceleration,
+a straight ramp up to its speed, and no corners taken at speed (also when homing). While a part
+hangs on the picker, only the head's (X) acceleration is lowered.
 
 **How full the bins are.** Every part dropped adds its volume to the bin: the exact volume from
 the parts table if you dropped one in the Files tab, otherwise an estimate from its outline and
-height. Each bin's room comes from its size. Press **Full** on a bin that really is full and the
+height. Each bin's room comes from its size. Mark a bin that really is full as **Full** and the
 machine learns how densely that kind of part packs.
 
 **Safety.** Every move is checked against the bed limits and made at a safe height. The machine
 refuses to move while the printer is printing, hot, not homed or carrying the hotend. Homing
-always comes down over the tray, never over a bin. And no other program sends moves.
+always comes down over the tray, never over a bin. The picker is switched off on stop, error and
+exit. And no other program sends moves.
 
 ---
 
@@ -474,10 +568,10 @@ always comes down over the tray, never over a bin. And no other program sends mo
 
 ![The Real photos tab](docs/images/photos.png)
 
-To see how well the model does on real parts, the **Real photos** tab takes sessions of real photos:
-make a session, write down on the PC what lies in the tray, then take a photo after each change.
-The bed is parked first, and the camera uses its locked settings. **Download** the session and put
-it in screw-synth's `data/real/` on your PC.
+To see how well the model does on real parts, the **Real photos** tab takes sessions of real
+photos: make a session, write down on the PC what lies in the tray, then take a photo after each
+change. The bed is parked first, and the camera uses its locked settings. **Download** the session
+and put it in screw-synth's `data/real/` on your PC.
 
 ---
 
@@ -489,8 +583,11 @@ On the Pi:
 cd ~/sortering-pnp && git pull && ./install-pi.sh --service
 ```
 
-The install script brings everything to the versions this release was tested with, and puts
-the new `sortering_pnp.cfg` into Klipper (restarting it when something changed).
+The install script brings everything to the versions this release was tested with, puts the new
+`sortering_pnp.cfg` into Klipper (restarting it when something changed) and restarts
+sortering-pnp. If it says so at the end, reboot once (new pin or SPI settings).
+
+For a change in the program only, `git pull && sudo systemctl restart sortering-pnp` is enough.
 
 ---
 
@@ -516,5 +613,6 @@ Open the address it prints. This is for a PC only: on the Pi use [install-pi.sh]
   users, and so on).
 - **[prints/README.md](prints/README.md):** which parts to print and how.
 - **[configs/machine.yaml](configs/machine.yaml):** all settings, each with a comment.
-- **Development:** set up as in [On a PC](#on-a-pc), then `pytest` and `ruff check .` before every commit.
-  The code is in [src/sortering_pnp/](src/sortering_pnp/); [CLAUDE.md](CLAUDE.md) explains how it is built.
+- **Development:** set up as in [On a PC](#on-a-pc), then `pytest`, `ruff check .` and
+  `ruff format --check .` before every commit. The code is in
+  [src/sortering_pnp/](src/sortering_pnp/); [CLAUDE.md](CLAUDE.md) explains how it is built.
