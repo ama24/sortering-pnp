@@ -54,7 +54,9 @@ another repository.
   "work" (`work_marker`; a 3x3/4x4 tray): parts lie inside its walls, minus its shelf
   (`work_rect`; a corner tray keeps all of it, minus the post: `work_keepout`, used by
   `in_work`), at `surface_z()` = tray floor + TPU sheet. `resync()` infers the grid origin
-  from the seen bins (any position on the bed), places bins with their `rot`, keeps unseen bins'
+  from the seen bins (any position on the bed), places bins with their `rot` and keeps each
+  one's measured centre (`Bin.seen`: parts are dropped there, `Layout.drop_centre`; bins loose on
+  the bed are off the grid), keeps unseen bins'
   settings in `away`, and picks the biggest bin as the plate unless `work_auto` is False (chosen
   by hand). Run start never re-chooses the plate. Old layouts without a plate bin use `work`
   (cut-out cells). Bins carry ArUco

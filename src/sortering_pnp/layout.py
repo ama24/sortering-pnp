@@ -38,6 +38,8 @@ class Bin:
     role: str = "wild"  # wild | sort | work | unknown | unsure | overflow | kit | all
     label: str = ""
     rot: int = 0  # where its marker side faces: 0 back (+Y), 90 left, 180 front, 270 right
+    # its centre (printer X/Y) as the camera measured it: bins need not stand on the 42 mm grid
+    seen: list[float] | None = None
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> Bin:
@@ -152,6 +154,18 @@ class Layout:
         x0, y0, x1, y1 = self.cells_rect(b.x, b.y, b.w, b.d)
         return (x0 + x1) / 2, (y0 + y1) / 2
 
+    def drop_centre(self, b: Bin) -> tuple[float, float]:
+        """Where parts are let go over a bin: its centre as the camera measured it (bins loose
+        on the bed, turned any way, are off the grid by up to half a cell), else its cells'
+        centre. A measurement more than half a cell from its cells is an old one (the bin was
+        moved on the page): the cells then."""
+        cx, cy = self.bin_centre(b)
+        if b.seen is not None and len(b.seen) == 2:
+            sx, sy = float(b.seen[0]), float(b.seen[1])
+            if abs(sx - cx) <= self.pitch / 2 + 1.0 and abs(sy - cy) <= self.pitch / 2 + 1.0:
+                return sx, sy
+        return cx, cy
+
     def marker_centre(self, b: Bin) -> tuple[float, float]:
         cx, cy = self.bin_centre(b)
         ox, oy = _rotate(binspec.marker_offset_for(b.marker, *b.own_size()), b.rot)
@@ -229,6 +243,7 @@ class Layout:
         ox, oy = self.origin
         b.x = round((centre[0] - ox) / self.pitch - b.w / 2)
         b.y = round((centre[1] - oy) / self.pitch - b.d / 2)
+        b.seen = [round(float(centre[0]), 2), round(float(centre[1]), 2)]
         return b
 
     def _size_seen(self, marker: int, yaw_deg: float) -> tuple[int, int]:
