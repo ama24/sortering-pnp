@@ -57,7 +57,7 @@ camera:
     margin_cells: 1            # Resync looks this many cells beyond the grid, for new bins
 
 lights:                        # addressable LEDs (WS2812B ring) on GPIO10 / pin 19 (Setup tab: Lights)
-  enabled: false               # there are lights; DIN -> pin 19, 5V -> pin 2, GND -> pin 6
+  enabled: false               # there are lights; DIN -> pin 19, GND -> pin 20, 5 V from a buck converter (not the Pi)
   count: 8                     # LEDs in the chain (LumenPnP ring: 8)
   colour: "#ffffff"            # #RRGGBB
   brightness: 0.5              # 0..1
