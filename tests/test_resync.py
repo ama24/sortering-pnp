@@ -103,3 +103,49 @@ def test_resync_through_the_camera(machine):
         (b.marker, b.x, b.y, b.rot) for b in real.bins
     }
     assert runner.setup.is_done("layout")
+
+
+@pytest.mark.parametrize("yaw", [0.0, 90.0, 180.0, -90.0, 30.0, -135.0, 7.0])
+@pytest.mark.parametrize("marker", [100, 140, 50])  # 1x1 shelf, 1x2 shelf, 1x1 corner post
+def test_parts_go_to_the_middle_of_a_bin_loose_on_the_bed(machine, yaw, marker):
+    """Bins put anywhere on the bed, turned any way: the drop point is where the bin really
+    stands (from its code's place and direction), not the centre of the grid cell it falls in,
+    which was up to half a cell (21 mm) off."""
+    import math
+
+    from sortering_pnp.binspec import marker_offset_for, size_for_marker
+    from sortering_pnp.markers import MarkerPose
+    from sortering_pnp.vision import Shot
+
+    runner = Runner(
+        machine,
+        SimPrinter(machine, SimWorld()),
+        SimVision(SimWorld(), Layout, Transform2D.identity),
+    )
+    lay = Layout()
+    size = size_for_marker(marker)
+    centre = (117.3, 64.9)  # off any 42 mm grid
+    ox, oy = marker_offset_for(marker, size.w, size.d)
+    c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    code = (centre[0] + c * ox - s * oy, centre[1] + s * ox + c * oy)
+    others = [MarkerPose(101, (20.0, 20.0), 90.0), MarkerPose(102, (230.0, 200.0), 90.0)]
+    shot = Shot("t", [], [MarkerPose(marker, code, 90.0 + yaw), *others])
+    lay.resync(runner._seen_bins(lay, shot, Transform2D.identity()))
+    b = lay.bin_by_marker(marker)
+    assert lay.drop_centre(b) == pytest.approx(centre, abs=0.02)
+    assert b.rot == (round(yaw / 90) % 4) * 90  # the cells still follow its turn
+    # kept through a save, as the page sends it back
+    again = Layout.from_dict(lay.to_dict())
+    assert again.drop_centre(again.bin_by_marker(marker)) == pytest.approx(centre, abs=0.02)
+
+
+def test_a_bin_moved_on_the_page_drops_in_its_new_cells():
+    lay = Layout(origin=[0.0, 0.0], cols=5, rows=5)
+    lay.resync([(100, (55.0, 70.0), 0.0), (101, (10.0, 10.0), 0.0)])
+    b = lay.bin_by_marker(100)
+    assert lay.drop_centre(b) == (55.0, 70.0)
+    b.x += 2  # dragged two cells to the right: the old measurement is not used
+    assert lay.drop_centre(b) == lay.bin_centre(b)
+    old = Layout.from_dict({**lay.to_dict()})
+    old.bins[0].seen = None  # a layout from before: the cells
+    assert old.drop_centre(old.bins[0]) == old.bin_centre(old.bins[0])

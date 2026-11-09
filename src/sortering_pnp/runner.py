@@ -1361,7 +1361,7 @@ class Runner:
     def _drop(self, plan: Plan, layout: Layout) -> None:
         b = plan.bin
         assert b is not None
-        cx, cy = layout.bin_centre(b)
+        cx, cy = layout.drop_centre(b)  # where the camera saw it, not only its grid cells
         p = plan.part
         name = (p.cls + (f"x{p.length_mm:g}" if p.length_mm is not None else "")) if p else "it"
         self.phase(f"leaving {name} in bin {layout.bin_name(b)} ({b.marker})")
