@@ -224,9 +224,11 @@ def test_the_tip_not_moved_between_codes_is_refused(machine):
         {"marker": 100 + i, "plate": [x, y], "bed": [50.0, 50.0]}
         for i, (x, y) in enumerate([(0, 0), (100, 0), (0, 100)])
     ]
+    runner._calib_fit = {"worst_mm": 0.3}  # an earlier fit's line on the page
     with pytest.raises(PrinterError, match="within 0 mm"):
         runner.calib_fit()
     assert not runner.setup.is_done("camera")
+    assert runner.setup_state()["camera"]["fit"] is None  # not left showing as this one's
 
 
 def test_a_saved_zero_size_fit_is_not_used(machine):

@@ -1436,6 +1436,7 @@ class Runner:
             cal = BedCalibration.fit(self.calib_pairs)
         except ValueError as exc:
             self.setup.reset("camera")
+            self._calib_fit = None  # an old fit's line would read as this one's
             raise PrinterError(str(exc)) from exc
         cal.save(self.transform_path)
         worst = max(cal.residuals_mm)
