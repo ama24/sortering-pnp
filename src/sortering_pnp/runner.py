@@ -1406,6 +1406,9 @@ class Runner:
         p = plan.part
         name = (p.cls + (f"x{p.length_mm:g}" if p.length_mm is not None else "")) if p else "it"
         self.phase(f"leaving {name} in bin {layout.bin_name(b)} ({b.marker})")
+        # a bin at the bed's edge: its opening's middle may be just out of reach. Half a shelf's
+        # depth still lets the part go over the opening; further out the move is refused
+        cx, cy = self.motion.within_reach(cx, cy, binspec.SHELF_DEPTH_MM / 2)
         self.motion.drop(cx, cy, layout.bin_rim_z(b))
 
     # ------------------------------------------------------------------ web-page helpers
