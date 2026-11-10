@@ -954,9 +954,12 @@ class Runner:
         self.motion.z_home_xy = ((x0 + x1) / 2, (y0 + y1) / 2)  # Z is homed over the plate
         return layout, T
 
-    def _sort(self, strategy: str, steps: int | None, auto: bool = False) -> str:
+    def _sort(
+        self, strategy: str, steps: int | None, auto: bool = False, looked: Shot | None = None
+    ) -> str:
         """Sort until the working area is empty: "done", "stuck" (only when `auto`: then the
-        caller waits for the parts to change), "stopped" or "steps"."""
+        caller waits for the parts to change), "stopped" or "steps". `looked`: a photo just
+        taken from the photo position, used instead of taking the same one again."""
         missing = getattr(self.vision, "model_missing", lambda: None)()
         if missing:
             raise PrinterError(missing)
@@ -973,10 +976,11 @@ class Runner:
         ok, why = self.pins.status()
         if not ok:
             raise PrinterError(f"the picker's pins: {why}")
-        first: Shot | None = None
+        first: Shot | None = looked
         run = self.m.run
         if run.scan_bins_on_start or run.only_seen_bins:
-            first = self.take_shot(layout, T, area="bins")
+            if first is None:
+                first = self.take_shot(layout, T, area="bins")
             seen = {mk.marker for mk in first.markers}
             if run.scan_bins_on_start:
                 moved = self._place_bins(layout, first, T)
@@ -1199,6 +1203,15 @@ class Runner:
         margin = self.m.run.work_margin_mm
         return shot, [p for p in shot.parts if layout.in_work(p.bed_xy, margin)], layout
 
+    def _can_reuse_look(self) -> bool:
+        """May the run start from the standby photo? Not when the bed must home first (motors
+        off: homing moves the bed and can shift the parts), nor with a head camera (a standby
+        look covers only the tray, the run's first photo the bins too)."""
+        if self.m.camera.source == "head":
+            return False
+        st = self.printer.status(None)
+        return st.ready and all(a in st.homed for a in "xyz")
+
     def _auto(self, strategy: str) -> None:
         """Standby: look for parts every standby.interval_s; when some lie on the plate, sort
         them at once; then wait again. Runs until Stop (or too many errors in a row)."""
@@ -1240,13 +1253,15 @@ class Runner:
                 self._now.clear()
                 if now:
                     tried = None
-                _, parts, _ = self._look()
+                shot, parts, _ = self._look()
                 # parts on the plate don't move by themselves: sort them at once, no second look
                 if len(parts) >= sb.min_parts and not (
                     tried is not None and same_parts(parts, tried)
                 ):
                     self.say(f"{len(parts)} part(s) seen: sorting")
-                    outcome = self._sort(strategy, None, auto=True)
+                    outcome = self._sort(
+                        strategy, None, auto=True, looked=shot if self._can_reuse_look() else None
+                    )
                     tried = None
                     if outcome == "stuck" and self.last_shot is not None:
                         _, tried, _ = self._look()
