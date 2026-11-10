@@ -136,8 +136,8 @@ ul.plain{margin:8px 0 0;padding-left:18px}
 .jogbox{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:8px 0}.jogside{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .jogxy{width:300px;max-width:100%;height:auto;flex:none;touch-action:manipulation}.jw{stroke:var(--card);stroke-width:2;cursor:pointer;transition:fill .12s}
 .jw.r0{fill:color-mix(in srgb,var(--acc) 12%,var(--card))}.jw.r1{fill:color-mix(in srgb,var(--acc) 24%,var(--card))}.jw.r2{fill:color-mix(in srgb,var(--acc) 38%,var(--card))}.jw.r3{fill:color-mix(in srgb,var(--acc) 52%,var(--card))}.jw:hover{fill:var(--acc)}.jw:active{fill:var(--ink)}
-.jogxy text{font-size:11px;text-anchor:middle;dominant-baseline:middle;fill:var(--ink);pointer-events:none}.jogxy .jax{font-size:14px;font-weight:700;fill:var(--acc)}.jogxy .jc{fill:var(--card);stroke:var(--line);stroke-width:2}.jogxy .jcl{font-size:10px;fill:var(--mut)}
-.jogz{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:72px}.jogzl{text-align:center;font-weight:700;color:var(--acc);padding:2px 0}
+:is(.jogxy,.jogzr) text{font-size:11px;text-anchor:middle;dominant-baseline:middle;fill:var(--ink);pointer-events:none}:is(.jogxy,.jogzr) .jax{font-size:14px;font-weight:700;fill:var(--acc)}:is(.jogxy,.jogzr) .jc{fill:var(--card);stroke:var(--line);stroke-width:2}:is(.jogxy,.jogzr) .jcl{font-size:10px;fill:var(--mut)}
+.jogzr{width:192px;max-width:60%;height:auto;flex:none;touch-action:manipulation}
 .bedmid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1}
 .zcol{flex:1 1 300px;max-width:360px;background:var(--line2);border:2px solid var(--soft);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column}.zcol h4{margin:0 0 8px;font-size:13px}
 .zbody{display:flex;flex:1;gap:18px;align-items:stretch;min-height:210px}.zscale{position:relative;width:116px;flex:none;margin:8px 0}.zbar{position:absolute;left:34px;top:0;bottom:0;width:4px;border-radius:2px;background:var(--soft)}
@@ -869,7 +869,7 @@ function lightsBody(st,redo){const L=SU.lights||{},on=!!L.enabled,c=L.colour||"#
  const top=`<div class="ltop"><div class="seg" role="group" aria-label="Lights"><button class="${on?"on":""}" aria-pressed="${on}" onclick="lightsMode(true)">ON</button><button class="${on?"":"on off"}" aria-pressed="${!on}" onclick="lightsMode(false)">OFF</button></div>
   <label class="ltick${on?"":" dim"}"><input type="checkbox" ${L.always_on?"":"checked"} ${on?"":"disabled"} onchange="setupCall('api/setup/lights',{always_on:!this.checked},'','lights')"> On for photos only</label>
   <span class="note">${on?(L.always_on?"Lit all the time while Sortering PNP runs.":"Lit only while a photo is taken."):"No lights: the photos use the room's light."}</span>
-  ${on?`<span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span>`:""}</div>`;
+  ${on?`<span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span><span id="lsent" class="note"></span>`:""}</div>`;
  if(!on)return top+redo+ledWire(L);
  return top+`<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')" onchange="lightsKeep()"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex');lightsKeep()"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
   <div class="lsl">${sl("lr","R",r,255)}${sl("lg","G",g,255)}${sl("lb","B",b,255)}${sl("lbr","Intensity",pct,100)}</div></div>
@@ -879,7 +879,7 @@ function lightsMode(on){if(on)setupCall('api/setup/lights',{enabled:true},'','li
 function hexRgb(h){const s=(h||"#ffffff").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)||0);}
 function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>(+v).toString(16).padStart(2,"0")).join("");}
 // the LEDs follow the bars: one request at a time, always the newest colour; saved when let go
-let LBUSY=false,LNEXT=null;
+let LBUSY=false,LNEXT=null,LSENT=0;
 function lightsInput(id){let c;
  if(id==="lcol"||id==="lhex"){c=$(id).value.trim();if(!c.startsWith("#"))c="#"+c;if(!/^#[0-9a-f]{6}$/i.test(c)){flash("msg_lights","colour: #RRGGBB",1);return;}c=c.toLowerCase();const[r,g,b]=hexRgb(c);$("lr").value=r;$("lg").value=g;$("lb").value=b;}
  else c=rgbHex($("lr").value,$("lg").value,$("lb").value);
@@ -888,7 +888,9 @@ function lightsInput(id){let c;
  document.querySelectorAll(".ledpx").forEach(e=>{e.setAttribute("fill",c);e.setAttribute("fill-opacity",0.25+0.75*br);});  // the ring in the drawing too
  LNEXT={colour:c,brightness:br};lightsSend();}
 async function lightsSend(){if(LBUSY||!LNEXT)return;const body=LNEXT;LNEXT=null;LBUSY=true;
- try{await api("api/lights/preview",body);}catch(e){flash("msg_lights",e.message,1);}LBUSY=false;lightsSend();}
+ try{const j=await api("api/lights/preview",body);LSENT++;  // what the Pi got: shows that every move reaches it
+  if($("lsent")){$("lsent").textContent=j.error?`· the LEDs got nothing: ${j.error}`:`· the Pi sent ${j.colour} at ${Math.round(j.brightness*100)} % to the LEDs (${LSENT})${j.shown?"":", but the lights are off"}`;$("lsent").className=j.error?"note bad":"note";}}
+ catch(e){flash("msg_lights",e.message,1);}LBUSY=false;lightsSend();}
 async function lightsKeep(){const c=$("lhex").value,br=+$("lbr").value/100;try{const j=await api("api/setup/lights",{colour:c,brightness:br});SU.lights=j.lights;}catch(e){flash("msg_lights",e.message,1);}}
 async function noLights(){try{await api("api/setup/lights",{enabled:false});SU=await api("api/setup/confirm",{step:"lights"});renderSetup();}catch(e){flash("msg_lights",e.message,1);}}
 function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
@@ -897,12 +899,17 @@ function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
 
 // ---------------------------------------------------------------- setup: jog, camera to printer, bins
 let LASTSCAN=null;
-// jogging: an X/Y cross of rings (0.1, 1, 10 and 50 mm; straight or diagonal) and a Z column.
-// Seen from above as the bed drawing: back at the top; the home corner sets where X+ and Y+ point
+// jogging: an X/Y cross of rings (0.1, 1, 10 and 50 mm; straight or diagonal) and beside it the
+// same for Z, up and down only (0.1, 1 and 10 mm). X/Y is seen from above as the bed drawing: back
+// at the top; the home corner sets where X+ and Y+ point
 const JOGS=[0.1,1,10,50];
-function jb(key,x,y,z,l){return `<button class="b s" onclick="jogBy(${x},${y},${z},'${key}')">${l}</button>`;}
+function zRadial(key){const R=[20,56,92,128],rad=a=>a*Math.PI/180,P=(r,a)=>[(r*Math.cos(rad(a))).toFixed(1),(-r*Math.sin(rad(a))).toFixed(1)];let w="",t="";
+ for(const[a,sg]of[[90,1],[270,-1]])[0.1,1,10].forEach((s,i)=>{const r1=R[i],r2=R[i+1],p=(r,b)=>P(r,b).join(" "),[x,y]=P((r1+r2)/2,a);
+  w+=`<path class="jw r${i+1}" d="M${p(r2,a-40)}A${r2} ${r2} 0 0 0 ${p(r2,a+40)}L${p(r1,a+40)}A${r1} ${r1} 0 0 1 ${p(r1,a-40)}Z" onclick="jogBy(0,0,${sg*s},'${key}')"><title>Z${sg>0?"+":"−"}${s} mm</title></path>`;
+  t+=`<text x="${x}" y="${y}">${s}</text>`;});
+ return `<svg class="jogzr" viewBox="-96 -156 192 312" role="group" aria-label="Move Z: up and down, rings of 0.1, 1 and 10 mm">${w}<g>${t}</g><text class="jax" x="0" y="-143">Z+</text><text class="jax" x="0" y="145">Z−</text><circle r="17" class="jc"/><text class="jcl" y="1">mm</text></svg>`;}
 function jogPad(key,xy,side=""){const h=(SU.machine||{}).home_corner||"front_left",fx=h.endsWith("right")?-1:1,fy=h.startsWith("back")?-1:1;
- const zcol=`<div class="jogz" role="group" aria-label="Z, mm">${[10,1,0.1].map(s=>jb(key,0,0,s,`Z+${s}`)).join("")}<span class="jogzl">Z</span>${[0.1,1,10].map(s=>jb(key,0,0,-s,`Z−${s}`)).join("")}</div>`,
+ const zcol=zRadial(key),
   out=`<div class="jogside"><div class="note">tip at <b id="tip_${key}">–</b> (X, Y, Z)</div>${side}</div>`;
  if(!xy)return `<div class="jogbox">${zcol}${out}</div>`;
  const R=[20,47,74,101,128],rad=a=>a*Math.PI/180,P=(r,a)=>`${(r*Math.cos(rad(a))).toFixed(1)} ${(-r*Math.sin(rad(a))).toFixed(1)}`,sg=v=>v>0?"+":"−";

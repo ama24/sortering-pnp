@@ -104,7 +104,7 @@ def test_preview_shows_at_once_and_saves_nothing(machine):
     r.setup_lights({"enabled": True, "colour": "#ffffff", "brightness": 1.0})
     sim = r.lights.driver
     out = r.lights_preview({"colour": "#FF0000", "brightness": 1.0})
-    assert out == {"colour": "#ff0000", "brightness": 1.0, "shown": True}
+    assert out == {"colour": "#ff0000", "brightness": 1.0, "shown": True, "error": None}
     assert sim.colours == [(255, 0, 0)] * 8  # on the LEDs at once
     assert _runner(machine).m.lights.colour == "#ffffff"  # kept only when the bar is let go
     r.setup_lights({"colour": "#ff0000"})
