@@ -1,9 +1,12 @@
-"""The bins check: what each storage bin holds, from one model pass on the whole board.
+"""The bins check: what each storage bin holds.
 
-Only Resync and the start-up check's Bins check do it (sorting photos keep the tray only,
-painted, see trayview.py). The model runs once on the whole calibrated picture at its trained
-scale (nothing cropped or painted); every detection is given to the bin whose floor (inside its
-walls) holds it. Detections on or next to a bin's code are dropped: the printed code looks like
+Only Resync and the start-up check's Bins check do it. With the camera fixed above the bed the
+model looks into one bin at a time (Runner._bins_check): the same photo, everything but that
+bin's inside painted over exactly as the tray is for sorting (trayview.py: same colour, same
+margin, the picture's size and scale unchanged), so it sees what it was trained on. Otherwise
+(a head camera) the parts of one pass on the whole picture are used. Every detection is given to
+the bin whose floor (inside its walls) holds it. Detections on or next to a bin's code are
+dropped: the printed code looks like
 parts to the model ("unknown", or any class). The code is kept out twice: where the layout puts
 it, and where the photo shows it (a code sits on the rim, so seen from above it appears shifted
 outwards on the floor plane the parts are measured on).
@@ -78,12 +81,14 @@ def sort_out(
         for p in parts
         if id(p) not in counted
         and p.score >= min_score
-        and any(_on_code(layout, b, p, codes) for b in layout.bins if b.role != "work")
+        and any(on_code(layout, b, p, codes) for b in layout.bins if b.role != "work")
     ]
     return per_bin, dropped
 
 
-def _on_code(layout: Layout, b: Bin, p: Part, codes: Iterable[tuple[float, float]]) -> bool:
+def on_code(layout: Layout, b: Bin, p: Part, codes: Iterable[tuple[float, float]]) -> bool:
+    """The part lies on bin `b`'s floor, on or next to its code (where the layout puts it or
+    where the photo shows a code)."""
     x0, y0, x1, y1 = floor_rect(layout, b)
     if not (x0 <= p.bed_xy[0] <= x1 and y0 <= p.bed_xy[1] <= y1):
         return False

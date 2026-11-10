@@ -308,6 +308,9 @@ class CameraVision:
         pre = getattr(self, "_pre", None)
         if pre is not None and pre[0] == photo:
             return pre[1]
+        last = getattr(self, "_last", None)
+        if last is not None and last[0] == photo:
+            return last[1]
         return load_scene(photo, self.calibration, self.nominal)
 
     def preview(self, photo: Path, name: str) -> tuple[Path, list]:
@@ -491,9 +494,11 @@ class CameraVision:
         name: str,
         marker_height: Callable[[int], float],
         work: WorkArea | None = None,
+        parts: bool = True,
     ) -> Shot:
         """`work`: the tray's inside (plate frame): the rest is painted over for the model
-        (trayview.py); None: the whole photo (e.g. to look into the bins)."""
+        (trayview.py); None: the whole photo. `parts` False: only the codes and the picture
+        (the bins check then looks into each bin with analyse_area)."""
         import dataclasses
 
         import cv2
@@ -501,21 +506,17 @@ class CameraVision:
         from sortering_pnp.measure.infer import draw
 
         scene = self._scene(photo)
+        self._last = (photo, scene)
         seen = scene  # unpainted: what the page shows
         if work is not None and self.m.camera.mask:
             scene = self._painted(scene, work)
-        if self.analyzer is None:  # no model yet: the codes are still read, no parts
+        model = self.analyzer if parts else None
+        if model is None:  # no model yet (or not wanted): the codes are still read, no parts
             result: dict[str, Any] = {}
             parts: list[Part] = []
         else:
-            result = self.analyzer.analyse(scene, str(photo))
-            parts = parts_from_result(
-                result,
-                lambda px, h: scene.cam.pixel_to_plate(px, h),
-                self._head_r.get,
-                self._shapes.get,
-                self.m.picker.kind.aim,
-            )
+            result = model.analyse(scene, str(photo))
+            parts = self._parts(result, scene)
         full = cv2.imread(str(photo), cv2.IMREAD_GRAYSCALE)
         found = detect(full)
         pre = getattr(self, "_pre", None)
@@ -535,11 +536,29 @@ class CameraVision:
             )
             markers.append(dataclasses.replace(pose, view_px=((cx - ox) * k, (cy - oy) * k)))
         vis = view
-        if self.analyzer is not None:
+        if model is not None:
             vis = self.out / f"{name}_vis.jpg"
             img = draw(scene, result, max_side=1600)
             cv2.imwrite(str(vis), img, [cv2.IMWRITE_JPEG_QUALITY, 85])
         return Shot(name, parts, markers, photo, vis, result, view, view_h)
+
+    def _parts(self, result: dict[str, Any], scene: Any) -> list[Part]:
+        return parts_from_result(
+            result,
+            lambda px, h: scene.cam.pixel_to_plate(px, h),
+            self._head_r.get,
+            self._shapes.get,
+            self.m.picker.kind.aim,
+        )
+
+    def analyse_area(self, photo: Path, name: str, work: WorkArea) -> list[Part]:
+        """The model on one area of a photo (a bin's inside): everything else painted over, as
+        the tray is for sorting (same colour, same margin), the picture's size unchanged, so the
+        model sees the scale it was trained at. The photo's scene is read once and reused."""
+        if self.analyzer is None:
+            return []
+        scene = self._painted(self._scene(photo), work)
+        return self._parts(self.analyzer.analyse(scene, f"{photo}#{name}"), scene)
 
     def model_missing(self) -> str | None:
         """Why the parts cannot be found (no model), or None."""

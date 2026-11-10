@@ -112,10 +112,15 @@ class Layout:
         wb = self.work_bin()
         if wb is None:
             return self.cells_rect(self.work.x, self.work.y, self.work.w, self.work.d)
-        x0, y0, x1, y1 = self.cells_rect(wb.x, wb.y, wb.w, wb.d)
+        return self.bin_inside(wb)
+
+    def bin_inside(self, b: Bin) -> tuple[float, float, float, float]:
+        """Inside a bin's walls, without its code's shelf (printer X/Y): what the camera can
+        look into. A corner-post bin keeps all of it (its post: bin_keepout)."""
+        x0, y0, x1, y1 = self.cells_rect(b.x, b.y, b.w, b.d)
         inset = binspec.GAP_MM / 2 + binspec.WALL_MM
         x0, y0, x1, y1 = x0 + inset, y0 + inset, x1 - inset, y1 - inset
-        if wb.style == "corner":
+        if b.style == "corner":
             return x0, y0, x1, y1
         shelf = binspec.SHELF_DEPTH_MM
         return {
@@ -123,7 +128,15 @@ class Layout:
             90: (x0 + shelf, y0, x1, y1),
             180: (x0, y0 + shelf, x1, y1),
             270: (x0, y0, x1 - shelf, y1),
-        }[wb.rot % 360]
+        }[b.rot % 360]
+
+    def bin_keepout(self, b: Bin) -> tuple[float, float, float, float] | None:
+        """The corner post inside a corner-style bin (printer X/Y), or None."""
+        if b.style != "corner":
+            return None
+        mx, my = self.marker_centre(b)
+        h = binspec.POST_MM / 2
+        return mx - h, my - h, mx + h, my + h
 
     def surface_z(self) -> float:
         """Printer Z of the surface the parts lie on (plate frame z = 0): the tray's floor plus
@@ -139,11 +152,7 @@ class Layout:
     def work_keepout(self) -> tuple[float, float, float, float] | None:
         """The corner post inside a corner-style plate (printer X/Y), or None."""
         wb = self.work_bin()
-        if wb is None or wb.style != "corner":
-            return None
-        mx, my = self.marker_centre(wb)
-        h = binspec.POST_MM / 2
-        return mx - h, my - h, mx + h, my + h
+        return self.bin_keepout(wb) if wb is not None else None
 
     def in_work(self, xy: tuple[float, float], margin: float = 0.0) -> bool:
         x0, y0, x1, y1 = self.work_rect()
