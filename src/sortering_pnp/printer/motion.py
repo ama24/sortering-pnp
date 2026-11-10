@@ -283,19 +283,28 @@ class Motion:
         else:
             self.pins.turn(a)
 
-    def pick(self, x: float, y: float, z: float, angle_deg: float | None = None) -> None:
-        """Go to the part, descend slowly to z (tip height), grab, lift to the travel height."""
+    def pick(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        angle_deg: float | None = None,
+        top: float | None = None,
+    ) -> None:
+        """Go to the part, descend slowly to z (tip height), grab, lift to the travel height.
+        `top`: the part's top when z is below it (a cup going over it): slow from above that."""
         pk = self.m.picker
+        slow_from = max(z, top if top is not None else z) + pk.approach_mm
         self.travel(x, y)
         if angle_deg is not None and pk.kind.rotates:
             # the jaws close across the part: `angle_deg` = their closing direction (grip.py)
             self.turn(angle_deg)
-        self.move(z=z + pk.approach_mm)
+        self.move(z=slow_from)
         self.move(z=z, feed=pk.feed_z_slow)
         self.p.gcode("M400")  # the pins are not in Klipper's queue: wait for the moves first
         self.pins.grab()
         self.carrying = True  # gentler X until it is let go
-        self.move(z=z + pk.approach_mm, feed=pk.feed_z_slow)
+        self.move(z=slow_from, feed=pk.feed_z_slow)
         self.move(z=self.m.printer.travel_z)
 
     def drop(self, x: float, y: float, rim_z: float) -> None:
