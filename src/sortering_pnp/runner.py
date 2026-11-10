@@ -27,7 +27,7 @@ from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
 from .camera import mirrored, orientation, rotated
-from .config import Machine
+from .config import HOME_CORNERS, Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
 from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
@@ -1593,6 +1593,7 @@ class Runner:
         "limits_x",
         "limits_y",
         "limits_z",
+        "home_corner",
     )
 
     def _load_machine(self) -> None:
@@ -1646,6 +1647,10 @@ class Runner:
                 raise ValueError(f"unknown machine value {k!r}")
             if k == "travel_z":
                 new[k] = float(v)
+            elif k == "home_corner":
+                if v not in HOME_CORNERS:
+                    raise ValueError(f"home_corner must be one of {', '.join(HOME_CORNERS)}")
+                new[k] = v
             else:
                 vals = [float(x) for x in v]
                 position = k.endswith("_position")
@@ -1680,6 +1685,7 @@ class Runner:
             "required": self.require_setup,
             "complete": not self.setup.missing(),
             "machine": self.machine_values(),
+            "photo_z": self.motion.photo_z(),  # the Z photos are really taken at
             "homed_now": self._setup_homed,
             "picker_tried": sorted(self._setup_picker),
             "tool": self._tool,  # the mounted tool, as Klipper last said (None: not asked yet)
@@ -1765,6 +1771,21 @@ class Runner:
         if not li.enabled and "enabled" in values:
             self.setup.reset("lights")
         return self.setup_state()
+
+    def lights_preview(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Setup tab, Lights, while a bar moves: the colour on the LEDs at once, nothing saved
+        and only a small answer, as it comes many times a second. setup_lights() keeps it
+        when the bar is let go."""
+        li = self.m.lights
+        colour = str(values.get("colour", li.colour))
+        parse_hex(colour)
+        brightness = float(values.get("brightness", li.brightness))
+        if not 0 <= brightness <= 1:
+            raise ValueError("brightness must be 0..1")
+        li.colour, li.brightness = "#" + colour.strip().lstrip("#").lower(), brightness
+        if li.enabled:
+            self.lights.preview()
+        return {"colour": li.colour, "brightness": li.brightness, "shown": li.enabled}
 
     def setup_picker_drop(self, lower: bool) -> dict[str, Any]:
         """Over the bin: lower to rim + drop_mm before letting go, or let go at the travel
@@ -1861,16 +1882,29 @@ class Runner:
         self.note("homed from the Setup tab")
         return self.setup_state()
 
-    def setup_goto(self, target: str) -> list[float]:
-        """Show a position: the photo position, two corners of the limits, the plate centre."""
-        self._idle()
+    def _limit_corners(self) -> dict[str, tuple[float, float]]:
+        """The four corners of the soft limits, as tip X/Y. The corner the printer homes to
+        has the X and Y minimum (printer.home_corner); the others follow from it."""
         pc = self.m.printer
         ox, oy, _ = self.m.tool.offset
+        right, back = pc.home_corner.endswith("right"), pc.home_corner.startswith("back")
+        x = {"left": pc.limits_x[1] if right else pc.limits_x[0]}
+        x["right"] = pc.limits_x[0] if right else pc.limits_x[1]
+        y = {"front": pc.limits_y[1] if back else pc.limits_y[0]}
+        y["back"] = pc.limits_y[0] if back else pc.limits_y[1]
+        return {
+            f"{fb}_{lr}": (x[lr] + ox, y[fb] + oy)
+            for fb in ("front", "back")
+            for lr in ("left", "right")
+        }
+
+    def setup_goto(self, target: str) -> list[float]:
+        """Show a position: the photo position, a corner of the limits, the plate centre."""
+        self._idle()
         layout = self.layout()
         x0, y0, x1, y1 = layout.work_rect()
         spots = {
-            "front_left": (pc.limits_x[0] + ox, pc.limits_y[0] + oy),
-            "back_right": (pc.limits_x[1] + ox, pc.limits_y[1] + oy),
+            **self._limit_corners(),
             "centre": ((x0 + x1) / 2, (y0 + y1) / 2),
         }
         with self._lock:

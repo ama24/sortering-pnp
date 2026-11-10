@@ -224,7 +224,7 @@ menu, until every step of the **Setup** tab is checked:
    are ready); *Grab* / *Release* and, for tweezers, *Turn to 0°* / *90°* and the offset try it
    without moving. Put it on the head, then **OK** (`TOOL_PICKER`: sorting needs it). Choosing
    another type un-checks the step.
-5. **Tip height:** in the step: *Go to centre* (over the plate), the Z jog buttons and *Set
+5. **Tip height:** in the step: *Go to X/Y centre* (over the plate), the Z jog buttons and *Set
    height* on one row. Checks itself.
 6. **Lights:** colour and intensity of the LEDs (see [Lights](#lights)), shown at once; *OK*.
    *No lights* when there are none. Before the camera: its photos are taken with them.

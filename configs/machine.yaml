@@ -80,6 +80,7 @@ printer:
   limits_x: [0, 220]           # toolhead limits (soft limits, checked before every move)
   limits_y: [0, 220]
   limits_z: [0, 120]
+  home_corner: front_left     # the bed corner the printer homes to, its X/Y minimum (front_left | front_right | back_left | back_right)
   max_hotend_c: 50             # refuse to run while the hotend is hotter
   auto_home: true              # G28 when an axis is not homed
   home_macro: _SORTERING_HOME  # Z is homed over the middle of the working area (null: plain G28)
