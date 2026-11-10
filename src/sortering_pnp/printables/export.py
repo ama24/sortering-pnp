@@ -227,6 +227,10 @@ def catalogue(out: Path, log: Callable[[str], None] = print) -> list[Path]:
 
     for name, data in holder_files():  # the tweezers' turning stepper on the printer
         put(f"tool/{name}", data)
+    from .floatholder import holder_files as float_files
+
+    for name, data in float_files():  # the same, floating on a linear rail with springs
+        put(f"tool/{name}", data)
     for size in SIZES:
         cols, rows = plate_grid(size)
         per = cols * rows

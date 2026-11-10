@@ -1,0 +1,44 @@
+Floating tool holder (sortering-pnp print catalogue)
+
+The tool rides up a miniature linear rail when it hits the bed; two extension springs pull it
+back down onto a rest stop. For a JLCMC E-BMN12H-1-L100-Z0-P-M-E12.5 (MGN12H sizes: rail 12 x 8 x
+100, M3 holes every 25 mm; block 27 x 45.4, 4 x M3 on 20 x 20). The printer's interface and the
+motor's seat are the tool holder's: 2 x M3, 14 mm apart, into the 4.5 mm standoffs; NEMA 8,
+4 x M2 on a 16 mm square, Ø15.5 flange hole.
+
+Print, PETG or PLA, 0.4 mm nozzle, 0.2 mm layers, 4 walls, 40 % infill or more, no supports:
+- float_plate.stl: standing up as exported.
+- float_carriage.stl: standing on the motor's foot.
+- float_stop.stl: lying on its back.
+
+Screws: 2 x M3 (the printer's, as the tool holder: 4 mm of plate under the heads), 2 x M3 x 10
+self-tapping (rail, bottom holes), 2 x M3 x 16 self-tapping (stop block and rail, top holes),
+4 x M3 x 6 (90° piece to the block: 3.2 mm in its 3.5 mm threads), 4 x M2 x 5 (motor),
+4 x M3 self-tapping as spring posts: 2 x M3 x 18 in the ears, 2 x M3 x 12 in the plate.
+
+Fitting, in this order:
+1. The plate on the printer's standoffs, its two M3 screws in their counterbores (the heads
+   end under the rail). Two shims on the back rest on the head, as on the tool holder.
+2. The rail (with its block on it) in the groove, its foot end down in the notch of the ledge.
+   Slide the block up and screw the two bottom holes (M3 x 10 into the plate); slide it back
+   down onto the ledge.
+3. The stop block on the rail's two top holes: 2 x M3 x 16 through the block and the rail
+   into the plate. The block can now move 8 mm and no further.
+4. The 90° piece on the block: 4 x M3 x 6, heads in the counterbores (do it before the motor:
+   the motor covers them). It rests on the ledge.
+5. The motor on its foot as on the tool holder (4 x M2 x 5 from below), then the tool.
+6. The spring posts: M3 x 18 from the front into each ear (the tip ends just short of the
+   plate, so a hook can not slip off), M3 x 12 into the plate's hole for your springs, heads
+   about 6 mm proud. One spring each side, hooks on the screws' shanks.
+
+The plate's holes for each spring (Ø x length over the hooks), 2.5 mm closer than its length:
+  5 x 20.5: 34.5 mm above the plate's bottom
+  5.5 x 25.5: 29.5 mm above the plate's bottom
+  7 x 38: 17.0 mm above the plate's bottom
+  7 x 51: 4.0 mm above the plate's bottom
+The springs together must hold the moving part (90° piece, block, motor, tool: about 140 g)
+on the ledge: lift the tool by hand, it should snap back and not sag when the head moves fast.
+
+After fitting, redo Tip height and Camera to printer on the Setup tab: the tool's axis is
+22.4 mm further from the head than on the tool holder and 18.8 mm lower.
+Size: plate 48.5 wide x 111.1 high; it reaches 40 mm above the printer's screws.
