@@ -168,6 +168,20 @@ own sections (it sets `[stepper_y]` homing speeds, and the later value wins), `[
 commented out, the old picker include removed, backups kept, then FIRMWARE_RESTART unless
 Klipper prints. What can go wrong and what to do: README, *Klipper's config: what goes wrong*.
 
+What `install-pi.sh` does, in order (it first checks for 64-bit, Python 3.11 or 3.13 and 4 GB):
+
+| Step | What it does |
+|---|---|
+| System packages | Picamera2, rpicam-apps, gpiozero/lgpio, git (from apt) |
+| The picker's pins | hardware PWM on GPIO12/13 in `config.txt` (servos), and a udev rule that gives every PWM channel to the `gpio` group, so no sudo is needed |
+| The LEDs | SPI on (`dtparam=spi=on`), the Pi 4's core clock fixed so the LEDs' timing doesn't drift, you added to the `spi` group |
+| Python packages | a venv in the clone with the pinned versions (below), then a check that OpenCV, the CPU build of torch and the rest load |
+| Klipper's config | `sortering-pnp klipper`: copies `sortering_pnp.cfg` next to printer.cfg (an edited copy is kept as `.bak`); writes `[include sortering_pnp.cfg]` once, after your own sections and before the `#*# SAVE_CONFIG` block; comments out `[safe_z_home]` (lines starting `#sortering-pnp#`); removes the old `sortering_pnp_picker.cfg` include; keeps the old printer.cfg as `printer.cfg.sortering-<date>`; FIRMWARE_RESTART unless Klipper prints. Safe to run again |
+| `--service` | a systemd service that starts sortering-pnp at every boot (and resumes automatic mode if it was on) |
+
+Reboot once after the first install: the PWM and SPI settings are read at boot. The log:
+`journalctl -u sortering-pnp -f`.
+
 **Everything is pinned**, so installing again in a year gives exactly the same programs:
 - [requirements-pi.lock.txt](../requirements-pi.lock.txt) lists every Python package with its
   exact version **and a checksum of the file**. It's installed with `--no-deps --require-hashes`,
