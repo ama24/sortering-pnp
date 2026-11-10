@@ -127,8 +127,10 @@ class Layout:
 
     def surface_z(self) -> float:
         """Printer Z of the surface the parts lie on (plate frame z = 0): the tray's floor plus
-        the TPU sheet, or the TPU sheet on the bed in an older layout."""
-        if self.work_bin() is None:
+        the TPU sheet. An empty grid counts as having a tray too: every session starts with no
+        bins and the Tip step comes before Find bins, and both must mean the same height. Only
+        an older layout (bins, none of them the plate) has its TPU sheet on the bed."""
+        if self.work_marker is None and self.bins:
             return self.plate_thickness_mm
         return (
             self.bin_floor_mm + binspec.BASE_HEIGHT_MM + binspec.FLOOR_MM + self.plate_thickness_mm
