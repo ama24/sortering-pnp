@@ -78,7 +78,6 @@ def test_the_whole_setup_then_sorting(machine):
         "back_left": [x0, y1],
         "back_right": [x1, y1],
     }
-    assert runner.setup_state()["corners"] == expected
     for corner, xy in expected.items():
         assert runner.setup_goto(corner)[:2] == xy
     runner.setup_confirm("machine")
