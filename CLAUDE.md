@@ -53,7 +53,8 @@ another repository.
 - **Layout:** Gridfinity cells (42 mm) and bins (`layout.py`). The plate is a bin with role
   "work" (`work_marker`; a 3x3/4x4 tray): parts lie inside its walls, minus its shelf
   (`work_rect`; a corner tray keeps all of it, minus the post: `work_keepout`, used by
-  `in_work`), at `surface_z()` = tray floor + TPU sheet. `resync()` infers the grid origin
+  `in_work`), at `surface_z()` = tray floor + TPU sheet (also on an empty grid: the Tip step
+  comes before Find bins and must mean the same height). `resync()` infers the grid origin
   from the seen bins (any position on the bed), places bins with their `rot` and keeps each
   one's measured centre (`Bin.seen`: parts are dropped there, `Layout.drop_centre`; bins loose on
   the bed are off the grid), keeps unseen bins'

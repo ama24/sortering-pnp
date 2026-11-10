@@ -1313,14 +1313,15 @@ class Runner:
                 self.m.tool.offset[2] = float(d["offset_z"])
 
     def tip_touches_plate(self) -> dict[str, Any]:
-        """The tip was jogged down until it just touches the TPU plate: from now on that is the
-        plate's height, whatever Z the homing gives (see "Homing" in docs/reference.md)."""
+        """The tip was jogged down until it just touches the TPU sheet in the tray: from now on
+        that is `surface_z()`, whatever Z the homing gives (see "Homing" in docs/reference.md)."""
         self._idle()
         layout = self.layout()
         with self._lock:
             pos = self.printer.status(None).position
             self.motion.tip = None
-        offset_z = round(layout.surface_z() - pos[2], 3)
+        surface = round(layout.surface_z(), 3)
+        offset_z = round(surface - pos[2], 3)
         p = self.m.path(self.m.paths.tool)
         assert p is not None
         write_json(
@@ -1328,15 +1329,17 @@ class Runner:
             {
                 "offset_z": offset_z,
                 "toolhead_z": pos[2],
+                "surface_z": surface,  # the printer Z the touched surface was taken to be
                 "measured": time.strftime("%Y-%m-%d %H:%M:%S"),
             },
         )
         self.m.tool.offset[2] = offset_z
         self.setup.mark("tip", f"offset {offset_z:+.2f} mm")
         self.note(
-            f"tip height: touches the plate at toolhead Z {pos[2]:.2f} (offset {offset_z:+.2f} mm)"
+            f"tip height: touches the plate (Z {surface:.2f}) at toolhead Z {pos[2]:.2f} "
+            f"(offset {offset_z:+.2f} mm)"
         )
-        return {"offset_z": offset_z, "toolhead_z": pos[2]}
+        return {"offset_z": offset_z, "toolhead_z": pos[2], "surface_z": surface}
 
     def _pick(self, plan: Plan, layout: Layout) -> None:
         p, b = plan.part, plan.bin
@@ -1352,7 +1355,10 @@ class Runner:
         x, y = p.grip_bed if p.grip_method != "centre" else p.bed_xy
         jaws = jaw_angle(p.bed_angle, pk.rotate_offset_deg)
         name = p.cls + (f"x{p.length_mm:g}" if p.length_mm is not None else "")
-        self.note(f"pick {name} at ({x:.1f}, {y:.1f}) -> bin {b.marker} ({plan.reason})")
+        self.note(
+            f"pick {name} at ({x:.1f}, {y:.1f}) Z{z:.2f} (top {p.top_mm:.1f}) "
+            f"-> bin {b.marker} ({plan.reason})"
+        )
         turn = f", jaws {jaws:.0f}°" if pk.kind.rotates else ""
         self.phase(f"picking {name} at X{x:.0f} Y{y:.0f}{turn}, for bin {layout.bin_name(b)}")
         self.motion.message(f"pick {name}")

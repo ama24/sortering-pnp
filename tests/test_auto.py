@@ -5,12 +5,14 @@ from __future__ import annotations
 import time
 
 import numpy as np
+import pytest
 
+from sortering_pnp.io import read_json
 from sortering_pnp.layout import Layout
 from sortering_pnp.parts import Part
 from sortering_pnp.printer.sim import SimPart, SimPrinter, SimVision, SimWorld
 from sortering_pnp.runner import Runner, same_parts
-from sortering_pnp.strategies import Planner
+from sortering_pnp.strategies import Plan, Planner
 from sortering_pnp.transform import Transform2D
 
 
@@ -142,6 +144,35 @@ def test_tip_touches_plate(machine):
     again, _, _, _ = make(machine, n=0)  # read back at start
     assert machine.tool.offset[2] == res["offset_z"]
     assert again.snapshot()["tip_offset_z"] == res["offset_z"]
+
+
+def test_tip_height_set_before_the_bins_are_found_counts_from_the_tray(machine):
+    """The usual order: a new session (no bins), the Tip step, then Find bins. The floor that
+    was touched must be the floor the picks aim at."""
+    machine.picker.set_type("suction")
+    runner, world, printer, lay = make(machine, n=0)
+    runner.fresh_session()
+    assert runner.layout().bins == []
+    printer.gcode("G28\nG1 X100 Y100 Z3.2")
+    res = runner.tip_touches_plate()
+    assert res["surface_z"] == round(lay.surface_z(), 3)
+    assert read_json(machine.path(machine.paths.tool))["surface_z"] == res["surface_z"]
+
+    lay.save(machine.path(machine.paths.layout))  # Find bins: the tray is the plate now
+    runner._layout_cache = None
+    layout = runner.layout()
+    assert layout.work_bin() is not None
+    screw = P("DIN912_M4", 16.0, (100.0, 100.0), 1)
+    screw.top_mm = 7.0  # the head's diameter: lying on its side
+    plan = Plan("pick", part=screw, bin=layout.bins[0], reason="test")
+    with runner._lock:
+        runner.motion.preflight(home=True)
+        printer.log.clear()
+        runner._pick(plan, layout)
+    zs = [float(w[1:]) for ln in printer.log for w in ln.split() if ln[:2] == "G1" and w[0] == "Z"]
+    assert min(zs) == pytest.approx(3.2 + 7.0 - machine.picker.depth_mm, abs=0.01)
+    line = next(e for e in runner.events if "pick DIN912_M4x16" in e)
+    assert f"Z{layout.surface_z() + 6.5:.2f}" in line and "top 7.0" in line
 
 
 def test_same_parts():

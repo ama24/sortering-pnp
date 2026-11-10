@@ -225,7 +225,8 @@ menu, until every step of the **Setup** tab is checked:
    without moving. Put it on the head, then **OK** (`TOOL_PICKER`: sorting needs it). Choosing
    another type un-checks the step.
 5. **Tip height:** in the step: *Go to centre* (over the plate), the Z jog buttons and *Set
-   height* on one row. Checks itself.
+   height* on one row. The tray with its TPU sheet must be under the tip: the height counts
+   from that sheet, also while no bins are known yet. Checks itself.
 6. **Lights:** colour and intensity of the LEDs (see [Lights](#lights)), shown at once; *OK*.
    *No lights* when there are none. Before the camera: its photos are taken with them.
 7. **Camera to printer:** in the step: *Take photo* (the codes circled on it and listed with
