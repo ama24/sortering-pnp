@@ -55,7 +55,7 @@ another repository.
   (`work_rect`; a corner tray keeps all of it, minus the post: `work_keepout`, used by
   `in_work`), at `surface_z()` = tray floor + TPU sheet. `resync()` infers the grid origin
   from the seen bins (any position on the bed), places bins with their `rot` and keeps each
-  one's measured centre (`Bin.seen`: parts are dropped there, `Layout.drop_centre`; bins loose on
+  one's measured centre (`Bin.seen` and its exact turn `Bin.yaw`: parts are dropped at `Layout.drop_centre`, the middle of the open cavity, which for a shelf bin is half the shelf depth (7 mm) nearer the front than the centre; bins loose on
   the bed are off the grid), keeps unseen bins'
   settings in `away`, and picks the biggest bin as the plate unless `work_auto` is False (chosen
   by hand). Run start never re-chooses the plate. Old layouts without a plate bin use `work`

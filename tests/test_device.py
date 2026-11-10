@@ -86,7 +86,7 @@ def test_layout_changes_are_used_from_the_next_pick(machine):
     runner.wait(30)
     assert runner.state.status == "done"
     assert any("layout changes applied" in e for e in runner.events)
-    cx, cy = runner.layout().bin_centre(runner.layout().bin_by_marker(109))
+    cx, cy = runner.layout().drop_centre(runner.layout().bin_by_marker(109))  # cavity middle
     assert any(abs(x - cx) < 1 and abs(y - cy) < 1 for _, (x, y) in world.dropped)
 
 
