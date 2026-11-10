@@ -35,6 +35,36 @@ def until(cond, timeout: float = 30.0) -> bool:
     return False
 
 
+def _shots_before_first_pick(machine, homed: bool) -> int:
+    machine.run.startup_check = False
+    machine.standby.interval_s = 60.0
+    runner, world, printer, lay = make(machine, n=2)
+    if homed:
+        printer.gcode("G28")
+    before: list[int] = []
+    real = runner.take_shot
+
+    def counted(*args, **kw):
+        if len(world.parts) == 2:
+            before.append(1)
+        return real(*args, **kw)
+
+    runner.take_shot = counted
+    runner.command("auto")
+    assert until(lambda: len(world.dropped) >= 1, 30)
+    runner.command("stop")
+    runner.wait(30)
+    return len(before)
+
+
+def test_automatic_run_starts_from_the_standby_photo(machine):
+    assert _shots_before_first_pick(machine, homed=True) == 1
+
+
+def test_automatic_run_looks_again_when_it_must_home_first(machine):
+    assert _shots_before_first_pick(machine, homed=False) == 2
+
+
 def test_automatic_mode_sorts_waits_and_sorts_new_parts(machine):
     machine.standby.interval_s = 0.2
     machine.standby.motors_off = True  # (off by default: homing stops the bed sharply)
