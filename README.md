@@ -133,8 +133,8 @@ See [prints/README.md](prints/README.md) for which files to print and how.
 
 ## Install
 
-1. **Install Klipper, Moonraker and Mainsail** (skip this if you flashed the MainsailOS image: they
-   are already there). On a fresh 64-bit Raspberry Pi OS, with [KIAUH](https://github.com/dw-0/kiauh):
+1. **Install Klipper, Moonraker and Mainsail.** Skip this if you flashed the MainsailOS image.
+   On a fresh 64-bit Raspberry Pi OS:
 
    ```bash
    sudo apt-get install -y git
@@ -142,30 +142,60 @@ See [prints/README.md](prints/README.md) for which files to print and how.
    ~/kiauh/kiauh.sh
    ```
 
-   In its menu choose **Install**, then **Klipper**, **Moonraker** and **Mainsail** one after
-   the other (the defaults are fine). Then make Klipper drive your printer:
-   - **Firmware:** the settings for your board are at the top of its example config in
-     `~/klipper/config/` (`ls ~/klipper/config | grep -i ender3`). Choose them in
-     `cd ~/klipper && make clean && make menuconfig`, then `make`. A 32-bit board (e.g.
-     Creality 4.2.x) takes `out/klipper.bin` from an SD card. An older 8-bit board (e.g. the
-     Ender 3's 1.1.x, ATmega1284p, 16 MHz) is flashed over USB:
-     `sudo service klipper stop && make flash FLASH_DEVICE=$(ls /dev/serial/by-id/* | head -1) && sudo service klipper start`.
-   - **printer.cfg:** replace KIAUH's placeholder with that example, keeping its first line, e.g.
-     for an Ender 3 with the 1.1.x board:
+   In the menu choose **Install**, then **Klipper**, **Moonraker** and **Mainsail** (defaults
+   are fine).
+
+2. **Build the printer's firmware.** Find your board's example config; the settings to choose
+   are at its top:
+
+   ```bash
+   ls ~/klipper/config | grep -i ender3
+   ```
+
+   Choose those settings, then build:
+
+   ```bash
+   cd ~/klipper && make clean && make menuconfig
+   make
+   ```
+
+   - **32-bit board** (e.g. Creality 4.2.x): copy `out/klipper.bin` to an SD card and start the
+     printer with it.
+   - **8-bit board** (e.g. the Ender 3's 1.1.x): flash it over USB:
 
      ```bash
-     cd ~/printer_data/config && mv printer.cfg printer.cfg.kiauh
-     { echo "[include mainsail.cfg]"; cat ~/klipper/config/printer-creality-ender3-2018.cfg; } > printer.cfg
+     sudo service klipper stop
+     make flash FLASH_DEVICE=$(ls /dev/serial/by-id/* | head -1)
+     sudo service klipper start
      ```
 
-     Keep that first line `[include mainsail.cfg]`: Mainsail's buttons and macros need it.
-     Then set `[mcu] serial:` to what `ls /dev/serial/by-id/*` shows (Mainsail, *Machine* tab),
-     the whole `/dev/serial/by-id/usb-...` path, not `/dev/ttyUSB0` (that one can change).
-   - **Check:** in Mainsail the printer is *Ready*; `STEPPER_BUZZ STEPPER=stepper_x` (and `_y`,
-     `_z`) moves each motor +1 mm first; `QUERY_ENDSTOPS` shows each switch; then home.
+3. **Make printer.cfg.** For an Ender 3 with the 1.1.x board:
 
-   More in [Klipper's installation guide](https://www.klipper3d.org/Installation.html).
-2. **Install sortering-pnp:**
+   ```bash
+   cd ~/printer_data/config && mv printer.cfg printer.cfg.kiauh
+   { echo "[include mainsail.cfg]"; cat ~/klipper/config/printer-creality-ender3-2018.cfg; } > printer.cfg
+   ```
+
+   Find the printer's port:
+
+   ```bash
+   ls /dev/serial/by-id/*
+   ```
+
+   In Mainsail (*Machine* tab), open printer.cfg and put that whole path after `[mcu] serial:`.
+
+4. **Check the printer.** Mainsail shows *Ready*. In Mainsail's console:
+
+   ```
+   STEPPER_BUZZ STEPPER=stepper_x
+   STEPPER_BUZZ STEPPER=stepper_y
+   STEPPER_BUZZ STEPPER=stepper_z
+   QUERY_ENDSTOPS
+   ```
+
+   Each motor moves; each switch is listed. Then home.
+
+5. **Install sortering-pnp:**
 
    ```bash
    git clone https://github.com/ama24/sortering-pnp.git ~/sortering-pnp
@@ -173,49 +203,31 @@ See [prints/README.md](prints/README.md) for which files to print and how.
    sudo reboot
    ```
 
-   The script checks the system (64-bit, Python 3.11 or 3.13, 4 GB), then, in one go:
+6. **Check it:**
 
-   | Step | What it does |
-   |---|---|
-   | System packages | Picamera2, rpicam-apps, gpiozero/lgpio, git (from apt) |
-   | The picker's pins | turns on hardware PWM on GPIO12/13 in `config.txt` (servos), and a udev rule that gives every PWM channel to the `gpio` group, so no sudo is needed |
-   | The LEDs | turns on SPI (`dtparam=spi=on`), fixes the Pi 4's core clock so the LEDs' timing doesn't drift, adds you to the `spi` group |
-   | Python packages | a venv in the clone with **exact, checked versions** of every package (`requirements-pi.lock.txt`, with hashes): an install today and one next year give the same program. It then checks that OpenCV, the CPU build of torch and the rest load |
-   | Klipper's config | `sortering-pnp klipper` (see step 3) |
-   | `--service` | a systemd service that starts sortering-pnp at every boot (and resumes automatic mode if it was on) |
+   ```bash
+   ~/sortering-pnp/.venv/bin/sortering-pnp check
+   ```
 
-   Nothing else is downloaded: the camera, calibration and measuring code are part of
-   sortering-pnp, and the model is uploaded later in the web page. **Reboot once** after the first
-   install: the PWM and SPI settings are read at boot.
-   `~/sortering-pnp/.venv/bin/sortering-pnp check` tests the set-up; `journalctl -u sortering-pnp -f`
-   shows the log.
-3. **Klipper is set up by the script too** (its step "Klipper: sortering_pnp.cfg and
-   printer.cfg"; on its own: `~/sortering-pnp/.venv/bin/sortering-pnp klipper`, safe to run
-   again). It:
-   - copies `klipper/sortering_pnp.cfg` next to `printer.cfg` (an edited copy is kept as
-     `sortering_pnp.cfg.bak`);
-   - writes `[include sortering_pnp.cfg]` into `printer.cfg` **once**, **after your own sections**
-     and before Klipper's `#*# SAVE_CONFIG` block (sortering_pnp.cfg slows Y homing: `[stepper_y]
-     homing_speed: 20`, and in Klipper the later value wins);
-   - comments out `[safe_z_home]` (lines starting `#sortering-pnp#`), removes the include of the
-     old `sortering_pnp_picker.cfg`;
-   - keeps the old file as `printer.cfg.sortering-<date>`, then restarts Klipper
-     (FIRMWARE_RESTART; not while it prints).
+7. **Open the page** on your phone or PC and create an account:
 
-   Lines marked **!!** are what it can't fix: see
-   [Klipper's config: what goes wrong](#klippers-config-what-goes-wrong). Mainsail should then
-   say *Ready*. That is all Klipper needs: the picker and the lights aren't in Klipper at all,
-   sortering-pnp switches the Pi's pins itself.
-4. **Open the page:** `http://<your-pi>:8080` on your phone or PC. The first visit asks you to
-   create an account.
+   ```
+   http://<your-pi>:8080
+   ```
 
-From now on **sortering-pnp is the only program that moves the printer**. Even the camera
-calibration photos are taken from its page.
+Something wrong? See the two tables below. What the install script does:
+[docs/reference.md](docs/reference.md#installing-and-the-pinned-versions).
 
 ### Klipper's config: what goes wrong
 
-Everything we ran into, with what to do. `sortering-pnp klipper` fixes the first four itself
-and warns about the rest; Mainsail's console shows Klipper's own message.
+Everything we ran into, with what to do. Mainsail's console shows Klipper's own message.
+"Run `sortering-pnp klipper`" in the table means:
+
+```bash
+~/sortering-pnp/.venv/bin/sortering-pnp klipper
+```
+
+It fixes the first four itself and warns about the rest.
 
 | You see | Why | Do |
 |---|---|---|
@@ -223,8 +235,8 @@ and warns about the rest; Mainsail's console shows Klipper's own message.
 | Y homing is still fast | the include stands **before** `[stepper_y]`, so printer.cfg's `homing_speed` wins | run `sortering-pnp klipper`: it moves the include after your sections |
 | *homing_override and safe_z_home cannot be used simultaneously* | printer.cfg has `[safe_z_home]`; sortering_pnp.cfg brings `[homing_override]` (Z homes over the plate, never over a bin) | run `sortering-pnp klipper`: it comments `[safe_z_home]` out |
 | *Unable to open config file sortering_pnp_picker.cfg* | an older version put the picker in Klipper; it is on the Pi's pins now | run `sortering-pnp klipper`: it removes that include (the file can go too) |
-| *Option 'step_pin' in section 'stepper_y' must be specified*, or a printer with no axes | printer.cfg is still **KIAUH's placeholder**; sortering_pnp.cfg only adds to your printer's sections | copy your printer's example into printer.cfg ([Install](#install), step 1), keep `[include mainsail.cfg]` as its first line, run `sortering-pnp klipper` |
-| *mcu 'mcu': Unable to connect* | `[mcu] serial:` is empty, a placeholder (`<your-mcu-id>`) or `/dev/ttyUSB0` that moved | `ls /dev/serial/by-id/*`, write that whole path, FIRMWARE_RESTART; the printer must be on |
+| *Option 'step_pin' in section 'stepper_y' must be specified*, or a printer with no axes | printer.cfg is still **KIAUH's placeholder**; sortering_pnp.cfg only adds to your printer's sections | copy your printer's example into printer.cfg ([Install](#install), step 3), keep `[include mainsail.cfg]` as its first line, run `sortering-pnp klipper` |
+| *mcu 'mcu': Unable to connect* | `[mcu] serial:` is empty, a placeholder (`<your-mcu-id>`) or `/dev/ttyUSB0` that moved | find the port as in [Install](#install) step 3, write that whole path, FIRMWARE_RESTART; the printer must be on |
 | *SAVE_CONFIG section ... conflicts with included value* | a setting that SAVE_CONFIG writes (e.g. `[input_shaper]`, `[stepper_z] position_endstop`) was put in sortering_pnp.cfg | keep those in printer.cfg only; sortering_pnp.cfg has none of them |
 | The tool variable is lost, or another program's saved variables are | two `[save_variables]` (Klipper keeps one file) | delete the one in printer.cfg (the warning says so) |
 | No *Screw sorter* menu on the printer's screen | no `[display]` in printer.cfg (the Ender 3 V2's DWIN screen can't show Klipper menus) | optional: the web page does everything |
@@ -239,7 +251,7 @@ Never edit printer.cfg's `#*#` block by hand: Klipper's SAVE_CONFIG writes it.
 
 | You see | Do |
 |---|---|
-| *the Pi's pins cannot be used: Permission denied: /sys/class/pwm/...* | run `./install-pi.sh --service` again (it adds the PWM udev rule), then reboot once |
+| *the Pi's pins cannot be used: Permission denied: /sys/class/pwm/...* | run the install script again, as in [Updating](#updating) (it adds the PWM udev rule), then reboot once |
 | The page says PWM or SPI is missing | reboot once after the install: `config.txt` is read at boot |
 | *settings drifted during capture: AnalogueGain ...* | update: sortering-pnp now keeps gain, exposure and focus inside what the sensor can do (the Camera Module 3 has no gain below 1.12) |
 
@@ -587,7 +599,11 @@ The install script brings everything to the versions this release was tested wit
 `sortering_pnp.cfg` into Klipper (restarting it when something changed) and restarts
 sortering-pnp. If it says so at the end, reboot once (new pin or SPI settings).
 
-For a change in the program only, `git pull && sudo systemctl restart sortering-pnp` is enough.
+For a change in the program only, this is enough:
+
+```bash
+cd ~/sortering-pnp && git pull && sudo systemctl restart sortering-pnp
+```
 
 ---
 
