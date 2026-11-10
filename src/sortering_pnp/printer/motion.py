@@ -252,12 +252,18 @@ class Motion:
         return pc.photo_position[2]
 
     def photo_position(self) -> None:
+        """Park for a photo. M400 ends when the moves do, but the bed still shakes for a moment
+        after a stop: printer.photo_settle_s of stillness follows every real move."""
         x, y, _ = self.m.printer.photo_position
         z = self.photo_z()
+        before = self.current_tip()
         self.travel(x, y)
         if abs(self.current_tip()[2] - z) > 1e-6:
             self.move(z=z)
         self.p.gcode("M400")
+        settle = self.m.printer.photo_settle_s
+        if settle > 0 and before != self.current_tip():
+            self.p.gcode(f"G4 P{round(settle * 1000)}\nM400")  # M400: really wait for the dwell
 
     def change_position(self) -> None:
         """Where the head waits while the picker is put on (printer.change_position)."""
