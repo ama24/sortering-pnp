@@ -1,30 +1,30 @@
-"""Floating tool holder: the tool rides up on a miniature linear rail when it hits the bed, two
-extension springs pull it back down (like a pick-and-place head). Same printer interface as
-toolholder.py (2 x M3, 14 mm apart, into two 4.5 mm standoffs) and the same motor seat (NEMA 8
-size: M2 holes on a 16 mm square, a Ø15 flange through the plate).
+"""Floating tool holder: the tool rides up on a miniature linear rail when it hits the bed (or a
+pile of parts), two extension springs pull it back down. Same printer interface as toolholder.py
+(2 x M3, 14 mm apart, into two 4.5 mm standoffs) and the same motor seat (NEMA 8 size: M2 holes on
+a 16 mm square, a Ø15 flange through the plate).
 
 The rail: JLCMC E-BMN12H-1-L100-Z0-P-M-E12.5 (MGN12H sizes: rail 12 x 8, 100 long, M3 holes every
-25 mm, 12.5 from each end; block 27 wide, 45.4 long, 13 from the rail's foot to its top, 4 x M3
-on 20 x 20). Three printed parts:
+25 mm, 12.5 from each end; block 27 wide, 45.4 long, 13 from the rail's foot to its top, 3 from
+the rail's foot to its underside, 4 x M3 on 20 x 20). Two printed parts:
 
-- The plate, on the printer. Its two M3 screws sit in counterbores, the heads under the rail.
-  The rail lies in a shallow groove (straight), its foot end in a notch of the ledge at the
-  bottom; M3 self-tapping screws hold it. The ledge is the rest stop: the 90° piece sits on it.
-  Two shims on the back, as on the tool holder, rest on the head.
-- The 90° piece, on the carriage (4 x M3 into the block). The motor stands on its foot as on
-  the tool holder. Its ears at the top carry the moving spring posts.
-- The stop block, on the rail's two top holes: the 90° piece hits it after `travel`, so the
-  carriage never leaves the rail and the springs are never over-stretched.
+- The plate, on the printer: the printer's two M3 screws sunk in it; the rail on a strip as wide
+  and long as itself (so the springs fit between the plate and the block), held by 4 x M3
+  self-tapping screws; a column under the block (the rest stop); the lower spring screws; and
+  holes for Ø2.5 x 10 dowel pins, the top stop, pressed in where the travel should end.
+- The L, on the block: its top on the block (4 x M3), the motor on its foot further down (so it
+  does not cover those screws), and on top an overhang over the block's end that reaches back
+  towards the printer beside the rail: each spring's hook sits in a slot there, and a screw
+  from the front goes through the overhang and the hook.
 
-Two extension springs, one each side of the carriage, hang from M3 screws: in the ears (the
-moving posts) and in the plate (one hole per spring length in SPRINGS: use the one that fits).
+The two springs (5.5 x 25.5) hang behind the block, one each side of the rail.
 
 Built where it sits: x across, y away from the printer (the plate's back at y = 0), z up (the
-90° piece's foot, at rest, at z = 0).
+block's lower end, at rest on the column, at z = 0).
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from manifold3d import CrossSection, Manifold, OpType
@@ -32,39 +32,34 @@ from manifold3d import CrossSection, Manifold, OpType
 from .meshio import Mesh
 from .toolholder import SEG, _rounded_rect, _teardrop_y
 
-# the extension springs it takes: (outside Ø, length over the hooks), mm
-SPRINGS: tuple[tuple[float, float], ...] = ((5.0, 20.5), (5.5, 25.5), (7.0, 38.0), (7.0, 51.0))
-
 
 @dataclass(frozen=True)
 class FloatHolder:
     # the printer's interface (as toolholder.ToolHolder)
-    m3_pitch: float = 14.0  # the two M3 screws, centre to centre
-    m3_d: float = 3.4  # clearance for M3
+    m3_pitch: float = 14.0
+    m3_d: float = 3.4
     m3_head_d: float = 6.5  # counterbore: an M3 socket head (Ø5.5) sinks in
-    m3_clamp: float = 4.0  # plate left under the heads: the same screws as the tool holder's
-    m3_z: float = 60.0  # the printer's screws, above the 90° piece's foot
+    m3_clamp: float = 4.0  # plate under the heads: the tool holder's screws still reach
+    m3_z: float = 12.0  # the printer's screws: behind the block, below the springs
     standoff_h: float = 4.5
     standoff_d: float = 6.5
-    above_room: float = 7.4  # the head's face above the screws
-    below_room: float = 15.0  # and below them
+    above_room: float = 7.4
+    below_room: float = 15.0
     shim_h: float = 4.0
     room_play: float = 0.4
     # the rail and its block (E-BMN12H = MGN12H sizes)
     rail_w: float = 12.0
     rail_h: float = 8.0
     rail_len: float = 100.0
-    rail_pitch: float = 25.0  # M3 holes
-    rail_end: float = 12.5  # first hole from each end (E12.5)
-    rail_drop: float = 1.5  # the rail's foot end below the rest: the block stops before it
-    groove: float = 0.6  # the rail lies this deep in the plate
-    groove_play: float = 0.3  # on the width
+    rail_pitch: float = 25.0
+    rail_end: float = 12.5
+    rail_drop: float = 1.5  # the rail's foot end sits this far down in the column
     car_w: float = 27.0
     car_l: float = 45.4
-    car_h: float = 13.0  # rail's foot to the block's top
+    car_h: float = 13.0
     car_gap: float = 3.0  # rail's foot to the block's underside
-    car_pitch: float = 20.0  # 4 x M3 on this square
-    car_thread: float = 3.5  # thread depth in the block
+    car_pitch: float = 20.0
+    car_thread: float = 3.5
     tap_d: float = 2.5  # pilot hole for an M3 self-tapping screw
     # the motor (as the tool holder)
     motor_w: float = 20.0
@@ -76,38 +71,57 @@ class FloatHolder:
     flange_d: float = 15.0
     flange_play: float = 0.5
     body_play: float = 0.6
-    # the 90° piece
-    leg_t: float = 6.0  # on the block
-    car_head_d: float = 6.2  # counterbores for the block's M3 heads
-    car_clamp: float = 2.8  # leg left under them: M3 x 6 reaches 3.2 mm into the block
-    base_t: float = 4.5  # the motor's foot
+    # the L
+    leg_t: float = 4.5  # M3 x 8 into the block: 3.5 mm of thread
+    m3_head: float = 5.5  # the block's screw heads stand on the leg's front
+    key_room: float = 1.0  # from the motor's top to those heads: a hex key's way in
+    base_t: float = 4.5
     rib_t: float = 2.5
     rib_h: float = 20.0
-    ear_h: float = 8.0
-    edge: float = 2.5
-    corner_r: float = 2.0
+    lid_h: float = 7.0  # the overhang over the block's top end
+    lid_play: float = 0.3  # above the block's end
+    corner_r: float = 1.5
     # springs and stops
-    travel: float = 8.0  # how far the tool can rise
-    spring_y: float = 12.0  # the springs' axis, from the plate's back
-    spring_play: float = 1.0  # from the block's side to the widest spring
-    post_short: float = (
-        2.5  # posts this much closer than the spring's length: a little stretch at rest
-    )
-    ledge_play: float = 0.5  # the block stays this far above the ledge (the 90° piece rests on it)
-    plate_t: float = 8.0
-    stop_t: float = 10.0  # the stop block, on the rail's top
-    stop_w: float = 20.0
-    stop_clamp: float = 3.0  # block left under its screws' heads
+    spring_od: float = 5.5
+    spring_len: float = 25.5  # over the hooks
+    spring_play: float = 0.5  # round each spring
+    post_short: float = 2.5  # screws this much closer than the spring's length
+    slot_w: float = 2.0  # the hook's slot in the overhang
+    dowel_d: float = 2.4  # Ø2.5 dowel pins, pressed
+    dowel_in: float = 4.8  # hole depth: 5 mm of a 10 mm pin stands out
+    travels: tuple[float, ...] = (10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0)
+    column_h: float = 8.0  # under the block
+    plate_edge: float = 1.5  # beyond the block's sides
+    plate_t: float = 7.2  # beside the strip: the printer's screw heads sink in it
 
-    # ---- where things are
+    # ---- the springs' room
+    @property
+    def strip_h(self) -> float:
+        """The strip under the rail: what the springs lack between the plate and the block."""
+        return self.spring_od + 2 * self.spring_play - self.car_gap
+
     @property
     def rail_y0(self) -> float:
-        return self.plate_t - self.groove
+        return self.plate_t + self.strip_h
 
     @property
     def rail_y1(self) -> float:
         return self.rail_y0 + self.rail_h
 
+    @property
+    def spring_x(self) -> float:
+        """Half-way between the rail's side and the block's."""
+        return (self.rail_w / 2 + self.car_w / 2) / 2
+
+    @property
+    def spring_y(self) -> float:
+        return self.plate_t + self.spring_play + self.spring_od / 2
+
+    @property
+    def spring_r(self) -> float:
+        return self.spring_od / 2 + self.spring_play
+
+    # ---- the rail and the block
     @property
     def rail_z0(self) -> float:
         return -self.rail_drop
@@ -126,12 +140,48 @@ class FloatHolder:
 
     @property
     def leg_y0(self) -> float:
-        """The 90° piece's back: on the block's top."""
         return self.rail_y0 + self.car_h
 
     @property
     def leg_y1(self) -> float:
         return self.leg_y0 + self.leg_t
+
+    def car_holes(self) -> list[tuple[float, float]]:
+        h, zc = self.car_pitch / 2, self.car_l / 2
+        return [(sx * h, zc + sz * h) for sx in (-1, 1) for sz in (-1, 1)]
+
+    # ---- the L
+    @property
+    def lid_z0(self) -> float:
+        return self.car_l + self.lid_play
+
+    @property
+    def lid_z1(self) -> float:
+        return self.lid_z0 + self.lid_h
+
+    @property
+    def lid_y0(self) -> float:
+        """The overhang's back, just off the plate's face."""
+        return self.plate_t + 0.5
+
+    @property
+    def post_z(self) -> float:
+        """The upper spring screws, through the overhang."""
+        return self.lid_z0 + 3.2
+
+    @property
+    def low_post_z(self) -> float:
+        return self.post_z - (self.spring_len - self.post_short)
+
+    @property
+    def base_z(self) -> float:
+        """The motor's foot (its underside): the motor's top stays under the block's screws."""
+        low = min(z for _, z in self.car_holes())
+        return low - self.m3_head / 2 - self.key_room - self.motor_l - self.base_t
+
+    @property
+    def leg_half(self) -> float:
+        return self.car_w / 2 + 0.5
 
     @property
     def motor_y(self) -> float:
@@ -139,60 +189,33 @@ class FloatHolder:
 
     @property
     def base_y1(self) -> float:
-        return self.motor_y + self.motor_pitch / 2 + self.m2_head_d / 2 + self.edge
+        return self.motor_y + self.motor_pitch / 2 + self.m2_head_d / 2 + 2.0
 
+    def m2_spots(self) -> list[tuple[float, float]]:
+        h = self.motor_pitch / 2
+        return [(sx * h, self.motor_y + sy * h) for sx in (-1, 1) for sy in (-1, 1)]
+
+    # ---- the plate
     @property
-    def leg_half(self) -> float:
-        """Half the 90° piece's width: the block's screw heads, then a rib each side."""
-        return self.car_pitch / 2 + self.car_head_d / 2 + 1.0 + self.rib_t
-
-    @property
-    def spring_x(self) -> float:
-        return self.car_w / 2 + self.spring_play + max(od for od, _ in SPRINGS) / 2
-
-    @property
-    def ear_half(self) -> float:
-        return self.spring_x + self.tap_d / 2 + 3.0
-
-    @property
-    def post_z(self) -> float:
-        """The moving posts (in the ears), at rest."""
-        return self.car_l - self.ear_h / 2
-
-    def plate_post_z(self, length: float) -> float:
-        return self.post_z - (length - self.post_short)
+    def plate_half(self) -> float:
+        return self.car_w / 2 + self.plate_edge
 
     @property
     def plate_z0(self) -> float:
-        return min(self.plate_post_z(n) for _, n in SPRINGS) - 4.0
+        return -self.column_h
 
     @property
     def plate_z1(self) -> float:
         return self.rail_z1 + 1.5
 
-    @property
-    def plate_half(self) -> float:
-        return self.ear_half + 2.0
-
-    @property
-    def ledge_half(self) -> float:
-        return self.car_w / 2 + 0.3
-
-    @property
-    def stop_z0(self) -> float:
-        return self.car_l + self.travel
-
-    @property
-    def stop_z1(self) -> float:
-        return self.rail_holes()[-1] + 6.0
-
-    def car_holes(self) -> list[tuple[float, float]]:
-        h, zc = self.car_pitch / 2, self.car_l / 2
-        return [(sx * h, zc + sz * h) for sx in (-1, 1) for sz in (-1, 1)]
-
-    def m2_spots(self) -> list[tuple[float, float]]:
-        h = self.motor_pitch / 2
-        return [(sx * h, self.motor_y + sy * h) for sx in (-1, 1) for sy in (-1, 1)]
+    def dowels(self) -> list[tuple[float, float, float]]:
+        """(travel, x, z) of each dowel hole (one each side at x and -x): two staggered rows,
+        so 2.5 mm steps fit."""
+        out = []
+        for i, t in enumerate(self.travels):
+            x = self.spring_x + (1.7 if i % 2 == 0 else -1.7)
+            out.append((t, x, self.lid_z1 + t + self.dowel_d / 2))
+        return out
 
     def m3_spots(self) -> list[float]:
         return [-self.m3_pitch / 2, self.m3_pitch / 2]
@@ -211,7 +234,6 @@ def _box(x0: float, x1: float, y0: float, y1: float, z0: float, z1: float) -> Ma
 
 
 def _xz_plate(sec: CrossSection, y0: float, y1: float) -> Manifold:
-    """A section in (x, z) made thick from y0 to y1."""
     return sec.extrude(y1 - y0).rotate([90, 0, 0]).translate([0, y1, 0])
 
 
@@ -224,91 +246,83 @@ def _shims(p: FloatHolder) -> list[Manifold]:
     return out
 
 
-def build_plate(p: FloatHolder | None = None) -> Manifold:
-    """The part on the printer: the rail, the ledge (rest stop), the plate's spring posts."""
-    p = p or FloatHolder()
-    hw = p.plate_half
-    plate = _xz_plate(_rounded_rect(-hw, hw, p.plate_z0, p.plate_z1, p.corner_r), 0, p.plate_t)
-    ledge = _box(-p.ledge_half, p.ledge_half, p.plate_t - 0.01, p.leg_y1 - 1.0, p.plate_z0, 0.0)
-    body = Manifold.batch_boolean([plate, ledge, *_shims(p)], OpType.Add)
-    gw = p.rail_w / 2 + p.groove_play / 2
-    cuts = [
-        _box(-gw, gw, p.rail_y0, p.plate_t + 1, p.rail_z0, p.plate_z1 + 1),  # the groove
-        _box(-gw, gw, p.rail_y0, p.rail_y1 + 0.3, p.rail_z0, 1.0),  # the rail's notch in the ledge
-        # the block's place: the 90° piece's leg rests on the ledge, the block does not
-        _box(-p.ledge_half - 1, p.ledge_half + 1, p.plate_t - 0.5, p.leg_y0, -p.ledge_play, 1.0),
+def _teardrop_z(d: float, x: float, y: float, z0: float, z1: float) -> Manifold:
+    """A hole along z with a 45 deg point towards +x (up when the L prints on its side)."""
+    r = d / 2
+    pts = [
+        (r * math.cos(math.radians(a)), r * math.sin(math.radians(a))) for a in range(45, 316, 10)
     ]
-    for x in p.m3_spots():  # the printer's screws, their heads sunk under the rail
-        cuts.append(_teardrop_y(p.m3_d, x, p.m3_z, -1, p.plate_t + 1))
-        cuts.append(_teardrop_y(p.m3_head_d, x, p.m3_z, p.m3_clamp, p.plate_t + 1))
-    for z in p.rail_holes():  # self-tapping screws from the rail (blind: they end in the plate)
-        cuts.append(_teardrop_y(p.tap_d, 0.0, z, 1.0, p.plate_t + 1))
-    for _, length in SPRINGS:  # the plate's spring posts
-        for x in (-p.spring_x, p.spring_x):
-            cuts.append(_teardrop_y(p.tap_d, x, p.plate_post_z(length), -1, p.plate_t + 1))
+    pts.append((r * math.sqrt(2), 0.0))
+    return CrossSection([pts]).extrude(z1 - z0).translate([x, y, z0])
+
+
+def build_plate(p: FloatHolder | None = None) -> Manifold:
+    """The part on the printer: prints standing up, as built."""
+    p = p or FloatHolder()
+    hw, r = p.plate_half, p.corner_r
+    w, cw = p.rail_w / 2, p.car_w / 2
+    parts = [
+        _xz_plate(_rounded_rect(-hw, hw, p.plate_z0, p.plate_z1, r), 0, p.plate_t),
+        *_shims(p),
+        _box(-w, w, p.plate_t - 0.01, p.rail_y0, p.rail_z0, p.rail_z1),  # the strip
+        _box(-cw, cw, p.plate_t - 0.01, p.leg_y0 - 0.5, p.plate_z0, 0.0),  # the column
+    ]
+    body = Manifold.batch_boolean(parts, OpType.Add)
+    rw = w + 0.15
+    cuts = [_box(-rw, rw, p.rail_y0, p.rail_y1 + 0.3, p.rail_z0, 1.0)]  # the rail's foot end
+    for x in p.m3_spots():  # the printer's screws, heads sunk
+        cuts.append(_teardrop_y(p.m3_d, x, p.m3_z, -1, p.rail_y0 + 1))
+        cuts.append(_teardrop_y(p.m3_head_d, x, p.m3_z, p.m3_clamp, p.rail_y0 + 0.01))
+    for z in p.rail_holes():  # the rail's self-tapping screws, blind
+        cuts.append(_teardrop_y(p.tap_d, 0.0, z, 1.0, p.rail_y0 + 0.01))
+    for s in (-1, 1):
+        x = s * p.spring_x
+        cuts.append(_teardrop_y(p.tap_d, x, p.low_post_z, 0.5, p.plate_t + 0.01))
+        for _, dx, z in p.dowels():
+            cuts.append(_teardrop_y(p.dowel_d, s * dx, z, p.plate_t - p.dowel_in, p.plate_t + 0.01))
     return body - Manifold.batch_boolean(cuts, OpType.Add)
 
 
-def build_carriage(p: FloatHolder | None = None) -> Manifold:
-    """The 90° piece: its leg on the block, the motor on its foot, the moving posts in its ears."""
+def build_l(p: FloatHolder | None = None) -> Manifold:
+    """The part on the block, built where it sits (print_poses lays it on its side)."""
     p = p or FloatHolder()
     hw, r = p.leg_half, p.corner_r
-    leg = _xz_plate(_rounded_rect(-hw, hw, -r, p.car_l, r), p.leg_y0, p.leg_y1)
-    leg = leg ^ _box(-hw, hw, p.leg_y0, p.leg_y1, 0, p.car_l)
-    ez0, w = p.car_l - p.ear_h, p.ear_half - hw
-    ears = []
-    for s in (-1, 1):  # 45 deg underneath: prints standing on the foot
-        pts = [(hw - 0.01, ez0 - w), (p.ear_half, ez0), (p.ear_half, p.car_l), (hw - 0.01, p.car_l)]
-        pts = [(s * x, z) for x, z in pts]
-        if s < 0:
-            pts.reverse()
-        ears.append(_xz_plate(CrossSection([pts]), p.leg_y0, p.leg_y1))
+    parts = [
+        _xz_plate(_rounded_rect(-hw, hw, p.base_z, p.lid_z1, r), p.leg_y0, p.leg_y1),
+        _box(-hw, hw, p.lid_y0, p.leg_y0 + 0.01, p.lid_z0, p.lid_z1),  # the overhang
+    ]
     base = _rounded_rect(-hw, hw, p.leg_y0 - r, p.base_y1, r).extrude(p.base_t)
-    base = base ^ _box(-hw, hw, p.leg_y0, p.base_y1, 0, p.base_t)
+    base = (base ^ _box(-hw, hw, p.leg_y0, p.base_y1, 0, p.base_t)).translate([0, 0, p.base_z])
+    parts.append(base)
+    zb = p.base_z + p.base_t
     tri = CrossSection(
-        [
-            [
-                (p.leg_y1 - 0.01, p.base_t - 0.01),
-                (p.base_y1, p.base_t - 0.01),
-                (p.leg_y1 - 0.01, p.base_t + p.rib_h),
-            ]
-        ]
+        [[(p.leg_y1 - 0.01, zb - 0.01), (p.base_y1, zb - 0.01), (p.leg_y1 - 0.01, zb + p.rib_h)]]
     )
     rib = tri.extrude(p.rib_t).rotate([90, 0, 90])
-    ribs = [rib.translate([hw - p.rib_t, 0, 0]), rib.translate([-hw, 0, 0])]
-    body = Manifold.batch_boolean([leg, *ears, base, *ribs], OpType.Add)
-    fd = (p.flange_d + p.flange_play) / 2
-    cuts = [Manifold.cylinder(p.base_t + 2, fd, fd, SEG).translate([0, p.motor_y, -1])]
-    cb = p.base_t - p.m2_clamp
+    parts += [rib.translate([hw - p.rib_t, 0, 0]), rib.translate([-hw, 0, 0])]
+    body = Manifold.batch_boolean(parts, OpType.Add)
+    rw = p.rail_w / 2 + 0.4
+    cuts = [_box(-rw, rw, 0, p.rail_y1 + 0.4, p.lid_z0 - 1, p.lid_z1 + 1)]  # the rail goes on up
+    fd = p.flange_d + p.flange_play
+    cuts.append(_teardrop_z(fd, 0.0, p.motor_y, p.base_z - 1, zb + 1))
     for x, y in p.m2_spots():
-        cuts.append(
-            Manifold.cylinder(p.base_t + 2, p.m2_d / 2, p.m2_d / 2, 24).translate([x, y, -1])
-        )
-        cuts.append(
-            Manifold.cylinder(cb + 1, p.m2_head_d / 2, p.m2_head_d / 2, 24).translate([x, y, -1])
-        )
-    for x, z in p.car_holes():  # 4 x M3 into the block, heads sunk in the leg's front
+        cuts.append(_teardrop_z(p.m2_d, x, y, p.base_z - 1, zb + 1))
+        cuts.append(_teardrop_z(p.m2_head_d, x, y, p.base_z - 1, p.base_z + p.base_t - p.m2_clamp))
+    for x, z in p.car_holes():
         cuts.append(_teardrop_y(p.m3_d, x, z, p.leg_y0 - 1, p.leg_y1 + 1))
-        cuts.append(_teardrop_y(p.car_head_d, x, z, p.leg_y0 + p.car_clamp, p.leg_y1 + 1))
-    for x in (-p.spring_x, p.spring_x):  # the moving posts
-        cuts.append(_teardrop_y(p.tap_d, x, p.post_z, p.leg_y0 - 1, p.leg_y1 + 1))
-    return body - Manifold.batch_boolean(cuts, OpType.Add)
-
-
-def _hole_y(d: float, x: float, z: float, y0: float, y1: float) -> Manifold:
-    return Manifold.cylinder(y1 - y0, d / 2, d / 2, 24).rotate([-90, 0, 0]).translate([x, y0, z])
-
-
-def build_stop(p: FloatHolder | None = None) -> Manifold:
-    """The stop block on the rail's top two holes (screws through it and the rail into the plate)."""
-    p = p or FloatHolder()
-    h = p.stop_w / 2
-    y0, y1 = p.rail_y1, p.rail_y1 + p.stop_t
-    body = _box(-h, h, y0, y1, p.stop_z0, p.stop_z1)
-    cuts = []
-    for z in p.rail_holes()[-2:]:
-        cuts.append(_hole_y(p.m3_d, 0.0, z, y0 - 1, y1 + 1))
-        cuts.append(_hole_y(p.m3_head_d, 0.0, z, y0 + p.stop_clamp, y1 + 1))
+    for s in (-1, 1):  # each spring's hook in a slot, the upper screw across it
+        x0, x1 = sorted((s * (p.spring_x + p.spring_r), s * (p.rail_w / 2)))
+        cuts.append(
+            _box(
+                x0,
+                x1,
+                p.spring_y - p.slot_w / 2,
+                p.spring_y + p.slot_w / 2,
+                p.lid_z0 - 1,
+                p.post_z + 2.2,
+            )
+        )
+        cuts.append(_teardrop_y(p.tap_d, s * p.spring_x, p.post_z, p.lid_y0 - 1, p.leg_y1 + 1))
     return body - Manifold.batch_boolean(cuts, OpType.Add)
 
 
@@ -324,14 +338,36 @@ def block_box(p: FloatHolder, rise: float = 0.0) -> Manifold:
 
 def motor_box(p: FloatHolder, rise: float = 0.0) -> Manifold:
     w = p.motor_w / 2
-    y = p.motor_y
-    return _box(-w, w, y - w, y + w, p.base_t + rise, p.base_t + p.motor_l + rise)
+    z = p.base_z + p.base_t + rise
+    return _box(-w, w, p.motor_y - w, p.motor_y + w, z, z + p.motor_l)
 
 
-def spring_body(p: FloatHolder, od: float, length: float, x: float, rise: float = 0.0) -> Manifold:
-    """A spring between its posts, as a cylinder (the hooks left out)."""
-    z0, z1 = p.plate_post_z(length) + 3.0, p.post_z + rise - 3.0
-    return Manifold.cylinder(z1 - z0, od / 2, od / 2, SEG).translate([x, p.spring_y, z0])
+def spring_body(p: FloatHolder, x: float, rise: float = 0.0) -> Manifold:
+    """A spring between its screws, as a cylinder (the hooks left out)."""
+    z0, z1 = p.low_post_z + 2.0, p.lid_z0 + rise - 0.5
+    r = p.spring_od / 2
+    return Manifold.cylinder(z1 - z0, r, r, SEG).translate([x, p.spring_y, z0])
+
+
+def dowel(p: FloatHolder, x: float, z: float) -> Manifold:
+    """A Ø2.5 x 10 pin pressed into its hole."""
+    return (
+        Manifold.cylinder(10.0, 1.25, 1.25, 24)
+        .rotate([-90, 0, 0])
+        .translate([x, p.plate_t - p.dowel_in, z])
+    )
+
+
+def print_poses(p: FloatHolder | None = None) -> dict[str, Manifold]:
+    """Each part the way it prints, on z = 0, without supports: the plate standing up, the L on
+    its side (its profile in every layer: strong across the bend, the overhang no overhang)."""
+    p = p or FloatHolder()
+    plate = build_plate(p)
+    lpart = build_l(p).rotate([0, -90, 0])  # +x up: the teardrops point up
+    return {
+        "plate": plate.translate([0, 0, -plate.bounding_box()[2]]),
+        "l": lpart.translate([0, 0, -lpart.bounding_box()[2]]),
+    }
 
 
 def _mesh(m: Manifold) -> Mesh:
@@ -340,59 +376,46 @@ def _mesh(m: Manifold) -> Mesh:
     return _to_mesh(m)
 
 
-def print_poses(p: FloatHolder | None = None) -> dict[str, Manifold]:
-    """Each part the way it prints, on z = 0, without supports."""
-    p = p or FloatHolder()
-    plate = build_plate(p)
-    stop = build_stop(p).rotate([90, 0, 0])  # on its back: the screw holes vertical
-    return {
-        "plate": plate.translate([0, 0, -plate.bounding_box()[2]]),
-        "carriage": build_carriage(p),
-        "stop": stop.translate([0, 0, -stop.bounding_box()[2]]),
-    }
-
-
 NOTES = """Floating tool holder (sortering-pnp print catalogue)
 
-The tool rides up a miniature linear rail when it hits the bed; two extension springs pull it
-back down onto a rest stop. For a JLCMC E-BMN12H-1-L100-Z0-P-M-E12.5 (MGN12H sizes: rail 12 x 8 x
-100, M3 holes every 25 mm; block 27 x 45.4, 4 x M3 on 20 x 20). The printer's interface and the
-motor's seat are the tool holder's: 2 x M3, {m3_pitch:g} mm apart, into the {standoff_h:g} mm standoffs; NEMA 8,
-4 x M2 on a 16 mm square, Ø{flange_hole:g} flange hole.
+The tool rides up a miniature linear rail when it hits the bed or a pile of parts; two
+extension springs behind the block pull it back down onto a column. For a JLCMC
+E-BMN12H-1-L100-Z0-P-M-E12.5 (MGN12H sizes: rail 12 x 8 x 100, M3 holes every 25 mm; block
+27 x 45.4, 4 x M3 on 20 x 20) and two {od:g} x {length:g} springs. The printer's interface and the motor's
+seat are the tool holder's: 2 x M3, {m3_pitch:g} mm apart, into the {standoff_h:g} mm standoffs; NEMA 8, 4 x M2
+on a 16 mm square, Ø{flange_hole:g} flange hole.
 
 Print, PETG or PLA, 0.4 mm nozzle, 0.2 mm layers, 4 walls, 40 % infill or more, no supports:
-- float_plate.stl: standing up as exported.
-- float_carriage.stl: standing on the motor's foot.
-- float_stop.stl: lying on its back.
+- float_plate.stl: standing up, as exported.
+- float_l.stl: on its side, as exported (strong across the bend).
 
-Screws: 2 x M3 (the printer's, as the tool holder: {m3_clamp:g} mm of plate under the heads), 2 x M3 x 10
-self-tapping (rail, bottom holes), 2 x M3 x 16 self-tapping (stop block and rail, top holes),
-4 x M3 x 6 (90° piece to the block: 3.2 mm in its {car_thread:g} mm threads), 4 x M2 x 5 (motor),
-4 x M3 self-tapping as spring posts: 2 x M3 x 18 in the ears, 2 x M3 x 12 in the plate.
+Screws and pins:
+- 2 x M3, the printer's: the tool holder's screws ({m3_clamp:g} mm of plate under the heads).
+- 4 x M3 x 10 self-tapping: the rail.
+- 4 x M3 x 8: the L on the block ({car_thread:g} mm of thread in it).
+- 4 x M2 x 5: the motor, as on the tool holder.
+- 2 x M3 x 8 self-tapping: the lower spring screws, into the plate (about 3 mm left out).
+- 2 x M3 x 20 self-tapping: the upper spring screws, from the L's front through the overhang.
+- 2 x dowel pin Ø2.5 x 10: the top stop.
 
 Fitting, in this order:
-1. The plate on the printer's standoffs, its two M3 screws in their counterbores (the heads
-   end under the rail). Two shims on the back rest on the head, as on the tool holder.
-2. The rail (with its block on it) in the groove, its foot end down in the notch of the ledge.
-   Slide the block up and screw the two bottom holes (M3 x 10 into the plate); slide it back
-   down onto the ledge.
-3. The stop block on the rail's two top holes: 2 x M3 x 16 through the block and the rail
-   into the plate. The block can now move {travel:g} mm and no further.
-4. The 90° piece on the block: 4 x M3 x 6, heads in the counterbores (do it before the motor:
-   the motor covers them). It rests on the ledge.
-5. The motor on its foot as on the tool holder (4 x M2 x 5 from below), then the tool.
-6. The spring posts: M3 x 18 from the front into each ear (the tip ends just short of the
-   plate, so a hook can not slip off), M3 x 12 into the plate's hole for your springs, heads
-   about 6 mm proud. One spring each side, hooks on the screws' shanks.
+1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores.
+2. The rail (with its block on it) on the strip, its foot end down in the notch of the
+   column. Slide the block up to reach the two lower holes; screw all four.
+3. The lower spring screws, block slid up: about 3 mm of shank left out, a hook on each.
+4. The L on the block: 4 x M3 x 8. Slide the block down onto the column.
+5. Each spring's upper hook up into its slot in the overhang, the upper screw from the front
+   through the overhang and the hook.
+6. The motor on the L's foot (4 x M2 x 5 from below), then the tool.
+7. The dowel pins: one each side, pressed into the pair of holes for the travel you want:
+{travels}
+   Each mm of travel stretches the springs by a mm: keep within what they take (a 15 mm core
+   that stretches to 25 mm takes 10 mm).
 
-The plate's holes for each spring (Ø x length over the hooks), {post_short:g} mm closer than its length:
-{springs}
-The springs together must hold the moving part (90° piece, block, motor, tool: about 140 g)
-on the ledge: lift the tool by hand, it should snap back and not sag when the head moves fast.
-
+The block's screws stay reachable above the motor: the L comes off the block with the motor on.
 After fitting, redo Tip height and Camera to printer on the Setup tab: the tool's axis is
-{dy:.1f} mm further from the head than on the tool holder and {dz:.1f} mm lower.
-Size: plate {pw:g} wide x {ph:g} high; it reaches {above:g} mm above the printer's screws.
+{dy:.1f} mm further from the head than on the tool holder and {dz:.1f} mm higher.
+Size: plate {pw:g} wide x {ph:g} high, {pd:g} deep; it reaches {above:g} mm above the printer's screws.
 """
 
 
@@ -402,23 +425,24 @@ def holder_files(p: FloatHolder | None = None) -> list[tuple[str, bytes]]:
 
     p = p or FloatHolder()
     t = ToolHolder()
-    springs = "\n".join(
-        f"  {od:g} x {n:g}: {p.plate_post_z(n) - p.plate_z0:.1f} mm above the plate's bottom"
-        for od, n in SPRINGS
+    rows = "\n".join(
+        f"   {tr:4g} mm: the holes {z - p.plate_z0:.1f} mm above the plate's bottom, {dx:.2f} mm off the middle"
+        for tr, dx, z in p.dowels()
     )
     notes = NOTES.format(
+        od=p.spring_od,
+        length=p.spring_len,
         m3_pitch=p.m3_pitch,
         standoff_h=p.standoff_h,
         flange_hole=p.flange_d + p.flange_play,
         m3_clamp=p.m3_clamp,
         car_thread=p.car_thread,
-        travel=p.travel,
-        post_short=p.post_short,
-        springs=springs,
+        travels=rows,
         dy=p.motor_y - t.motor_y,
-        dz=p.m3_z - t.m3_z,
+        dz=(t.m3_z - 0.0) - (p.m3_z - p.base_z),
         pw=round(2 * p.plate_half, 1),
         ph=round(p.plate_z1 - p.plate_z0, 1),
+        pd=round(p.leg_y0 - 0.5, 1),
         above=round(p.plate_z1 - p.m3_z, 1),
     )
     poses = print_poses(p)
@@ -427,10 +451,6 @@ def holder_files(p: FloatHolder | None = None) -> list[tuple[str, bytes]]:
             "float_plate.stl",
             stl_bytes(_mesh(poses["plate"]), "sortering-pnp floating holder plate"),
         ),
-        (
-            "float_carriage.stl",
-            stl_bytes(_mesh(poses["carriage"]), "sortering-pnp floating holder 90 deg piece"),
-        ),
-        ("float_stop.stl", stl_bytes(_mesh(poses["stop"]), "sortering-pnp floating holder stop")),
+        ("float_l.stl", stl_bytes(_mesh(poses["l"]), "sortering-pnp floating holder L")),
         ("FLOAT_HOLDER.txt", notes.encode()),
     ]
