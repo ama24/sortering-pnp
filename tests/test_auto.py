@@ -175,6 +175,18 @@ def test_tip_height_set_before_the_bins_are_found_counts_from_the_tray(machine):
     assert f"Z{layout.surface_z() + 6.5:.2f}" in line and "top 7.0" in line
 
 
+def test_sheet_field_does_not_move_the_touched_height(machine):
+    """The tip touched the surface: changing the sheet's number afterwards keeps picks on it."""
+    runner, world, printer, lay = make(machine, n=0)
+    printer.gcode("G28\nG1 X100 Y100 Z3.2")
+    runner.tip_touches_plate()
+    lay.plate_thickness_mm = 0.0
+    lay.save(machine.path(machine.paths.layout))
+    runner._layout_cache = None
+    assert runner.layout().surface_z() == lay.surface_z()
+    assert lay.surface_z() - machine.tool.offset[2] == pytest.approx(3.2)  # the touch's toolhead Z
+
+
 def test_same_parts():
     a = [P("DIN912_M3", 8.0, (10.0, 10.0), 1), P("DIN934_M4", None, (50.0, 50.0), 2)]
     b = [P("DIN934_M4", None, (51.0, 49.0), 7), P("DIN912_M3", 8.0, (10.5, 10.0), 8)]
