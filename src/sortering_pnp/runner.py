@@ -1785,7 +1785,12 @@ class Runner:
         li.colour, li.brightness = "#" + colour.strip().lstrip("#").lower(), brightness
         if li.enabled:
             self.lights.preview()
-        return {"colour": li.colour, "brightness": li.brightness, "shown": li.enabled}
+        return {
+            "colour": li.colour,
+            "brightness": li.brightness,
+            "shown": li.enabled,
+            "error": self.lights.error,  # e.g. no /dev/spidev0.0: the LEDs got nothing
+        }
 
     def setup_picker_drop(self, lower: bool) -> dict[str, Any]:
         """Over the bin: lower to rim + drop_mm before letting go, or let go at the travel
