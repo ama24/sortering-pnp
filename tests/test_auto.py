@@ -200,9 +200,48 @@ def test_tip_height_set_before_the_bins_are_found_counts_from_the_tray(machine):
         printer.log.clear()
         runner._pick(plan, layout)
     zs = [float(w[1:]) for ln in printer.log for w in ln.split() if ln[:2] == "G1" and w[0] == "Z"]
-    assert min(zs) == pytest.approx(3.2 + 7.0 - machine.picker.depth_mm, abs=0.01)
+    assert min(zs) == pytest.approx(3.2, abs=0.01)  # the cup: all the way to the touched height
+    assert 3.2 + 7.0 + machine.picker.approach_mm == pytest.approx(  # slow from above the head
+        sorted(set(zs))[1], abs=0.01
+    )
     line = next(e for e in runner.events if "pick DIN912_M4x16" in e)
-    assert f"Z{layout.surface_z() + 6.5:.2f}" in line and "top 7.0" in line
+    assert f"Z{layout.surface_z():.2f}" in line and "top 7.0" in line
+
+
+@pytest.mark.parametrize("top", [3.0, 12.0])
+def test_suction_cup_height_does_not_depend_on_the_part(machine, top):
+    machine.picker.set_type("suction")
+    machine.picker.cup_above_mm = 0.5
+    runner, world, printer, lay = make(machine, n=0)
+    printer.gcode("G28\nG1 X100 Y100 Z3.2")
+    runner.tip_touches_plate()
+    layout = runner.layout()
+    part = P("DIN912_M4", 16.0, (100.0, 100.0), 1)
+    part.top_mm = top
+    plan = Plan("pick", part=part, bin=layout.bins[0], reason="test")
+    with runner._lock:
+        runner.motion.preflight(home=True)
+        printer.log.clear()
+        runner._pick(plan, layout)
+    zs = [float(w[1:]) for ln in printer.log for w in ln.split() if ln[:2] == "G1" and w[0] == "Z"]
+    assert min(zs) == pytest.approx(3.7, abs=0.01)
+
+
+def test_magnet_still_stops_on_the_part(machine):
+    machine.picker.set_type("magnet")
+    runner, world, printer, lay = make(machine, n=0)
+    printer.gcode("G28\nG1 X100 Y100 Z3.2")
+    runner.tip_touches_plate()
+    layout = runner.layout()
+    part = P("DIN912_M4", 16.0, (100.0, 100.0), 1)
+    part.top_mm = 7.0
+    plan = Plan("pick", part=part, bin=layout.bins[0], reason="test")
+    with runner._lock:
+        runner.motion.preflight(home=True)
+        printer.log.clear()
+        runner._pick(plan, layout)
+    zs = [float(w[1:]) for ln in printer.log for w in ln.split() if ln[:2] == "G1" and w[0] == "Z"]
+    assert min(zs) == pytest.approx(3.2 + 7.0 - machine.picker.depth_mm, abs=0.01)
 
 
 def test_sheet_field_does_not_move_the_touched_height(machine):

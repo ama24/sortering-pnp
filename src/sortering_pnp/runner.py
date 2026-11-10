@@ -1380,9 +1380,12 @@ class Runner:
         if pk.kind.holds == "jaws":
             h = p.grip_height_mm if p.grip_height_mm is not None else p.top_mm * pk.grip_height
             z = surface + h
+        elif pk.kind.holds == "cup":  # the cup goes down over the part: its size doesn't matter
+            z = surface + pk.cup_above_mm
         else:
             z = surface + p.top_mm - pk.depth_mm
-        z = max(z, surface + 0.3)
+        if pk.kind.holds != "cup":
+            z = max(z, surface + 0.3)
         x, y = p.grip_bed if p.grip_method != "centre" else p.bed_xy
         jaws = jaw_angle(p.bed_angle, pk.rotate_offset_deg)
         name = p.cls + (f"x{p.length_mm:g}" if p.length_mm is not None else "")
@@ -1393,7 +1396,8 @@ class Runner:
         turn = f", jaws {jaws:.0f}°" if pk.kind.rotates else ""
         self.phase(f"picking {name} at X{x:.0f} Y{y:.0f}{turn}, for bin {layout.bin_name(b)}")
         self.motion.message(f"pick {name}")
-        self.motion.pick(x, y, z, jaws)
+        top = surface + p.top_mm if pk.kind.holds == "cup" else None
+        self.motion.pick(x, y, z, jaws, top=top)
 
     def _drop(self, plan: Plan, layout: Layout) -> None:
         b = plan.bin

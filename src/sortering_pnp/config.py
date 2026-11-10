@@ -207,7 +207,10 @@ class Picker:
     rotate_home: str | None = None  # with rotate_macro: finds 0 deg before every sort
     grip_from_head_mm: float = 1.5  # tweezers close at least this far below a screw head
     approach_mm: float = 8.0  # slow descent from this far above the part
-    depth_mm: float = 0.5  # go this far below the top of the part (spring-loaded cup)
+    depth_mm: float = 0.5  # magnet: go this far below the top of the part
+    # suction cup: the tip goes down over the part to this far above the height set in Setup's
+    # Tip step (0: all the way), whatever the part's size
+    cup_above_mm: float = 0.0
     grip_height: float = 0.5  # gripper: close at this share of the part height (0 bed, 1 top)
     clearance_mm: float = 1.0  # free space a part needs around it to be picked first
     drop_mm: float = 10.0  # release at least this far above the bin's rim

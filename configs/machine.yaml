@@ -112,7 +112,8 @@ picker:
   rotate_home: null            # with rotate_macro: SORTERING_ROT_HOME finds 0 degrees before every sort
   grip_from_head_mm: 1.5       # tweezers close at least this far below a screw head
   approach_mm: 8               # slow descent over the last mm
-  depth_mm: 0.5                # vacuum: press this far below the part's top (spring-loaded cup)
+  depth_mm: 0.5                # magnet: press this far below the part's top
+  cup_above_mm: 0              # suction cup: goes over the part to this far above the Tip step's height (0: all the way)
   grip_height: 0.5             # gripper/tweezers: close at this share of the part's height (screws: the shank's middle)
   clearance_mm: 1.0            # parts with this much free space around them are picked first
   drop_mm: 10                  # release at least this far above the bin's rim
