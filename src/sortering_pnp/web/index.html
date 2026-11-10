@@ -125,6 +125,10 @@ ul.plain{margin:8px 0 0;padding-left:18px}
 .step{display:grid;grid-template-columns:34px 1fr;gap:4px 14px}.num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--line2);color:var(--mut);font-weight:600;font-size:13px}
 .num.ok{background:var(--ok);color:#fff}.step h3{margin:3px 0 2px;font-size:15px;font-weight:600}.step .body{grid-column:2}
 .checks{list-style:none;padding:0;margin:8px 0}.checks li{padding:2px 0}.mfield input{width:84px}
+.bedmap{position:relative;display:grid;grid-template-columns:1fr 1fr;row-gap:44px;max-width:430px;margin:12px 0 4px;padding:14px;background:var(--line2);border:2px solid var(--soft);border-radius:10px}
+.bedc{display:flex;flex-direction:column;gap:3px;align-items:flex-start;position:relative}.bedc.back_right,.bedc.front_right{align-items:flex-end;text-align:right}
+.bedc::before{content:"";position:absolute;width:10px;height:10px;border-radius:50%;background:var(--acc)}.bedc.back_left::before{left:-19px;top:-19px}.bedc.back_right::before{right:-19px;top:-19px}.bedc.front_left::before{left:-19px;bottom:-19px}.bedc.front_right::before{right:-19px;bottom:-19px}
+.bedl{position:absolute;left:0;right:0;text-align:center;font-size:12px;color:var(--mut);pointer-events:none}.bedl.bk{top:6px}.bedl.fr{bottom:6px}
 .jog{display:grid;grid-template-columns:repeat(3,54px);gap:6px}.jog button{height:44px;padding:0}
 
 /* device tab */
@@ -684,6 +688,9 @@ let SU={steps:[]},CHECKS=null;
 async function loadSetup(){try{SU=await api("api/setup");renderSetup();loadTodo();}catch(e){flash("setupsum",e.message,1);}}
 async function setupCall(path,body,msg,key){const box=()=>key&&$("msg_"+key)?"msg_"+key:"setupsum";try{if(msg)flash(box(),msg);const j=await api(path,body||{});if(j.checks)CHECKS=j.checks;SU=j.steps?j:await api("api/setup");renderSetup();flash(box(),j.tip?`tip at ${j.tip.map(v=>(+v).toFixed(2)).join(", ")}`:"");poll();}catch(e){flash(box(),e.message,1);$(box()).scrollIntoView({block:"nearest",behavior:"smooth"});}}
 function mval(id){return +$(id).value;}
+// Setup, Machine: the limits' four corners as seen from above, front at the bottom
+function bedMap(){const c=SU.corners||{},n=v=>+(+v||0).toFixed(1),card=(k,l)=>{const[x,y]=c[k]||[];return `<div class="bedc ${k}"><b>${l}</b><span class="note">X ${n(x)} · Y ${n(y)}</span><button class="b s" onclick="setupCall('api/setup/goto',{target:'${k}'},'moving…','machine')">Move tip here</button></div>`;};
+ return `<div class="bedmap" role="group" aria-label="The corners of the limits, seen from above"><span class="bedl bk">back</span><span class="bedl fr">front</span>${card("back_left","back-left")}${card("back_right","back-right")}${card("front_left","front-left")}${card("front_right","front-right")}</div>`;}
 function saveMachine(){setupCall("api/setup/machine",{values:{limits_x:[mval("mx0"),mval("mx1")],limits_y:[mval("my0"),mval("my1")],limits_z:[mval("mz0"),mval("mz1")],travel_z:mval("mtz"),photo_position:[mval("mpx"),mval("mpy"),mval("mpz")],change_position:[mval("mcx"),mval("mcy"),mval("mcz")]}},"saving…","machine");}
 const WC={sig:"#e8590c",sig2:"#7048e8",v5:"#d6336c",v33:"#0c8599",v24:"#a61e1e",gnd:"#343a40"};
 const PIREF={1:"3V3",17:"3V3",2:"5V",4:"5V",6:"GND",9:"GND",14:"GND",20:"GND",25:"GND",30:"GND",34:"GND",39:"GND"},REFC={"3V3":WC.v33,"5V":WC.v5,GND:WC.gnd};
@@ -769,7 +776,8 @@ function stepBody(st){const m=SU.machine||{},k=st.key,redo=st.done?` <button cla
  case "machine":{const pp=m.photo_position||[0,0,0],cp=m.change_position||[0,0,0];return `<p class="note">The toolhead limits (mm, as in printer.cfg), the travel height (above the tallest bins), the <b>photo position</b> (bed all the way out, head out of the picture) and the <b>picker-change position</b> (head high and in the middle: easy to put the picker on). <b>Show me</b> drives to each one.</p>
   <div class="row mfield"><label>X<input id="mx0" type="number" value="${m.limits_x[0]}">–<input id="mx1" type="number" value="${m.limits_x[1]}"></label><label>Y<input id="my0" type="number" value="${m.limits_y[0]}">–<input id="my1" type="number" value="${m.limits_y[1]}"></label><label>Z<input id="mz0" type="number" value="${m.limits_z[0]}">–<input id="mz1" type="number" value="${m.limits_z[1]}"></label><label>travel height<input id="mtz" type="number" value="${m.travel_z}"></label></div>
   <div class="row mfield" style="margin-top:8px"><label>photo X/Y/Z<input id="mpx" type="number" value="${pp[0]}"><input id="mpy" type="number" value="${pp[1]}"><input id="mpz" type="number" value="${pp[2]}"></label><label>picker change X/Y/Z<input id="mcx" type="number" value="${cp[0]}"><input id="mcy" type="number" value="${cp[1]}"><input id="mcz" type="number" value="${cp[2]}"></label><button class="b s" onclick="saveMachine()">Save</button></div>
-  <div class="row" style="margin-top:10px"><span class="note">show me:</span>${[["front_left","front-left limit"],["back_right","back-right limit"],["centre","plate centre"],["photo","photo position"],["change","picker change"]].map(([t,l])=>`<button class="b s" onclick="setupCall('api/setup/goto',{target:'${t}'},'moving…','machine')">${l}</button>`).join("")}</div>
+  ${bedMap()}
+  <div class="row" style="margin-top:10px"><span class="note">show me:</span>${[["centre","plate centre"],["photo","photo position"],["change","picker change"]].map(([t,l])=>`<button class="b s" onclick="setupCall('api/setup/goto',{target:'${t}'},'moving…','machine')">${l}</button>`).join("")}</div>
   <p style="margin-top:10px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'machine'},'moving to the picker-change position…','machine')">Confirm</button> <span class="note">the head then goes to the picker-change position</span>`}${redo}</p>`;}
  case "picker":return pickerBody(st,redo);
  case "tip":return `<p class="note">Over the TPU sheet in the tray, jog the tip down until a sheet of paper just drags under it (0.1 mm steps at the end), then <b>Set height</b>. Every height counts from here; redo it when the picker or the Z switch moved.</p>

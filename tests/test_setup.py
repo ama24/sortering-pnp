@@ -70,6 +70,17 @@ def test_the_whole_setup_then_sorting(machine):
     assert runner.setup_goto("photo")[:2] == [0.0, 210.0]
     assert runner.setup_goto("change") == [110.0, 200.0, 90.0]
     runner.setup_goto("centre")
+    x0, x1 = runner.m.printer.limits_x
+    y0, y1 = runner.m.printer.limits_y
+    expected = {
+        "front_left": [x0, y0],
+        "front_right": [x1, y0],
+        "back_left": [x0, y1],
+        "back_right": [x1, y1],
+    }
+    assert runner.setup_state()["corners"] == expected
+    for corner, xy in expected.items():
+        assert runner.setup_goto(corner)[:2] == xy
     runner.setup_confirm("machine")
     assert runner.motion.current_tip() == [110.0, 200.0, 90.0]  # easy to put the picker on
     # 4 picker: one OK, which tells Klipper the picker is on

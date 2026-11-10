@@ -1677,6 +1677,7 @@ class Runner:
             "required": self.require_setup,
             "complete": not self.setup.missing(),
             "machine": self.machine_values(),
+            "corners": {k: [round(v, 2) for v in xy] for k, xy in self._limit_corners().items()},
             "homed_now": self._setup_homed,
             "picker_tried": sorted(self._setup_picker),
             "tool": self._tool,  # the mounted tool, as Klipper last said (None: not asked yet)
@@ -1858,16 +1859,25 @@ class Runner:
         self.note("homed from the Setup tab")
         return self.setup_state()
 
-    def setup_goto(self, target: str) -> list[float]:
-        """Show a position: the photo position, two corners of the limits, the plate centre."""
-        self._idle()
+    def _limit_corners(self) -> dict[str, tuple[float, float]]:
+        """The four corners of the soft limits, as tip X/Y."""
         pc = self.m.printer
         ox, oy, _ = self.m.tool.offset
+        (x0, x1), (y0, y1) = pc.limits_x, pc.limits_y
+        return {
+            "front_left": (x0 + ox, y0 + oy),
+            "front_right": (x1 + ox, y0 + oy),
+            "back_left": (x0 + ox, y1 + oy),
+            "back_right": (x1 + ox, y1 + oy),
+        }
+
+    def setup_goto(self, target: str) -> list[float]:
+        """Show a position: the photo position, a corner of the limits, the plate centre."""
+        self._idle()
         layout = self.layout()
         x0, y0, x1, y1 = layout.work_rect()
         spots = {
-            "front_left": (pc.limits_x[0] + ox, pc.limits_y[0] + oy),
-            "back_right": (pc.limits_x[1] + ox, pc.limits_y[1] + oy),
+            **self._limit_corners(),
             "centre": ((x0 + x1) / 2, (y0 + y1) / 2),
         }
         with self._lock:
