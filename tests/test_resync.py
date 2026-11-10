@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from sortering_pnp.layout import Bin, Layout
+from sortering_pnp.binspec import SHELF_DEPTH_MM
+from sortering_pnp.layout import Bin, Layout, _rotate
 from sortering_pnp.printer.sim import SimPrinter, SimVision, SimWorld
 from sortering_pnp.runner import Runner
 from sortering_pnp.transform import Transform2D
@@ -132,20 +133,64 @@ def test_parts_go_to_the_middle_of_a_bin_loose_on_the_bed(machine, yaw, marker):
     shot = Shot("t", [], [MarkerPose(marker, code, 90.0 + yaw), *others])
     lay.resync(runner._seen_bins(lay, shot, Transform2D.identity()))
     b = lay.bin_by_marker(marker)
-    assert lay.drop_centre(b) == pytest.approx(centre, abs=0.02)
+    # a shelf bin: the middle of the open cavity, half the shelf depth towards its front along its
+    # real direction; a corner-post bin: its centre
+    want = centre
+    if b.style == "shelf":
+        sx, sy = _rotate((0.0, -SHELF_DEPTH_MM / 2), yaw)
+        want = (centre[0] + sx, centre[1] + sy)
+    assert lay.drop_centre(b) == pytest.approx(want, abs=0.02)
     assert b.rot == (round(yaw / 90) % 4) * 90  # the cells still follow its turn
     # kept through a save, as the page sends it back
     again = Layout.from_dict(lay.to_dict())
-    assert again.drop_centre(again.bin_by_marker(marker)) == pytest.approx(centre, abs=0.02)
+    assert again.drop_centre(again.bin_by_marker(marker)) == pytest.approx(want, abs=0.02)
 
 
 def test_a_bin_moved_on_the_page_drops_in_its_new_cells():
     lay = Layout(origin=[0.0, 0.0], cols=5, rows=5)
     lay.resync([(100, (55.0, 70.0), 0.0), (101, (10.0, 10.0), 0.0)])
     b = lay.bin_by_marker(100)
-    assert lay.drop_centre(b) == (55.0, 70.0)
+    front = SHELF_DEPTH_MM / 2  # the shelf takes the back: the cavity's middle is nearer the front
+    assert lay.drop_centre(b) == pytest.approx((55.0, 70.0 - front))
     b.x += 2  # dragged two cells to the right: the old measurement is not used
-    assert lay.drop_centre(b) == lay.bin_centre(b)
+    cx, cy = lay.bin_centre(b)
+    assert lay.drop_centre(b) == pytest.approx((cx, cy - front))
     old = Layout.from_dict({**lay.to_dict()})
     old.bins[0].seen = None  # a layout from before: the cells
-    assert old.drop_centre(old.bins[0]) == old.bin_centre(old.bins[0])
+    cx, cy = old.bin_centre(old.bins[0])
+    assert old.drop_centre(old.bins[0]) == pytest.approx((cx, cy - front))
+
+
+def test_shelf_bin_drop_point_is_shifted_to_the_front_for_every_size_and_turn():
+    from sortering_pnp.binspec import SIZES
+
+    for size in SIZES:
+        if size.style != "shelf":
+            continue
+        marker = size.markers.start
+        for rot, (dx, dy) in {0: (0, -1), 90: (1, 0), 180: (0, 1), 270: (-1, 0)}.items():
+            lay = Layout(origin=[0.0, 0.0], cols=8, rows=8)
+            lay.resync([(marker, (100.0, 100.0), float(rot)), (101, (10.0, 10.0), 0.0)])
+            b = lay.bin_by_marker(marker)
+            x, y = lay.drop_centre(b)
+            half = SHELF_DEPTH_MM / 2
+            assert (x, y) == pytest.approx((100.0 + dx * half, 100.0 + dy * half), abs=0.02)
+
+
+def test_shelf_shift_also_applies_to_the_cells_fallback_and_old_layouts():
+    lay = Layout(origin=[0.0, 0.0], cols=5, rows=5)
+    lay.resync([(100, (55.0, 70.0), 90.0), (101, (10.0, 10.0), 0.0)])
+    b = lay.bin_by_marker(100)
+    b.x += 2  # moved on the page: the cells, with the shift
+    cx, cy = lay.bin_centre(b)
+    assert lay.drop_centre(b) == pytest.approx((cx + SHELF_DEPTH_MM / 2, cy))
+    old = Layout.from_dict(
+        {**lay.to_dict(), "bins": [{**x, "yaw": None} for x in lay.to_dict()["bins"]]}
+    )
+    ob = old.bin_by_marker(100)  # no exact yaw saved: its rot
+    ob.seen = None
+    cx, cy = old.bin_centre(ob)
+    assert old.drop_centre(ob) == pytest.approx((cx + SHELF_DEPTH_MM / 2, cy))
+    lay.resync([(50, (150.0, 150.0), 90.0), (101, (10.0, 10.0), 0.0)])
+    corner = lay.bin_by_marker(50)
+    assert lay.drop_centre(corner) == (150.0, 150.0)
