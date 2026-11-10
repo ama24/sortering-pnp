@@ -1118,12 +1118,12 @@ class Runner:
                 self._set(status="done", message=plan.reason)
                 self.note(f"done: {plan.reason}")
                 self.say("done: " + plan.reason)
-                self.motion.message("sortering-pnp: done")
+                self.motion.message("Sortering PNP: done")
                 return "done"
             if plan.kind == "stuck":
                 self.note(plan.reason)
                 self.say("stuck: " + plan.reason)
-                self.motion.message("sortering-pnp: needs a hand")
+                self.motion.message("Sortering PNP: needs a hand")
                 if auto:
                     self._set(
                         status="stuck", message=plan.reason + "; waiting until they are moved"
