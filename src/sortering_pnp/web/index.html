@@ -870,11 +870,12 @@ function lightsBody(st,redo){const L=SU.lights||{},on=!!L.enabled,c=L.colour||"#
   <label class="ltick${on?"":" dim"}"><input type="checkbox" ${L.always_on?"":"checked"} ${on?"":"disabled"} onchange="setupCall('api/setup/lights',{always_on:!this.checked},'','lights')"> On for photos only</label>
   <span class="note">${on?(L.always_on?"Lit all the time while Sortering PNP runs.":"Lit only while a photo is taken."):"No lights: the photos use the room's light."}</span>
   ${on?`<span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span>`:""}</div>`;
- if(!on)return top+`<div class="row">${st.done?"":`<button class="b p s" onclick="noLights()">OK, no lights</button>`}</div>`+redo+ledWire(L);
+ if(!on)return top+redo+ledWire(L);
  return top+`<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')" onchange="lightsKeep()"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex');lightsKeep()"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
   <div class="lsl">${sl("lr","R",r,255)}${sl("lg","G",g,255)}${sl("lb","B",b,255)}${sl("lbr","Intensity",pct,100)}</div></div>
   <div class="row" style="margin-top:8px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'lights'},'','lights')">OK</button>`}</div>`+redo+ledWire(L);}
-function lightsMode(on){setupCall('api/setup/lights',{enabled:on},'','lights');}
+// OFF is a choice too: no lights, and the step is done
+function lightsMode(on){if(on)setupCall('api/setup/lights',{enabled:true},'','lights');else noLights();}
 function hexRgb(h){const s=(h||"#ffffff").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)||0);}
 function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>(+v).toString(16).padStart(2,"0")).join("");}
 // the LEDs follow the bars: one request at a time, always the newest colour; saved when let go
