@@ -27,7 +27,7 @@ from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
 from .camera import mirrored, orientation, rotated
-from .config import Machine
+from .config import HOME_CORNERS, Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
 from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
@@ -1590,6 +1590,7 @@ class Runner:
         "limits_x",
         "limits_y",
         "limits_z",
+        "home_corner",
     )
 
     def _load_machine(self) -> None:
@@ -1643,6 +1644,10 @@ class Runner:
                 raise ValueError(f"unknown machine value {k!r}")
             if k == "travel_z":
                 new[k] = float(v)
+            elif k == "home_corner":
+                if v not in HOME_CORNERS:
+                    raise ValueError(f"home_corner must be one of {', '.join(HOME_CORNERS)}")
+                new[k] = v
             else:
                 vals = [float(x) for x in v]
                 position = k.endswith("_position")
@@ -1860,15 +1865,19 @@ class Runner:
         return self.setup_state()
 
     def _limit_corners(self) -> dict[str, tuple[float, float]]:
-        """The four corners of the soft limits, as tip X/Y."""
+        """The four corners of the soft limits, as tip X/Y. The corner the printer homes to
+        has the X and Y minimum (printer.home_corner); the others follow from it."""
         pc = self.m.printer
         ox, oy, _ = self.m.tool.offset
-        (x0, x1), (y0, y1) = pc.limits_x, pc.limits_y
+        right, back = pc.home_corner.endswith("right"), pc.home_corner.startswith("back")
+        x = {"left": pc.limits_x[1] if right else pc.limits_x[0]}
+        x["right"] = pc.limits_x[0] if right else pc.limits_x[1]
+        y = {"front": pc.limits_y[1] if back else pc.limits_y[0]}
+        y["back"] = pc.limits_y[0] if back else pc.limits_y[1]
         return {
-            "front_left": (x0 + ox, y0 + oy),
-            "front_right": (x1 + ox, y0 + oy),
-            "back_left": (x0 + ox, y1 + oy),
-            "back_right": (x1 + ox, y1 + oy),
+            f"{fb}_{lr}": (x[lr] + ox, y[fb] + oy)
+            for fb in ("front", "back")
+            for lr in ("left", "right")
         }
 
     def setup_goto(self, target: str) -> list[float]:

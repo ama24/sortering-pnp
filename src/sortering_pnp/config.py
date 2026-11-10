@@ -24,6 +24,7 @@ from .pickers import MODES as PICKER_MODES
 from .pickers import PickerType, picker_type
 
 PRINTER_DRIVERS = ("moonraker", "sim")
+HOME_CORNERS = ("front_left", "front_right", "back_left", "back_right")
 # settings that are gone (section class, key): an old machine.yaml with them still loads
 RETIRED = {("Run", "pipeline"), ("Standby", "settle_s")}
 
@@ -166,6 +167,8 @@ class Printer:
     # camera always uses photo_position's Z (it sets the photo's scale)
     photo_at_travel_z: bool = True
     photo_settle_s: float = 0.5  # wait this long after moving to the photo position (blur)
+    # the corner of the bed the printer homes to: its X and Y minimum (Setup tab, Machine)
+    home_corner: str = "front_left"  # front_left | front_right | back_left | back_right
     feed_xy: float = 6000.0
     feed_z: float = 1200.0
     limits_x: list[float] = field(default_factory=lambda: [0.0, 220.0])
@@ -341,6 +344,10 @@ class Machine:
                 raise ConfigError(f"printer.{name}: wrong number of values {v}")
         if len(self.tool.offset) != 3:
             raise ConfigError("tool.offset needs X Y Z")
+        if self.printer.home_corner not in HOME_CORNERS:
+            raise ConfigError(
+                f"printer.home_corner must be one of {HOME_CORNERS}, got {self.printer.home_corner!r}"
+            )
         from .trayview import parse_colour
 
         try:

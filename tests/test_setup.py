@@ -81,6 +81,14 @@ def test_the_whole_setup_then_sorting(machine):
     assert runner.setup_state()["photo_z"] == runner.m.printer.travel_z  # fixed camera
     for corner, xy in expected.items():
         assert runner.setup_goto(corner)[:2] == xy
+    runner.save_machine({"home_corner": "back_right"})  # homes at the back right
+    corners = runner.setup_state()["machine"]["home_corner"], runner._limit_corners()
+    assert corners[0] == "back_right"
+    assert list(corners[1]["back_right"]) == [x0, y0] and list(corners[1]["front_left"]) == [x1, y1]
+    assert runner.setup_goto("front_left")[:2] == [x1, y1]
+    with pytest.raises(ValueError, match="home_corner"):
+        runner.save_machine({"home_corner": "middle"})
+    runner.save_machine({"home_corner": "front_left"})
     runner.setup_confirm("machine")
     assert runner.motion.current_tip() == [110.0, 200.0, 90.0]  # easy to put the picker on
     # 4 picker: one OK, which tells Klipper the picker is on

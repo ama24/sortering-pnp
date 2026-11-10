@@ -124,9 +124,17 @@ ul.plain{margin:8px 0 0;padding-left:18px}
 .badge{display:inline-block;min-width:18px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-size:12px;font-weight:600}
 .step{display:grid;grid-template-columns:34px 1fr;gap:4px 14px}.num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--line2);color:var(--mut);font-weight:600;font-size:13px}
 .num.ok{background:var(--ok);color:#fff}.step h3{margin:3px 0 2px;font-size:15px;font-weight:600}.step .body{grid-column:2}
-.checks{list-style:none;padding:0;margin:8px 0}.checks li{padding:2px 0}.machwrap{display:flex;flex-wrap:wrap;gap:16px;align-items:stretch;margin:12px 0 4px}
-@media(max-width:560px){.step:has(.machwrap)>.body{grid-column:1/-1;min-width:0}.step:has(.machwrap){grid-template-columns:34px minmax(0,1fr)}.machwrap .bedmap{padding:10px;flex-basis:100%;min-width:0;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.machwrap .bedxy{gap:5px}.machwrap .bedxy input{width:46px;padding:4px 5px;-moz-appearance:textfield;appearance:textfield}.machwrap .bedxy input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.machwrap .zcol{max-width:none}
+.checks{list-style:none;padding:0;margin:8px 0}.checks li{padding:2px 0}.machwrap{display:flex;flex-wrap:wrap;gap:16px;align-items:stretch;margin:26px 0 4px}.machwrap .bedmap{margin-bottom:18px}
+@media(max-width:560px){.step:has(.machwrap)>.body{grid-column:1/-1;min-width:0}.step:has(.machwrap){grid-template-columns:34px minmax(0,1fr)}.machwrap .bedmap{padding:10px;flex-basis:100%;min-width:0;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.machwrap .bedxy{gap:5px}.machwrap .bedh{flex-direction:column!important;align-items:inherit;gap:3px}.machwrap{row-gap:30px}.machwrap .bedxy input{width:46px;padding:4px 5px;-moz-appearance:textfield;appearance:textfield}.machwrap .bedxy input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.machwrap .zcol{max-width:none}
  .machwrap .bedc.back_left::before{left:-16px;top:-16px}.machwrap .bedc.back_right::before{right:-16px;top:-16px}.machwrap .bedc.front_left::before{left:-16px;bottom:-16px}.machwrap .bedc.front_right::before{right:-16px;bottom:-16px}}
+.bedh{display:flex;align-items:center;gap:6px}.bedc.back_right .bedh,.bedc.front_right .bedh{flex-direction:row-reverse}
+.homepick{font:inherit;font-size:11px;line-height:16px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}.homepick:hover{color:var(--mut);border-color:var(--soft)}.homepick.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.bedc.home::before{width:14px;height:14px;box-shadow:0 0 0 3px var(--acc-soft)}
+.jogbox{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:8px 0}.jogside{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.jogxy{width:300px;max-width:100%;height:auto;flex:none;touch-action:manipulation}.jw{stroke:var(--card);stroke-width:2;cursor:pointer;transition:fill .12s}
+.jw.r0{fill:color-mix(in srgb,var(--acc) 12%,var(--card))}.jw.r1{fill:color-mix(in srgb,var(--acc) 24%,var(--card))}.jw.r2{fill:color-mix(in srgb,var(--acc) 38%,var(--card))}.jw.r3{fill:color-mix(in srgb,var(--acc) 52%,var(--card))}.jw:hover{fill:var(--acc)}.jw:active{fill:var(--ink)}
+.jogxy text{font-size:11px;text-anchor:middle;dominant-baseline:middle;fill:var(--ink);pointer-events:none}.jogxy .jax{font-size:14px;font-weight:700;fill:var(--acc)}.jogxy .jc{fill:var(--card);stroke:var(--line);stroke-width:2}.jogxy .jcl{font-size:10px;fill:var(--mut)}
+.jogz{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:72px}.jogzl{text-align:center;font-weight:700;color:var(--acc);padding:2px 0}
 .bedmid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1}
 .zcol{flex:1 1 300px;max-width:360px;background:var(--line2);border:2px solid var(--soft);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column}.zcol h4{margin:0 0 8px;font-size:13px}
 .zbody{display:flex;flex:1;gap:18px;align-items:stretch;min-height:210px}.zscale{position:relative;width:116px;flex:none;margin:8px 0}.zbar{position:absolute;left:34px;top:0;bottom:0;width:4px;border-radius:2px;background:var(--soft)}
@@ -138,7 +146,7 @@ ul.plain{margin:8px 0 0;padding-left:18px}
 .bedxy{display:flex;gap:8px;font-size:13px;color:var(--mut)}.bedxy label{display:flex;align-items:center;gap:3px}.bedxy input{width:58px}
 .bedc{display:flex;flex-direction:column;gap:3px;align-items:flex-start;position:relative}.bedc.back_right,.bedc.front_right{align-items:flex-end;text-align:right}
 .bedc::before{content:"";position:absolute;width:10px;height:10px;border-radius:50%;background:var(--acc)}.bedc.back_left::before{left:-19px;top:-19px}.bedc.back_right::before{right:-19px;top:-19px}.bedc.front_left::before{left:-19px;bottom:-19px}.bedc.front_right::before{right:-19px;bottom:-19px}
-.bedl{position:absolute;left:0;right:0;text-align:center;font-size:12px;color:var(--mut);pointer-events:none}.bedl.bk{top:6px}.bedl.fr{bottom:6px}
+.bedl{position:absolute;left:0;right:0;text-align:center;font-size:12px;color:var(--mut);pointer-events:none}.bedl.bk{top:-20px}.bedl.fr{bottom:-20px}
 .jog{display:grid;grid-template-columns:repeat(3,54px);gap:6px}.jog button{height:44px;padding:0}
 
 /* device tab */
@@ -699,10 +707,15 @@ async function loadSetup(){try{SU=await api("api/setup");renderSetup();loadTodo(
 async function setupCall(path,body,msg,key){const box=()=>key&&$("msg_"+key)?"msg_"+key:"setupsum";try{if(msg)flash(box(),msg);const j=await api(path,body||{});if(j.checks)CHECKS=j.checks;SU=j.steps?j:await api("api/setup");renderSetup();flash(box(),j.tip?`tip at ${j.tip.map(v=>(+v).toFixed(2)).join(", ")}`:"");poll();}catch(e){flash(box(),e.message,1);$(box()).scrollIntoView({block:"nearest",behavior:"smooth"});}}
 function mval(id){return +$(id).value;}
 // Setup, Machine: the limits' four corners as seen from above, front at the bottom
-function bedMap(){const m=SU.machine||{},L={x0:m.limits_x[0],x1:m.limits_x[1],y0:m.limits_y[0],y1:m.limits_y[1]},
-  box=(a,lim,id)=>`<label>${a}<input ${id?`id="${id}"`:""} data-lim="${lim}" type="number" value="${L[lim]}" oninput="limSync(this)"></label>`,
-  card=(k,l,x,y,ix,iy)=>`<div class="bedc ${k}"><b>${l}</b><span class="bedxy">${box("X",x,ix)}${box("Y",y,iy)}</span><button class="b s" onclick="machGo('${k}')">Move tip here</button></div>`;
- return `<div class="bedmap" role="group" aria-label="The corners of the limits, seen from above"><span class="bedl bk">back</span><span class="bedl fr">front</span>${card("back_left","back-left","x0","y1")}${card("back_right","back-right","x1","y1","mx1","my1")}${card("front_left","front-left","x0","y0","mx0","my0")}${card("front_right","front-right","x1","y0")}<button class="b s bedmid" onclick="machGo('centre')">Plate centre</button></div>`;}
+let HOMEC=null;  // Setup, Machine: the corner the printer homes to, as chosen on the page
+function bedMap(L){const m=SU.machine||{};HOMEC=HOMEC||m.home_corner||"front_left";L=L||{x0:m.limits_x[0],x1:m.limits_x[1],y0:m.limits_y[0],y1:m.limits_y[1]};
+  const hr=HOMEC.endsWith("right"),hb=HOMEC.startsWith("back"),lim=k=>[k.endsWith("right")!==hr?"x1":"x0",k.startsWith("back")!==hb?"y1":"y0"],
+  box=(a,l,id)=>`<label>${a}<input ${id?`id="${id}"`:""} data-lim="${l}" type="number" value="${L[l]}" oninput="limSync(this)"></label>`,
+  card=(k,t)=>{const[x,y]=lim(k),ids=x==="x0"&&y==="y0"?["mx0","my0"]:x==="x1"&&y==="y1"?["mx1","my1"]:[],on=k===HOMEC;
+   return `<div class="bedc ${k}${on?" home":""}"><span class="bedh"><b>${t}</b><button class="homepick${on?" on":""}" aria-pressed="${on}" title="${on?"Your printer homes to this corner":"Does your printer home here? Choose it"}" onclick="pickHome('${k}')">⌂ Home</button></span><span class="bedxy">${box("X",x,ids[0])}${box("Y",y,ids[1])}</span><button class="b s" onclick="machGo('${k}')">Move tip here</button></div>`;};
+ return `<div class="bedmap" id="bedmap" role="group" aria-label="The corners of the limits, seen from above"><span class="bedl bk">back</span><span class="bedl fr">front</span>${card("back_left","back-left")}${card("back_right","back-right")}${card("front_left","front-left")}${card("front_right","front-right")}<button class="b s bedmid" onclick="machGo('centre')">Plate centre</button></div>`;}
+// another home corner: the same limits, swapped onto the corners (the home corner has X and Y minimum)
+function pickHome(k){const L={};document.querySelectorAll("#bedmap [data-lim]").forEach(e=>{L[e.dataset.lim]=e.value;});HOMEC=k;$("bedmap").outerHTML=bedMap(L);}
 // Setup, Machine: the Z scale, 0 to 300 mm: a line at each value, its label kept clear of the others
 const ZM=[["mz0","Min","var(--mut)"],["mtz","Travel","var(--acc)"],["mz1","Max","var(--warn)"]];
 function zSpots(v){const s=ZM.map(([id],i)=>({id,val:v[i],at:Math.min(100,Math.max(0,v[i]/3))}));let last=-99;[...s].sort((a,b)=>a.at-b.at).forEach(e=>{e.tag=Math.max(e.at,last+11);last=e.tag;});return s;}
@@ -714,8 +727,8 @@ function zMark(){zSpots(ZM.map(([id])=>mval(id))).forEach(e=>{const line=documen
 function posRow(k,title,hint,id,p){return `<div class="posrow"><div class="postxt"><b>${title}</b><span class="note">${hint}</span></div><div class="posxyz">${["X","Y","Z"].map((a,i)=>`<label>${a}<input id="${id}${a.toLowerCase()}" type="number" value="${p[i]}"></label>`).join("")}</div><button class="b s" onclick="machGo('${k}')">Move tip here</button></div>`;}
 // corners share their limits: X with the one in front or behind, Y with the one beside
 function limSync(el){document.querySelectorAll(`[data-lim="${el.dataset.lim}"]`).forEach(o=>{if(o!==el)o.value=el.value;});}
-function machGo(k){const m=SU.machine,same=(a,b)=>a.every((v,i)=>mval(v)===b[i]);if(!(same(["mx0","mx1"],m.limits_x)&&same(["my0","my1"],m.limits_y)&&same(["mz0","mz1","mtz"],[...m.limits_z,m.travel_z])&&same(["mpx","mpy","mpz"],m.photo_position)&&same(["mcx","mcy","mcz"],m.change_position))){flash("msg_machine","you changed a value: press Save first",1);return;}setupCall('api/setup/goto',{target:k},'moving…','machine');}
-function saveMachine(){setupCall("api/setup/machine",{values:{limits_x:[mval("mx0"),mval("mx1")],limits_y:[mval("my0"),mval("my1")],limits_z:[mval("mz0"),mval("mz1")],travel_z:mval("mtz"),photo_position:[mval("mpx"),mval("mpy"),mval("mpz")],change_position:[mval("mcx"),mval("mcy"),mval("mcz")]}},"saving…","machine");}
+function machGo(k){const m=SU.machine,same=(a,b)=>a.every((v,i)=>mval(v)===b[i]);if(!(same(["mx0","mx1"],m.limits_x)&&same(["my0","my1"],m.limits_y)&&same(["mz0","mz1","mtz"],[...m.limits_z,m.travel_z])&&same(["mpx","mpy","mpz"],m.photo_position)&&same(["mcx","mcy","mcz"],m.change_position)&&(HOMEC||m.home_corner)===m.home_corner)){flash("msg_machine","you changed a value: press Save first",1);return;}setupCall('api/setup/goto',{target:k},'moving…','machine');}
+function saveMachine(){setupCall("api/setup/machine",{values:{limits_x:[mval("mx0"),mval("mx1")],limits_y:[mval("my0"),mval("my1")],limits_z:[mval("mz0"),mval("mz1")],travel_z:mval("mtz"),photo_position:[mval("mpx"),mval("mpy"),mval("mpz")],change_position:[mval("mcx"),mval("mcy"),mval("mcz")],home_corner:HOMEC||"front_left"}},"saving…","machine");}
 const WC={sig:"#e8590c",sig2:"#7048e8",v5:"#d6336c",v33:"#0c8599",v24:"#a61e1e",gnd:"#343a40"};
 const PIREF={1:"3V3",17:"3V3",2:"5V",4:"5V",6:"GND",9:"GND",14:"GND",20:"GND",25:"GND",30:"GND",34:"GND",39:"GND"},REFC={"3V3":WC.v33,"5V":WC.v5,GND:WC.gnd};
 // the Pi's 2x20 header, odd pins on the left, pin 1 at the top: `hot` pins (number: colour) are
@@ -797,13 +810,13 @@ function stepBody(st){const m=SU.machine||{},k=st.key,redo=st.done?` <button cla
   (CHECKS?`<ul class="checks">${CHECKS.map(c=>`<li><span class="${c.ok?"ok":"bad"}">${c.ok?"✓":"✗"}</span> ${esc(c.what)} <span class="note">${esc(c.detail||"")}</span></li>`).join("")}</ul>`:"");
  case "homing":return `<p class="note">Watch the printer. It lifts first, homes X and Y, moves over the <b>middle of the working area</b> and homes Z there. If it heads for a bin, press <b>STOP</b>.</p><button class="b p s" onclick="setupCall('api/setup/home',{},'homing…','homing')">Home now</button>`+
   (SU.homed_now&&!st.done?` <button class="b s" onclick="setupCall('api/setup/confirm',{step:'homing'},'','homing')">Z homed over plate</button>`:"")+redo;
- case "machine":{const pp=m.photo_position||[0,0,0],cp=m.change_position||[0,0,0],parked=SU.photo_z!=null&&SU.photo_z!==pp[2];return `<p class="note">Where the printer may go and where the head waits. All values in mm. <b>Move tip here</b> drives there.</p>
+ case "machine":{HOMEC=null;const pp=m.photo_position||[0,0,0],cp=m.change_position||[0,0,0],parked=SU.photo_z!=null&&SU.photo_z!==pp[2];return `<p class="note">Where the printer may go and where the head waits. All values in mm. Mark the corner your printer homes to with <b>⌂ Home</b>: it has the X and Y minimum. <b>Move tip here</b> drives there.</p>
   <div class="machwrap">${bedMap()}${zColumn()}</div>
   <div class="poslist">${posRow("photo","Photo / Parked Position","Bed all the way out, head out of the picture."+(parked?` For photos the head stays at the travel height (${SU.photo_z}), so Z is not used.`:""),"mp",pp)}${posRow("change","Tool Change","Head high and in the middle, easy to put the picker on.","mc",cp)}</div>
   <p style="margin-top:12px"><button class="b s" onclick="saveMachine()">Save</button> ${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'machine'},'moving to the Tool Change position…','machine')">Confirm</button> <span class="note">the head then goes to the Tool Change position</span>`}${redo}</p>`;}
  case "picker":return pickerBody(st,redo);
  case "tip":return `<p class="note">Over the TPU sheet in the tray, jog the tip down until a sheet of paper just drags under it (0.1 mm steps at the end), then <b>Set height</b>. Every height counts from here; redo it when the picker or the Z switch moved.</p>
-  <div class="row"><button class="b s" onclick="setupCall('api/setup/goto',{target:'centre'},'moving to the plate centre…','tip')">Go to centre</button>${jogPad("tip",false)}<button class="b p s" onclick="setupCall('api/calib/tip',{},'saving…','tip')">Set height</button></div>
+  ${jogPad("tip",false,`<button class="b s" onclick="setupCall('api/setup/goto',{target:'centre'},'moving to the plate centre…','tip')">Go to X/Y centre</button><button class="b p s" onclick="setupCall('api/calib/tip',{},'saving…','tip')">Set height</button>`)}
   <p class="note" style="margin:6px 0 0">tip offset now ${(SU.tip_offset_z>=0?"+":"")+(+SU.tip_offset_z||0).toFixed(2)} mm</p>`+redo;
  case "lights":return lightsBody(st,redo);
  case "camera":return cameraBody(st,redo);
@@ -874,10 +887,24 @@ function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
 
 // ---------------------------------------------------------------- setup: jog, camera to printer, bins
 let LASTSCAN=null;
-function jogPad(key,xy){const b=(x,y,z,l)=>`<button class="b s" onclick="stepJog(${x},${y},${z},'${key}')">${l}</button>`;
- return ` <label class="note">step<select id="jstep_${key}"><option>0.1</option><option selected>1</option><option>10</option></select>mm</label>`+
-  (xy?b(-1,0,0,"X−")+b(1,0,0,"X+")+b(0,-1,0,"Y−")+b(0,1,0,"Y+"):"")+b(0,0,1,"Z+")+b(0,0,-1,"Z−")+` <span class="note">tip <b id="tip_${key}">–</b></span> `;}
-async function stepJog(x,y,z,key){const s=+$("jstep_"+key).value;try{const j=await api("api/jog",{dx:x*s,dy:y*s,dz:z*s});$("tip_"+key).textContent=j.tip.map(v=>(+v).toFixed(2)).join(", ");}catch(e){flash("msg_"+key,e.message,1);}}
+// jogging: an X/Y cross of rings (0.1, 1, 10 and 50 mm; straight or diagonal) and a Z column.
+// Seen from above as the bed drawing: back at the top; the home corner sets where X+ and Y+ point
+const JOGS=[0.1,1,10,50];
+function jb(key,x,y,z,l){return `<button class="b s" onclick="jogBy(${x},${y},${z},'${key}')">${l}</button>`;}
+function jogPad(key,xy,side=""){const h=(SU.machine||{}).home_corner||"front_left",fx=h.endsWith("right")?-1:1,fy=h.startsWith("back")?-1:1;
+ const zcol=`<div class="jogz" role="group" aria-label="Z, mm">${[10,1,0.1].map(s=>jb(key,0,0,s,`Z+${s}`)).join("")}<span class="jogzl">Z</span>${[0.1,1,10].map(s=>jb(key,0,0,-s,`Z−${s}`)).join("")}</div>`,
+  out=`<div class="jogside"><div class="note">tip at <b id="tip_${key}">–</b> (X, Y, Z)</div>${side}</div>`;
+ if(!xy)return `<div class="jogbox">${zcol}${out}</div>`;
+ const R=[20,47,74,101,128],rad=a=>a*Math.PI/180,P=(r,a)=>`${(r*Math.cos(rad(a))).toFixed(1)} ${(-r*Math.sin(rad(a))).toFixed(1)}`,sg=v=>v>0?"+":"−";
+ let w="",t="";
+ for(let d=0;d<8;d++){const a=d*45,ux=Math.round(Math.cos(rad(a))),uy=Math.round(Math.sin(rad(a)));
+  JOGS.forEach((s,i)=>{const r1=R[i],r2=R[i+1],dx=ux*fx*s,dy=uy*fy*s,tt=[dx?`X${sg(dx)}${s}`:"",dy?`Y${sg(dy)}${s}`:""].join(" ").trim();
+   w+=`<path class="jw r${i}" d="M${P(r2,a-21.5)}A${r2} ${r2} 0 0 0 ${P(r2,a+21.5)}L${P(r1,a+21.5)}A${r1} ${r1} 0 0 1 ${P(r1,a-21.5)}Z" onclick="jogBy(${dx},${dy},0,'${key}')"><title>${tt} mm</title></path>`;
+   if(d%2===0)t+=`<text x="${P((r1+r2)/2,a).split(" ")[0]}" y="${P((r1+r2)/2,a).split(" ")[1]}">${s}</text>`;});}
+ const ax=[[0,fx>0?"X+":"X−"],[90,fy>0?"Y+":"Y−"],[180,fx>0?"X−":"X+"],[270,fy>0?"Y−":"Y+"]].map(([a,l])=>`<text class="jax" x="${P(141,a).split(" ")[0]}" y="${P(141,a).split(" ")[1]}">${l}</text>`).join("");
+ const svg=`<svg class="jogxy" viewBox="-156 -156 312 312" role="group" aria-label="Move X and Y: rings of 0.1, 1, 10 and 50 mm">${w}<g class="jlab">${t}</g>${ax}<circle r="17" class="jc"/><text class="jcl" y="1">mm</text></svg>`;
+ return `<div class="jogbox">${svg}${zcol}${out}</div>`;}
+async function jogBy(x,y,z,key){const r=v=>Math.round(v*1000)/1000;try{const j=await api("api/jog",{dx:r(x),dy:r(y),dz:r(z)});$("tip_"+key).textContent=j.tip.map(v=>(+v).toFixed(2)).join(", ");flash("msg_"+key,"");}catch(e){flash("msg_"+key,e.message,1);}}
 async function stepScan(){flash("msg_layout","taking a photo, finding the bins…");try{LASTSCAN=await api("api/scan",{});SU=await api("api/setup");renderSetup();loadLayout(true);poll();}catch(e){flash("msg_layout",e.message,1);}}
 function cameraBody(st,redo){const C=SU.camera||{},mk=C.markers||[],pairs=C.pairs||[],done=new Set(pairs.map(x=>x.marker));
  const cal=C.calibrated?`<p class="note" style="margin:0 0 8px"><span class="ok">✓ camera calibration</span> (${esc(C.calibrated)}): the photo's millimetres are measured.</p>`:`<p class="note" style="margin:0 0 8px"><span class="bad">No camera calibration yet.</span> Without it the millimetres are rough. <button class="b s" onclick="go('calib')">Camera Calibration</button></p>`;
@@ -886,7 +913,7 @@ function cameraBody(st,redo){const C=SU.camera||{},mk=C.markers||[],pairs=C.pair
  return cal+`<ol class="note" style="padding-left:18px;margin:0 0 10px"><li>Put 3 or more bins far apart on the bed, then <b>Take photo</b>: it shows what the camera sees and which codes it reads (no model needed).</li><li>Jog the tip onto the centre of a code, then <b>Tip is here</b> on its row. Do this for 3 or more codes, far apart.</li><li><b>Fit</b>. The step ticks itself when the worst error is under 1 mm.</li></ol>
   <div class="row"><button class="b p s" onclick="setupCall('api/calib/photo',{},'taking a photo…','camera')">Take photo</button> <button class="b s" ${pairs.length<3?"disabled":""} onclick="setupCall('api/calib/fit',{},'fitting…','camera')">Fit (${pairs.length} point${pairs.length===1?"":"s"})</button> <button class="b s" onclick="setupCall('api/calib/clear',{},'','camera')">Clear points</button></div>`+fit+
   (C.view?`<div class="camview"><img src="runs/${encodeURIComponent(C.view)}" alt="" onload="camMarks(this)"><svg></svg></div>`:"")+rows+
-  `<div class="row" style="margin-top:10px">${jogPad("camera",true)}</div>`+redo;}
+  `<h4 style="margin:14px 0 4px;font-size:13px">Move the tip</h4><p class="note" style="margin:0">Seen from above, back at the top. Each ring is a distance; the corners move X and Y together. Hover a field to see the move.</p>${jogPad("camera",true)}`+redo;}
 function camMarks(img){const C=SU.camera||{},H=C.view_h,svg=img.nextElementSibling;if(!svg)return;const w=img.naturalWidth,h=img.naturalHeight,r=Math.max(w,h)/90;
  svg.setAttribute("viewBox",`0 0 ${w} ${h}`);
  svg.innerHTML=(C.markers||[]).map(m=>{let u,v;if(m.view_px){[u,v]=m.view_px;}else if(H){const [x,y]=m.plate,d=H[2][0]*x+H[2][1]*y+H[2][2];u=(H[0][0]*x+H[0][1]*y+H[0][2])/d;v=(H[1][0]*x+H[1][1]*y+H[1][2])/d;}else return "";
