@@ -165,6 +165,7 @@ class Printer:
     # extra rise and fall each cycle); False: it also goes to photo_position's Z. The head
     # camera always uses photo_position's Z (it sets the photo's scale)
     photo_at_travel_z: bool = True
+    photo_settle_s: float = 0.5  # wait this long after moving to the photo position (blur)
     feed_xy: float = 6000.0
     feed_z: float = 1200.0
     limits_x: list[float] = field(default_factory=lambda: [0.0, 220.0])

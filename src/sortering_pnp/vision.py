@@ -459,6 +459,8 @@ class CameraVision:
 
         with self._cam_lock:
             cam = self._camera()
+            if cam is not None:
+                cam.grab()  # the stream's waiting frame was exposed earlier, maybe still moving
             img = cam.grab()[0] if cam is not None else None
         if img is not None:
             if not cv2.imwrite(str(path), img, [cv2.IMWRITE_JPEG_QUALITY, 95]):

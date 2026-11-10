@@ -131,6 +131,42 @@ def test_photo_position_moves_in_xy_only_at_travel_height(machine):
     assert motion.current_tip()[2] == tz
 
 
+def test_photo_position_waits_for_the_bed_to_stop_shaking(machine):
+    from sortering_pnp.printer.motion import Motion
+
+    machine.printer.photo_settle_s = 0.7
+    printer = SimPrinter(machine, SimWorld(seed=1))
+    printer.gcode("G28")
+    motion = Motion(printer, machine)
+    motion.move(100.0, 100.0, machine.printer.travel_z)
+    printer.log.clear()
+    motion.photo_position()
+    g1 = max(i for i, line in enumerate(printer.log) if line.startswith("G1"))
+    dwell = printer.log.index("G4 P700")
+    assert dwell > g1 and "M400" in printer.log[dwell + 1 :]
+    printer.log.clear()
+    motion.photo_position()  # already there: nothing shakes, no wait
+    assert not any(line.startswith("G4") for line in printer.log)
+
+
+def test_photo_is_a_frame_taken_after_the_move(machine, tmp_path):
+    import threading
+
+    import cv2
+    import numpy as np
+
+    from sortering_pnp.vision import CameraVision
+
+    frames = iter([np.zeros((4, 4, 3), np.uint8), np.full((4, 4, 3), 200, np.uint8)])
+    cam = type("Cam", (), {"grab": lambda self: (next(frames), {})})()
+    vision = CameraVision.__new__(CameraVision)
+    vision._cam_lock = threading.Lock()
+    vision._camera = lambda: cam
+    path = tmp_path / "photo.jpg"
+    vision._snap(path)
+    assert cv2.imread(str(path)).mean() > 150  # the stale first frame was thrown away
+
+
 def test_photo_position_z_when_asked_and_for_the_head_camera(machine):
     from sortering_pnp.printer.motion import Motion
 

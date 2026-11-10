@@ -74,6 +74,7 @@ printer:
   change_position: [110, 220, 100]  # tip X Y Z where the head waits while the picker is put on (head high, bed out)
   travel_z: 50                 # tip height for moves across the bed (above the bins)
   photo_at_travel_z: true      # fixed camera: park for photos at travel_z, not photo_position's Z (no extra rise each cycle; false: go to that Z)
+  photo_settle_s: 0.5          # wait this long after moving to the photo position, so the bed has stopped shaking (blurry photos: raise it)
   feed_xy: 6000
   feed_z: 1200
   limits_x: [0, 220]           # toolhead limits (soft limits, checked before every move)
