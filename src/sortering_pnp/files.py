@@ -9,7 +9,7 @@ Which copy is in use, first found:
      in every dataset, training-synth into every package), so they always match the model;
   2. the file dropped in the Files tab;
   3. the path set in machine.yaml (paths.calibration, ...), for whoever prefers that;
-  4. the copy that comes with sortering-pnp (defaults/: vision settings, parts, classes);
+  4. the copy that comes with Sortering PNP (defaults/: vision settings, parts, classes);
   5. nothing: each slot says what is done without it.
 The model itself is not here: the Models tab keeps any number of them.
 """
@@ -107,7 +107,7 @@ SLOTS: tuple[Slot, ...] = (
         "Vision settings",
         "vision.yaml",
         "yaml",
-        "Comes with sortering-pnp (src/sortering_pnp/defaults/vision.yaml): download it from here, "
+        "Comes with Sortering PNP (src/sortering_pnp/defaults/vision.yaml): download it from here, "
         "change it, drop it back.",
         "The camera's height until it is calibrated, and how lengths are measured.",
         "The settings that come with sortering-pnp.",
@@ -122,7 +122,7 @@ SLOTS: tuple[Slot, ...] = (
         "for a model without it: screw-synth, `screwsynth-catalogue parts --out parts.json`.",
         "Per class: the standard lengths a measurement snaps to, the thread and head sizes (the "
         "grip point) and how high the axis lies.",
-        "The table that comes with sortering-pnp (the full screw-synth catalogue).",
+        "The table that comes with Sortering PNP (the full screw-synth catalogue).",
         _parts,
     ),
     Slot(
@@ -132,7 +132,7 @@ SLOTS: tuple[Slot, ...] = (
         "yaml",
         "Inside every model package. Or screw-synth's configs/classes.yaml.",
         "The Models tab checks that a model knows the classes the catalogue expects.",
-        "The list that comes with sortering-pnp (the full screw-synth catalogue).",
+        "The list that comes with Sortering PNP (the full screw-synth catalogue).",
         _classes,
     ),
     Slot(
