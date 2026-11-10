@@ -40,6 +40,8 @@ h2{font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercas
 p{margin:0 0 10px}.mut{color:var(--mut)}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
 .alert{display:inline-block;max-width:100%;box-sizing:border-box;background:var(--bad-soft);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);border-left:4px solid var(--bad);border-radius:8px;padding:7px 12px;font-weight:600;line-height:1.4;animation:alertin .3s ease-out}.alert::before{content:"⚠ "}
 @keyframes alertin{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.spin{animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.bcrun{animation:bcpulse 1.2s ease-in-out infinite}@keyframes bcpulse{50%{opacity:.35}}
 .note{font-size:13px;color:var(--mut)}
 
 /* controls */
@@ -490,6 +492,7 @@ let layTick=0,NEXT=null,SHOT_T=null;
 function mmss(s){return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
 function camNote(){const n=(S.parts||[]).filter(p=>p.in_work!==false).length,el=$("camnote");if(!el)return;
  if(!S.view){el.textContent="";return;}
+ if(S.bins_check){const B=S.bins_check;el.textContent=B.finished?`bins check done · ${B.total} bins`:`bins check · ${B.done} of ${B.total} bins`;return;}
  if(S.analysing){el.textContent="new photo · running the model…";return;}
  const t=NEXT!=null?`next photo in ${mmss(Math.max(0,Math.round((NEXT-Date.now())/1000)))}`:SHOT_T!=null?ago(Math.round((Date.now()-SHOT_T)/1000)):"";
  el.textContent=`${n} part${n===1?"":"s"}`+(t?` · ${t}`:"");}
@@ -527,8 +530,31 @@ const PAL=["#5f8f8b","#b0873c","#6f7fb3","#b4553f","#5b8e66","#9a6fa8","#4d8fb0"
 function colourOf(cls){let h=0;for(const c of cls)h=(h*31+c.charCodeAt(0))>>>0;return PAL[h%PAL.length];}
 function mapPt(H,x,y){const w=H[2][0]*x+H[2][1]*y+H[2][2];return[(H[0][0]*x+H[0][1]*y+H[0][2])/w,(H[1][0]*x+H[1][1]*y+H[1][2])/w];}
 function partName(p){return p.cls+(p.length!=null?`x${p.length}`:"");}
+// a "thinking" ring, turning; c: a colour or a CSS variable
+function spinner(cx,cy,r,c,w){return `<g transform="translate(${cx} ${cy})"><g class="spin"><circle r="${r}" fill="none" style="stroke:${c}" stroke-opacity=".28" stroke-width="${w}"/><circle r="${r}" fill="none" style="stroke:${c}" stroke-width="${w}" stroke-linecap="round" stroke-dasharray="${r*1.7} ${r*9}"/></g></g>`;}
+function bcMap(){const r={};for(const b of (S.bins_check||{}).bins||[])r[b.marker]=b;return r;}
+// the bins check, bin by bin: done bins show what was found and what they collect now, the one
+// being looked into is lit, the others wait greyed out with a turning ring; a bar on top counts
+function binsCheckSvg(H,W,Hh,fs,lw){const B=S.bins_check;if(!B||!B.bins)return"";let s="",cur=null;
+ for(const b of B.bins){const pts=b.floor.map(q=>mapPt(H,q[0],q[1])),P=pts.map(q=>q.join(",")).join(" "),xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),cx=(x0+x1)/2,cy=(y0+y1)/2,r=Math.max(fs*0.7,Math.min(x1-x0,y1-y0)*0.17);
+  if(b.state==="pending")s+=`<polygon points="${P}" fill="#4b5563" fill-opacity=".62" stroke="#fff" stroke-opacity=".5" stroke-width="${lw}"/>`+spinner(cx,cy,r,"#fff",r*0.26);
+  else if(b.state==="running"){cur=b;s+=`<polygon class="bcrun" points="${P}" style="fill:var(--acc)" fill-opacity=".22"/><polygon points="${P}" fill="none" style="stroke:var(--acc)" stroke-width="${lw*3.2}"/>`+spinner(cx,cy,r*1.25,"var(--acc)",r*0.3)+
+   `<text x="${cx}" y="${cy+r*1.25+fs*1.3}" font-size="${fs}" font-weight="700" fill="#fff" stroke="#0b3b37" stroke-width="${fs*0.22}" paint-order="stroke" text-anchor="middle">looking…</text>`;}
+  else{const full=b.full,col=full?"#15803d":"#8a9198";
+   for(const p of b.parts||[]){const c=colourOf(p.cls),q=p.poly.map(v=>mapPt(H,v[0],v[1])).map(v=>v.join(",")).join(" ");s+=`<polygon points="${q}" fill="${c}" fill-opacity=".3" stroke="${c}" stroke-width="${lw}"/>`;}
+   s+=`<polygon points="${P}" fill="none" stroke="${col}" stroke-width="${lw*(full?2.2:1.4)}"/>`;
+   const t=b.result||"",f2=fs*1.1,w=Math.min(x1-x0,t.length*f2*0.56+f2*0.6);
+   s+=`<g><rect x="${x0+lw}" y="${y0+lw}" width="${w}" height="${f2*1.4}" rx="${f2*0.3}" fill="${col}" opacity=".92"/><text x="${x0+lw+f2*0.3}" y="${y0+lw+f2*1.05}" font-size="${f2}" font-weight="600" fill="#fff">${esc(t.length*f2*0.56>w?t.slice(0,Math.max(4,Math.floor((w-f2*0.6)/(f2*0.56))))+"…":t)}</text></g>`;}}
+ const F=fs*1.5,bh=F*2.2,done=B.done||0,tot=Math.max(1,B.total||0);
+ if(B.finished){const n=B.bins.filter(b=>b.full).length;
+  s+=`<g><rect x="0" y="0" width="${W}" height="${bh}" fill="#14532d" opacity=".85"/><text x="${F*0.7}" y="${bh/2+F*0.35}" font-size="${F}" font-weight="700" fill="#fff">✓ Bins check done · ${B.total} bins, ${n} with parts</text></g>`;return s;}
+ s+=`<g><rect x="0" y="0" width="${W}" height="${bh}" fill="#111827" opacity=".85"/><rect x="0" y="${bh-F*0.3}" width="${W*done/tot}" height="${F*0.3}" style="fill:var(--acc)"/>`+
+  spinner(F*1.1,bh/2-F*0.1,F*0.5,"#fff",F*0.17)+
+  `<text x="${F*2.1}" y="${bh/2+F*0.25}" font-size="${F}" font-weight="700" fill="#fff">Looking into the bins · ${done} of ${B.total}${cur?` · now bin ${esc(cur.cell)} (${cur.marker})`:""}</text></g>`;
+ return s;}
 function drawOverlay(){const svg=$("ov"),im=$("view"),H=S.view_h;
- if(!im.naturalWidth||!H||!S.view){svg.innerHTML="";return;}
+ if(!im.naturalWidth||!H||!S.view){svg.innerHTML="";svg._s="";return;}
  const W=im.naturalWidth,Hh=im.naturalHeight,fs=Math.max(11,W/70),lw=Math.max(1.2,W/600);
  svg.setAttribute("viewBox",`0 0 ${W} ${Hh}`);svg.setAttribute("preserveAspectRatio","xMidYMid meet");
  const parts=(S.parts||[]).filter(p=>p.in_work!==false&&p.poly&&p.poly.length>2),T=S.target;let s="";
@@ -543,7 +569,8 @@ function drawOverlay(){const svg=$("ov"),im=$("view"),H=S.view_h;
  if($("showcode").checked)for(const mk of S.markers||[]){if(!mk.view_px&&!mk.plate)continue;const[x,y]=mk.view_px||mapPt(H,mk.plate[0],mk.plate[1]);if(x<0||y<0||x>W||y>Hh)continue;
   const lab=mk.cell?`${mk.marker} · ${mk.cell}`:String(mk.marker),w=lab.length*fs*0.62+fs*0.7;
   s+=`<g><circle cx="${x}" cy="${y}" r="${fs*0.35}" fill="#1d4ed8" stroke="#fff" stroke-width="${lw}"/><rect x="${x+fs*0.5}" y="${y-fs*0.75}" width="${w}" height="${fs*1.4}" rx="${fs*0.3}" fill="#1d4ed8" opacity=".9"/><text x="${x+fs*0.85}" y="${y+fs*0.32}" font-size="${fs}" font-weight="600" fill="#fff">${esc(lab)}</text></g>`;}
- svg.innerHTML=s;
+ s+=binsCheckSvg(H,W,Hh,fs,lw);
+ if(svg._s!==s){svg._s=s;svg.innerHTML=s;}  // unchanged: the turning rings keep turning
  camNote();
  $("target").innerHTML=T?`Next: <b>${esc(T.name)}</b>${T.cell?` into bin <b>${esc(T.cell)}</b> (${T.bin})`:""}`:(S.plan?esc(S.plan):"");}
 
@@ -586,7 +613,7 @@ function binText(b){const claim=(S.claims||{})[b.marker];
 function queue(text){pending.push(text);renderBed();}
 function changedBins(){if(!lay||!draft)return new Set();const was={};for(const b of lay.bins)was[b.marker]=JSON.stringify(b);return new Set(draft.bins.filter(b=>was[b.marker]!==JSON.stringify(b)).map(b=>b.marker));}
 function dots(x,y,on){return `<g class="dots" data-dot="1"><rect x="${x-9}" y="${y-5}" width="18" height="10" rx="5" fill="${on?"var(--acc-soft)":"transparent"}"/>`+[-4.5,0,4.5].map(d=>`<circle cx="${x+d}" cy="${y}" r="1.25" fill="var(--mut)"/>`).join("")+"</g>";}
-function renderBed(){const L=draft;if(!L)return;const W=L.cols*CELL,H=L.rows*CELL,svg=$("grid"),rm=readyMap(),qm=swapMap(),ch=changedBins(),pad=4;
+function renderBed(){const L=draft;if(!L)return;const W=L.cols*CELL,H=L.rows*CELL,svg=$("grid"),rm=readyMap(),qm=swapMap(),ch=changedBins(),bcm=bcMap(),pad=4;
  svg.setAttribute("viewBox",`${-pad} ${-pad} ${W+2*pad} ${H+2*pad}`);const Y=(y,d)=>H-(y+d)*CELL;let s="";
  const taken=new Set();for(const b of L.bins)for(let i=0;i<b.w;i++)for(let j=0;j<b.d;j++)taken.add(`${b.x+i},${b.y+j}`);
  for(let x=0;x<L.cols;x++)for(let y=0;y<L.rows;y++){const free=!taken.has(`${x},${y}`),x0=x*CELL+1.5,y0=Y(y,1)+1.5;
@@ -607,10 +634,14 @@ function renderBed(){const L=draft;if(!L)return;const W=L.cols*CELL,H=L.rows*CEL
   else if(f&&f.count&&!t.plate){const share=Math.min(1,f.share),bar=bw-30;
    s+=`<g><title>${f.full?"full: change it soon":`about ${Math.round(share*100)} % full, room for about ${f.more} more`}</title><rect x="${x0+7}" y="${y0+bh-6}" width="${bar}" height="2.4" rx="1.2" fill="var(--line2)"/><rect x="${x0+7}" y="${y0+bh-6}" width="${Math.max(2.4,bar*share)}" height="2.4" rx="1.2" fill="${f.full?"var(--warn)":"var(--acc)"}"/></g>`;}
   if(S.target&&S.target.bin===b.marker)s+=`<rect x="${x0-2.5}" y="${y0-2.5}" width="${bw+5}" height="${bh+5}" rx="9" fill="none" stroke="#c8462c" stroke-width="1.4"/>`;
+  const bc=bcm[b.marker];  // the bins check: waiting (greyed, a turning ring) or looked into now
+  if(bc&&bc.state!=="done"){const run=bc.state==="running",rr=Math.min(bw,bh)*0.15;
+   s+=`<rect ${run?'class="bcrun" ':""}x="${x0}" y="${y0}" width="${bw}" height="${bh}" rx="7" fill="${run?"var(--acc-soft)":"#9ca3af"}" fill-opacity="${run?0.9:0.55}"${run?' style="stroke:var(--acc)" stroke-width="2"':""}/>`+
+    spinner(x0+bw/2,y0+bh/2-(run?3:0),rr,run?"var(--acc)":"#fff",rr*0.3)+(run?`<text x="${x0+bw/2}" y="${y0+bh/2+rr+7}" font-size="6.4" font-weight="700" style="fill:var(--acc)" text-anchor="middle">looking…</text>`:"");}
   s+=dots(x0+bw-11,y0+bh-6.5)+"</g>";}
- svg.innerHTML=s;
+ if(svg._s!==s){svg._s=s;svg.innerHTML=s;  // unchanged: left alone, the rings keep turning
  svg.querySelectorAll("g[data-m]").forEach(g=>{const m=+g.dataset.m,open=e=>{e.preventDefault();e.stopPropagation();binMenu(m,e);};g.onclick=open;g.oncontextmenu=open;});
- svg.querySelectorAll("g[data-cell]").forEach(g=>{const[x,y]=g.dataset.cell.split(",").map(Number);if(taken.has(`${x},${y}`))return;const open=e=>{e.preventDefault();e.stopPropagation();cellMenu(x,y,e);};g.onclick=open;g.oncontextmenu=open;});
+ svg.querySelectorAll("g[data-cell]").forEach(g=>{const[x,y]=g.dataset.cell.split(",").map(Number);if(taken.has(`${x},${y}`))return;const open=e=>{e.preventDefault();e.stopPropagation();cellMenu(x,y,e);};g.onclick=open;g.oncontextmenu=open;});}
  $("pending").hidden=!pending.length;$("pendtext").innerHTML=pending.length?`<b>${pending.length} change${pending.length===1?"":"s"} queued</b> · ${pending.map(esc).join(" · ")}`:"";
  renderBedBar();}
 const WARN_ICO='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.5"/></svg>';

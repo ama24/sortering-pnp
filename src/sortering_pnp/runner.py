@@ -74,6 +74,9 @@ class State:
     # in_work per part), kept while the next photo is taken; None until a model has looked
     census: list[dict[str, Any]] | None = None
     analysing: bool = False  # a new photo is shown, its parts are not known yet
+    # the bins check going bin by bin: {total, done, current, bins: [{marker, cell, floor
+    # (plate mm), state pending|running|done, result, full, parts: [{cls, poly}]}]}; None
+    bins_check: dict[str, Any] | None = None
 
 
 ADJUST_RANGE = {  # Camera Calibration tab: what the sliders may set
@@ -121,6 +124,8 @@ class Runner:
         if cal is not None:
             self.calib_pairs = list(cal.pairs)
         self.last_shot: Shot | None = None
+        self._last_photo: tuple[str, Any] | None = None  # (name, photo) of the latest snap
+        self._bins_view: dict[str, Any] = {}  # the bins check, bin by bin (state.bins_check)
         self._claims_lock = threading.RLock()
         # wild bin marker -> what it collects; bin marker -> parts in it since it was emptied
         self.claims, self.bin_counts, self.bin_volume = self._load_claims()
@@ -279,6 +284,7 @@ class Runner:
             "target": self.state.target,
             "view": self.state.view,
             "view_h": self.state.view_h,
+            "bins_check": self.state.bins_check,
             "next_look_s": (
                 round(max(0.0, self._next_look - time.time()), 1)
                 if self._next_look is not None
@@ -504,12 +510,14 @@ class Runner:
         move: bool = True,
         area: str = "work",
         paint: bool = True,
+        parts: bool = True,
     ) -> Shot:
         """Photo position, photo, parts (with printer X/Y when T is known), markers. `move`
         False: photograph where the bed is (standby with the motors off: still parked).
         A head camera photographs `area`: work (the tray), bins (the grid and around it) or
         here (one photo at the photo position: calibration). `paint`: the model sees only the
-        tray's inside (trayview.py); False to look into the bins too."""
+        tray's inside (trayview.py); False to look into the bins too. `parts` False: no model
+        pass, only the codes (the bins check then looks into each bin on its own)."""
         work = self._work_area(layout, T) if paint else None
         if self.m.camera.source == "head":
             return self._head_shot(layout, T, area, work)
@@ -523,16 +531,20 @@ class Runner:
                 self.phase("taking a photo")
                 with self.lights.for_photo():
                     photo = self.vision.snap(name)
+                self._last_photo = (name, photo)
                 self._show_photo(photo, name)
-                self.phase("running the model")
+                self.phase("running the model" if parts else "reading the codes")
                 try:
-                    shot = (
-                        self.vision.analyse(photo, name, heights, work)
-                        if work is not None
-                        else self.vision.analyse(photo, name, heights)
-                    )
+                    if not parts:
+                        shot = self.vision.analyse(photo, name, heights, parts=False)
+                    elif work is not None:
+                        shot = self.vision.analyse(photo, name, heights, work)
+                    else:
+                        shot = self.vision.analyse(photo, name, heights)
                 finally:
                     self._set(analysing=False)
+                if not parts:
+                    return self._finish_shot(shot, layout, T, counted=False)
             else:
                 self.phase("taking a photo")
                 with self.lights.for_photo():
@@ -874,9 +886,13 @@ class Runner:
             markers=[],
             target=None,
             analysing=True,
+            bins_check=None,
         )
 
-    def _finish_shot(self, shot: Shot, layout: Layout, T: Transform2D | None) -> Shot:
+    def _finish_shot(
+        self, shot: Shot, layout: Layout, T: Transform2D | None, counted: bool = True
+    ) -> Shot:
+        """`counted` False: the model did not look (codes only): the tray's census stays."""
         self.markers_seen |= {mk.marker for mk in shot.markers}
         self._shot_t = time.time()
         if T is not None:
@@ -901,7 +917,7 @@ class Runner:
             for p in shot.parts
         ]
         # without a model only the codes were read: no parts is not an empty tray
-        modelled = not getattr(self.vision, "model_missing", lambda: None)()
+        modelled = counted and not getattr(self.vision, "model_missing", lambda: None)()
         census = (
             [{k: d[k] for k in ("cls", "length", "in_work")} for d in parts]
             if modelled
@@ -914,6 +930,7 @@ class Runner:
             parts=parts,
             census=census,
             analysing=False,
+            bins_check=None,  # a new photo: the last bins check's results go
             markers=[
                 {
                     "marker": mk.marker,
@@ -1564,7 +1581,9 @@ class Runner:
         if not parked:
             with self._lock:
                 self.motion.preflight(home=False)
-        shot = self.take_shot(layout, T, move=not parked, area="bins", paint=False)
+        shot = self.take_shot(
+            layout, T, move=not parked, area="bins", paint=False, parts=not self._bin_by_bin(T)
+        )
         report = layout.resync(self._seen_bins(layout, shot, T))
         layout.save(self.layout_path)
         checked = None
@@ -2029,7 +2048,9 @@ class Runner:
             sc.set("layout", "running")
             self.phase("start-up: finding the bins")
             layout, T = self.layout(), self.transform()
-            shot = self.take_shot(layout, T, area="bins", paint=False)
+            shot = self.take_shot(
+                layout, T, area="bins", paint=False, parts=not self._bin_by_bin(T)
+            )
             sc.set("layout", "done", self._startup_layout(layout, shot, T))
 
             sc.set("bins", "running")
@@ -2066,57 +2087,87 @@ class Runner:
         self.note(f"start-up: {text}")
         return text
 
+    def _bin_by_bin(self, T: Transform2D | None) -> bool:
+        """The bins check looks into each bin on its own (the rest painted over, as the tray
+        for sorting), when the camera is fixed above the bed and the model can do it."""
+        return (
+            T is not None
+            and self.m.camera.source != "head"
+            and hasattr(self.vision, "analyse_area")
+            and not getattr(self.vision, "model_missing", lambda: None)()
+        )
+
+    def _bin_area(self, layout: Layout, T: Transform2D, b: Any) -> WorkArea:
+        """A bin's inside (without its code's shelf, its corner post a hole) in the plate frame,
+        with the tray's mask margin: what the model sees of it."""
+        Ti = T.inverse()
+        g = self.m.camera.mask_margin_mm
+        x0, y0, x1, y1 = layout.bin_inside(b)
+        post = layout.bin_keepout(b)
+        holes = []
+        if post is not None:
+            px0, py0, px1, py1 = post
+            holes = [Ti.apply(tray_rect(px0 + g, py0 + g, px1 - g, py1 - g))]
+        return WorkArea(Ti.apply(tray_rect(x0 - g, y0 - g, x1 + g, y1 + g)), holes)
+
     def _bins_check(self, layout: Layout, shot: Shot, T: Transform2D | None) -> str:
-        """What each bin holds (binscheck.py), from one model pass on the whole board: Resync
-        and the start-up check only. Parts on a bin's code are not counted (the printed code
+        """What each bin holds (binscheck.py): Resync and the start-up check only. Bin by bin
+        (`_bin_by_bin`): one model pass per bin on the same photo, everything but that bin
+        painted over as the tray is for sorting; the page sees each bin's result as it comes
+        (state.bins_check), the others greyed out, waiting. Otherwise the parts of the one
+        pass on the whole board. Parts on a bin's code are not counted (the printed code
         looks like parts to the model), nor unknown or unsure ones. A wild bin with parts
         collects their kind, an empty one is free; one with only unknown parts keeps what it
         had. An empty bin with no rules becomes wild. A bin with rules keeps them (a kind its
         rules do not take is told). The picture with the result replaces the photo."""
         spots = binscheck.code_spots(shot, T)
-        per_bin, dropped = binscheck.sort_out(layout, shot.parts, self.m.run.min_score, spots)
+        codes = list(spots.values())
+        min_score = self.m.run.min_score
+        stores = sorted((b for b in layout.bins if b.role != "work"), key=lambda b: b.marker)
+        one_by_one = self._bin_by_bin(T) and self._last_photo is not None
+        if one_by_one:
+            assert T is not None and self._last_photo is not None
+            name, photo = self._last_photo
+            per_bin: dict[int, list[Part]] = {}
+            dropped: list[Part] = []
+            self._bins_progress_start(layout, T, stores)
+        else:
+            per_bin, dropped = binscheck.sort_out(layout, shot.parts, min_score, spots)
         looks: list[binscheck.BinLook] = []
         filled: list[str] = []
         empty: list[str] = []
         changed = False
-        with self._claims_lock:
-            for b in layout.bins:
-                if b.role == "work":
-                    continue
-                mk, cell = b.marker, layout.bin_name(b)
-                seen = per_bin.get(mk, [])
-                ps = [p for p in seen if not p.unknown]
-                look = binscheck.BinLook(mk, cell, seen)
+        try:
+            for i, b in enumerate(stores):
+                if one_by_one:
+                    assert T is not None
+                    cell = layout.bin_name(b)
+                    self._bins_progress(b.marker, state="running")
+                    self.phase(f"looking into bin {cell} ({b.marker}): {i + 1} of {len(stores)}")
+                    found = self.vision.analyse_area(
+                        photo, f"{name}_{b.marker}", self._bin_area(layout, T, b)
+                    )
+                    to_bed(found, T)
+                    per_bin[b.marker] = parts_in_bin(layout, b, found, min_score, codes)
+                    dropped += [
+                        p
+                        for p in found
+                        if p not in per_bin[b.marker]
+                        and p.score >= min_score
+                        and binscheck.on_code(layout, b, p, codes)
+                    ]
+                with self._claims_lock:
+                    look = binscheck.BinLook(
+                        b.marker, layout.bin_name(b), per_bin.get(b.marker, [])
+                    )
+                    changed |= self._bins_check_one(layout, b, look, filled, empty)
+                    self._save_claims()
                 looks.append(look)
-                if b.role == "sort" and not b.holds and not seen:
-                    b.role, changed = "wild", True
-                if b.role != "wild":
-                    look.result = self._bins_check_kept(b, ps)
-                    continue
-                if seen and not ps:  # only unknown parts: maybe the code after all
-                    look.result = f"unknown only: kept ({self.claims.get(mk) or 'free'})"
-                    continue
-                if ps:
-                    key = kind_of(ps, layout.wild_by)
-                    vol = sum(part_volume_mm3(p, self.m.run.fill, self.volumes) for p in ps)
-                    if self.claims.get(mk) == key:  # the same kind: the camera sees only the top
-                        n = max(len(ps), self.bin_counts.get(mk, 0))
-                        vol = max(vol, self.bin_volume.get(mk, 0.0))
-                    else:
-                        n = len(ps)
-                    if self.claims.get(mk) != key:
-                        self.say(f"bin {cell} ({mk}): {key} seen in it, collects {key} now")
-                    self.claims[mk], self.bin_counts[mk], self.bin_volume[mk] = key, n, vol
-                    self.bin_family[mk] = family(Counter(p.cls for p in ps).most_common(1)[0][0])
-                    filled.append(f"{cell} {key} ({n})")
-                    look.result, look.changed = f"{key} ({n})", True
-                else:
-                    for d in (self.claims, self.bin_counts, self.bin_volume, self.bin_family):
-                        d.pop(mk, None)
-                    self.requests = [r for r in self.requests if r.marker != mk]
-                    empty.append(cell)
-                    look.result = "empty: wild, free"
-            self._save_claims()
+                if one_by_one:
+                    self._bins_progress(b.marker, state="done", look=look)
+        except BaseException:
+            self._set(bins_check=None)
+            raise
         if changed:
             layout.save(self.layout_path)
         text = f"{len(filled)} with parts" + (f": {', '.join(filled)}" if filled else "")
@@ -2125,8 +2176,96 @@ class Runner:
             text += f"; {len(dropped)} on codes, not counted"
         self.note(f"bins check: {text}")
         self.say(f"bins check: {text}")
-        self._show_bins_check(shot, T, layout, looks, dropped, spots)
+        # bin by bin: the page keeps showing the results over the photo until the next photo
+        # (the drawn picture is kept as a record); otherwise the drawn picture is shown
+        self._show_bins_check(shot, T, layout, looks, dropped, spots, show=not one_by_one)
+        if one_by_one:
+            self._bins_view.update(finished=True, current=None)
+            self._set(bins_check=copy.deepcopy(self._bins_view))
         return text
+
+    def _bins_check_one(
+        self,
+        layout: Layout,
+        b: Any,
+        look: binscheck.BinLook,
+        filled: list[str],
+        empty: list[str],
+    ) -> bool:
+        """What one bin collects after the check (claims lock held); True when the layout
+        changed (an empty bin without rules became wild)."""
+        mk, cell, seen = b.marker, look.cell, look.parts
+        ps = [p for p in seen if not p.unknown]
+        changed = False
+        if b.role == "sort" and not b.holds and not seen:
+            b.role, changed = "wild", True
+        if b.role != "wild":
+            look.result = self._bins_check_kept(b, ps)
+            return changed
+        if seen and not ps:  # only unknown parts: maybe the code after all
+            look.result = f"unknown only: kept ({self.claims.get(mk) or 'free'})"
+            return changed
+        if ps:
+            key = kind_of(ps, layout.wild_by)
+            vol = sum(part_volume_mm3(p, self.m.run.fill, self.volumes) for p in ps)
+            if self.claims.get(mk) == key:  # the same kind: the camera sees only the top
+                n = max(len(ps), self.bin_counts.get(mk, 0))
+                vol = max(vol, self.bin_volume.get(mk, 0.0))
+            else:
+                n = len(ps)
+            if self.claims.get(mk) != key:
+                self.say(f"bin {cell} ({mk}): {key} seen in it, collects {key} now")
+            self.claims[mk], self.bin_counts[mk], self.bin_volume[mk] = key, n, vol
+            self.bin_family[mk] = family(Counter(p.cls for p in ps).most_common(1)[0][0])
+            filled.append(f"{cell} {key} ({n})")
+            look.result, look.changed = f"{key} ({n})", True
+        else:
+            for d in (self.claims, self.bin_counts, self.bin_volume, self.bin_family):
+                d.pop(mk, None)
+            self.requests = [r for r in self.requests if r.marker != mk]
+            empty.append(cell)
+            look.result = "empty: wild, free"
+        return changed
+
+    def _bins_progress_start(self, layout: Layout, T: Transform2D, stores: list[Any]) -> None:
+        """The page's view of the bins check: every bin waiting, its floor in the plate frame."""
+        Ti = T.inverse()
+        bins = []
+        for b in stores:
+            x0, y0, x1, y1 = layout.bin_inside(b)
+            floor = Ti.apply(tray_rect(x0, y0, x1, y1))
+            bins.append(
+                {
+                    "marker": b.marker,
+                    "cell": layout.bin_name(b),
+                    "floor": _poly_for_page(floor),
+                    "state": "pending",
+                    "result": "",
+                    "full": False,
+                    "parts": [],
+                }
+            )
+        self._bins_view = {"total": len(bins), "done": 0, "current": None, "bins": bins}
+        self._set(bins_check=copy.deepcopy(self._bins_view))
+
+    def _bins_progress(
+        self, marker: int, state: str, look: binscheck.BinLook | None = None
+    ) -> None:
+        """One bin starts (running) or is done (its result and the parts counted in it)."""
+        v = self._bins_view
+        for row in v["bins"]:
+            if row["marker"] != marker:
+                continue
+            row["state"] = state
+            if look is not None:
+                row["result"] = look.result
+                row["full"] = bool(look.parts)
+                row["parts"] = [
+                    {"cls": p.cls, "poly": _poly_for_page(p.polygon, 16)} for p in look.parts
+                ]
+        v["current"] = marker if state == "running" else None
+        v["done"] = sum(r["state"] == "done" for r in v["bins"])
+        self._set(bins_check=copy.deepcopy(v))
 
     def _bins_check_kept(self, b: Any, ps: list[Part]) -> str:
         """A bin with its own role or rules keeps them: what is written on it."""
@@ -2147,8 +2286,9 @@ class Runner:
         looks: list[binscheck.BinLook],
         dropped: list[Part],
         spots: dict[int, tuple[float, float]],
+        show: bool = True,
     ) -> None:
-        """The bins check drawn on the photo, shown on the page in its place."""
+        """The bins check drawn on the photo (`show`: shown on the page in its place)."""
         view, H = getattr(shot, "view", None), getattr(shot, "view_h", None)
         if view is None or H is None or T is None:
             return
@@ -2158,7 +2298,7 @@ class Runner:
         except Exception:  # noqa: BLE001 - only the picture is missing
             log.exception("bins check picture")
             return
-        if done is not None:
+        if done is not None and show:
             self._set(view=done.name)
 
     def _look_for_bins(self, layout: Layout, T: Transform2D) -> bool:

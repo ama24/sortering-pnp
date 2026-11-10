@@ -255,6 +255,7 @@ class SimVision:
         self.head = None  # config.HeadCamera
         self.head_ref: tuple[float, float] = (0.0, 0.0)  # tip X/Y of the calibration photo
         self.painted: list[bool] = []  # per photo: was everything outside the tray painted over
+        self.areas: list = []  # the areas analyse_area looked into (one per bin in a bins check)
         self._px: np.ndarray | None = None  # bed mm -> picture pixels of the last drawing
         self.previews: list[str] = []  # photos shown before their analysis
 
@@ -287,8 +288,9 @@ class SimVision:
         name: str,
         marker_height: Callable[[int], float],
         work=None,  # noqa: ANN001 - trayview.WorkArea: the model sees only the tray's inside
+        parts: bool = True,  # False: the codes and the picture only (no model)
     ) -> Shot:
-        if self.delay_s:
+        if self.delay_s and parts:
             time.sleep(self.delay_s)
         T = self.transform()
         Ti = T.inverse()
@@ -311,10 +313,40 @@ class SimVision:
                 sp for sp in plate if work.contains(tuple(Ti.apply([sp.x - d[0], sp.y - d[1]])))
             ]
         self.painted.append(work is not None)
-        parts = []
+        found = self._parts(plate, T, d) if parts else []
+        markers = []
+        for b in lay.bins:  # each code on its bin's shelf or post, its top edge to the back
+            mx, my = lay.marker_centre(b)
+            if not seen(mx, my):
+                continue
+            markers.append(
+                MarkerPose(
+                    b.marker,
+                    tuple(float(v) for v in Ti.apply([mx - d[0], my - d[1]])),
+                    (90.0 + b.rot - T.angle_deg) % 360.0,
+                )
+            )
+        shot = Shot(name, found, markers)
+        if self.out is not None:
+            painted = [T.apply(work.outline)] if work is not None else None
+            shot.vis = self._draw(name, lay, plate, painted)  # what the model saw
+            shot.view = self._draw(name, lay, plate, None, "view")  # the whole picture
+            if self._px is not None:  # plate -> bed (T) -> picture pixels
+                Tm = np.eye(3)
+                Tm[:2, :2], Tm[:2, 2] = T.A, T.t
+                shot.view_h = (self._px @ Tm).tolist()
+                Hv = np.asarray(shot.view_h)
+                for i, mk in enumerate(markers):  # each code's centre in the picture
+                    u, v, w = Hv @ np.array([mk.centre[0], mk.centre[1], 1.0])
+                    markers[i] = dataclasses.replace(mk, view_px=(float(u / w), float(v / w)))
+        return shot
+
+    def _parts(self, plate: list[SimPart], T: Transform2D, d: np.ndarray) -> list[Part]:
+        Ti = T.inverse()
+        out = []
         for i, sp in enumerate(plate, start=1):
             bed_poly = _rect(sp.x - d[0], sp.y - d[1], sp.size[0], sp.size[1], sp.angle)
-            parts.append(
+            out.append(
                 Part(
                     id=i,
                     cls=sp.cls,
@@ -329,32 +361,17 @@ class SimVision:
                     has_length=sp.length is not None,
                 )
             )
-        markers = []
-        for b in lay.bins:  # each code on its bin's shelf or post, its top edge to the back
-            mx, my = lay.marker_centre(b)
-            if not seen(mx, my):
-                continue
-            markers.append(
-                MarkerPose(
-                    b.marker,
-                    tuple(float(v) for v in Ti.apply([mx - d[0], my - d[1]])),
-                    (90.0 + b.rot - T.angle_deg) % 360.0,
-                )
-            )
-        shot = Shot(name, parts, markers)
-        if self.out is not None:
-            painted = [T.apply(work.outline)] if work is not None else None
-            shot.vis = self._draw(name, lay, plate, painted)  # what the model saw
-            shot.view = self._draw(name, lay, plate, None, "view")  # the whole picture
-            if self._px is not None:  # plate -> bed (T) -> picture pixels
-                Tm = np.eye(3)
-                Tm[:2, :2], Tm[:2, 2] = T.A, T.t
-                shot.view_h = (self._px @ Tm).tolist()
-                Hv = np.asarray(shot.view_h)
-                for i, mk in enumerate(markers):  # each code's centre in the picture
-                    u, v, w = Hv @ np.array([mk.centre[0], mk.centre[1], 1.0])
-                    markers[i] = dataclasses.replace(mk, view_px=(float(u / w), float(v / w)))
-        return shot
+        return out
+
+    def analyse_area(self, plate: list[SimPart], name: str, work) -> list[Part]:  # noqa: ANN001
+        """The model on one area (a bin's inside), the rest painted over: only what lies in it."""
+        if self.delay_s:
+            time.sleep(self.delay_s)
+        T = self.transform()
+        Ti = T.inverse()
+        self.areas.append(work)
+        inside = [sp for sp in plate if work.contains(tuple(Ti.apply([sp.x, sp.y])))]
+        return self._parts(inside, T, np.zeros(2))
 
     def _draw(
         self,
