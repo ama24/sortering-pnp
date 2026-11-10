@@ -84,6 +84,9 @@ details.man summary::-webkit-details-marker{display:none}details.man summary:hov
 details.man[open]>div{position:absolute;right:0;top:100%;z-index:20;display:flex;gap:6px;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.08);white-space:nowrap}
 .bchg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 8px 7px 12px;margin-bottom:10px;border-radius:var(--r2);background:var(--warn-soft);border:1px solid #ecdcbc;font-size:13px}
 .bchg>b{color:var(--warn)}.bchg button:disabled{opacity:.6;cursor:default}
+#lr{accent-color:#dc2626}#lg{accent-color:#16a34a}#lb{accent-color:#2563eb}#lbr{accent-color:var(--acc)}.lsw{box-shadow:0 0 14px 2px rgba(0,0,0,.12)}
+.ltop{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-bottom:14px}.ltick{color:var(--ink);font-size:14px}.ltick.dim{opacity:.45}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--line2)}.seg button{font:inherit;font-size:13px;font-weight:700;letter-spacing:.04em;border:0;background:none;color:var(--mut);padding:6px 18px;border-radius:999px;cursor:pointer}.seg button.on{background:var(--acc);color:#fff}.seg button.on.off{background:var(--ink)}
 .lights{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-start}.lpick{display:flex;gap:8px;align-items:center}
 .lpick input[type=color]{width:44px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}.lpick #lhex{width:86px;font-family:ui-monospace,monospace}
 .lsw{width:34px;height:34px;border-radius:50%;border:1px solid var(--line)}.lsl{display:grid;gap:4px;min-width:260px}
@@ -846,7 +849,7 @@ function ledWiring(n){let s="";
  [["5V",212,WC.v5],["GND",240,WC.gnd],["DIN",268,WC.sig]].forEach(([l,y,c])=>{s+=`<rect x="470" y="${y-4}" width="8" height="8" fill="${c}"/>`+tx(482,y+4,l,'style="font-size:10px"');});
  const cx=576,cy=240,R=62,r=31;s+=tx(492,192,"JST XH",'text-anchor="middle" style="font-size:9.5px;opacity:.75"');
  s+=`<path d="M${cx-R},${cy}a${R},${R} 0 1,0 ${2*R},0a${R},${R} 0 1,0 ${-2*R},0ZM${cx-r},${cy}a${r},${r} 0 1,1 ${2*r},0a${r},${r} 0 1,1 ${-2*r},0Z" fill="#2b2f33" fill-rule="evenodd"/>`;
- for(let i=0;i<n;i++){const a=2*Math.PI*i/n,x=cx+46.5*Math.cos(a),y=cy+46.5*Math.sin(a);s+=`<rect x="${(x-5).toFixed(1)}" y="${(y-5).toFixed(1)}" width="10" height="10" rx="1.5" fill="#f8f8f4" stroke="#ffd43b" stroke-width="1.4"/>`;}
+ for(let i=0;i<n;i++){const a=2*Math.PI*i/n,x=cx+46.5*Math.cos(a),y=cy+46.5*Math.sin(a);s+=`<rect x="${(x-5).toFixed(1)}" y="${(y-5).toFixed(1)}" width="10" height="10" rx="1.5" class="ledpx" fill="${(SU.lights||{}).enabled?SU.lights.colour||"#ffffff":"#f8f8f4"}" fill-opacity="${(SU.lights||{}).enabled?0.25+0.75*(SU.lights.brightness==null?0.5:SU.lights.brightness):1}" stroke="#ffd43b" stroke-width="1.4"/>`;}
  s+=tx(cx,cy+R+20,"LED ring",'text-anchor="middle" font-weight="600"')+tx(cx,cy+R+35,`WS2812B × ${n} · OD 40 · ID 19.9 mm`,'text-anchor="middle" style="font-size:10.5px;opacity:.75"');
  // legend
  let lx=22;[["GPIO10: data (DIN)",WC.sig],["5 V",WC.v5],["24 V",WC.v24],["GND (all joined)",WC.gnd]].forEach(([l,c])=>{s+=`<rect x="${lx}" y="398" width="16" height="4" rx="2" fill="${c}"/>`+tx(lx+22,404,l,'font-size="11"');lx+=36+l.length*6.3;});
@@ -861,25 +864,31 @@ function ledWire(L){const n=L.count||8,rows=[[WC.sig,"19 · GPIO10","DIN of the 
   <h4>Pins on the Raspberry Pi</h4><table class="pins">${rows.map(([c,p,w])=>`<tr><td style="white-space:nowrap"><i style="background:${c}"></i><b>${p}</b></td><td>${w}</td></tr>`).join("")}</table>
   <h4>You need</h4><ul><li>LED ring, WS2812B (${n} LEDs, 3-pin JST XH)</li><li>5 V buck converter (LM2596 or MP1584, 1 A or more)</li><li>3-wire lead, 24 V pair from the PSU</li></ul></div>
   <div><h4>Good to know</h4><ul class="note" style="padding-left:16px">${notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div></div></div>`;}
-function lightsBody(st,redo){const L=SU.lights||{},c=L.colour||"#ffffff",[r,g,b]=hexRgb(c),pct=Math.round((L.brightness==null?0.5:L.brightness)*100);
- const sl=(id,lab,v,max)=>`<label class="lrow"><span>${lab}</span><input type="range" id="${id}" min="0" max="${max}" value="${v}" oninput="lightsInput('${id}')"><b id="${id}v">${v}</b></label>`;
- if(!L.enabled)return `<div class="row"><button class="b p s" onclick="setupCall('api/setup/lights',{enabled:true},'','lights')">Use lights</button> ${st.done?"":`<button class="b s" onclick="noLights()">No lights</button>`}</div>`+redo+ledWire(L);
- return `<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex')"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
+function lightsBody(st,redo){const L=SU.lights||{},on=!!L.enabled,c=L.colour||"#ffffff",[r,g,b]=hexRgb(c),pct=Math.round((L.brightness==null?0.5:L.brightness)*100);
+ const sl=(id,lab,v,max)=>`<label class="lrow"><span>${lab}</span><input type="range" id="${id}" min="0" max="${max}" value="${v}" oninput="lightsInput('${id}')" onchange="lightsKeep()"><b id="${id}v">${v}</b></label>`;
+ const top=`<div class="ltop"><div class="seg" role="group" aria-label="Lights"><button class="${on?"on":""}" aria-pressed="${on}" onclick="lightsMode(true)">ON</button><button class="${on?"":"on off"}" aria-pressed="${!on}" onclick="lightsMode(false)">OFF</button></div>
+  <label class="ltick${on?"":" dim"}"><input type="checkbox" ${L.always_on?"":"checked"} ${on?"":"disabled"} onchange="setupCall('api/setup/lights',{always_on:!this.checked},'','lights')"> On for photos only</label>
+  <span class="note">${on?(L.always_on?"Lit all the time while Sortering PNP runs.":"Lit only while a photo is taken."):"No lights: the photos use the room's light."}</span>
+  ${on?`<span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span>`:""}</div>`;
+ if(!on)return top+`<div class="row">${st.done?"":`<button class="b p s" onclick="noLights()">OK, no lights</button>`}</div>`+redo+ledWire(L);
+ return top+`<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')" onchange="lightsKeep()"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex');lightsKeep()"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
   <div class="lsl">${sl("lr","R",r,255)}${sl("lg","G",g,255)}${sl("lb","B",b,255)}${sl("lbr","Intensity",pct,100)}</div></div>
-  <div class="row" style="margin-top:8px"><label class="row note"><input type="checkbox" ${L.always_on?"checked":""} onchange="setupCall('api/setup/lights',{always_on:this.checked},'','lights')"> Always on</label>
-  <button class="b s" onclick="setupCall('api/setup/lights',{enabled:false},'','lights')">Off</button>
-  <span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span></div>
   <div class="row" style="margin-top:8px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'lights'},'','lights')">OK</button>`}</div>`+redo+ledWire(L);}
+function lightsMode(on){setupCall('api/setup/lights',{enabled:on},'','lights');}
 function hexRgb(h){const s=(h||"#ffffff").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)||0);}
 function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>(+v).toString(16).padStart(2,"0")).join("");}
-let LSEND=null,LPEND={};
+// the LEDs follow the bars: one request at a time, always the newest colour; saved when let go
+let LBUSY=false,LNEXT=null;
 function lightsInput(id){let c;
  if(id==="lcol"||id==="lhex"){c=$(id).value.trim();if(!c.startsWith("#"))c="#"+c;if(!/^#[0-9a-f]{6}$/i.test(c)){flash("msg_lights","colour: #RRGGBB",1);return;}c=c.toLowerCase();const[r,g,b]=hexRgb(c);$("lr").value=r;$("lg").value=g;$("lb").value=b;}
  else c=rgbHex($("lr").value,$("lg").value,$("lb").value);
  for(const k of["lr","lg","lb","lbr"])$(k+"v").textContent=$(k).value;
  $("lcol").value=c;$("lhex").value=c;const br=+$("lbr").value/100;$("lsw").style.background=c;$("lsw").style.opacity=0.25+0.75*br;
- LPEND={colour:c,brightness:br};
- if(!LSEND)LSEND=setTimeout(async()=>{LSEND=null;const body=LPEND;LPEND={};try{const j=await api("api/setup/lights",body);SU.lights=j.lights;}catch(e){flash("msg_lights",e.message,1);}},120);}
+ document.querySelectorAll(".ledpx").forEach(e=>{e.setAttribute("fill",c);e.setAttribute("fill-opacity",0.25+0.75*br);});  // the ring in the drawing too
+ LNEXT={colour:c,brightness:br};lightsSend();}
+async function lightsSend(){if(LBUSY||!LNEXT)return;const body=LNEXT;LNEXT=null;LBUSY=true;
+ try{await api("api/lights/preview",body);}catch(e){flash("msg_lights",e.message,1);}LBUSY=false;lightsSend();}
+async function lightsKeep(){const c=$("lhex").value,br=+$("lbr").value/100;try{const j=await api("api/setup/lights",{colour:c,brightness:br});SU.lights=j.lights;}catch(e){flash("msg_lights",e.message,1);}}
 async function noLights(){try{await api("api/setup/lights",{enabled:false});SU=await api("api/setup/confirm",{step:"lights"});renderSetup();}catch(e){flash("msg_lights",e.message,1);}}
 function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
  $("setupsum").innerHTML=SU.required?(left?`<b>${left}</b> step${left===1?"":"s"} to go.`:'<span class="ok">All done: the machine may sort.</span>'):"(Simulation: not required.)";

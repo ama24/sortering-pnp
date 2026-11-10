@@ -1769,6 +1769,21 @@ class Runner:
             self.setup.reset("lights")
         return self.setup_state()
 
+    def lights_preview(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Setup tab, Lights, while a bar moves: the colour on the LEDs at once, nothing saved
+        and only a small answer, as it comes many times a second. setup_lights() keeps it
+        when the bar is let go."""
+        li = self.m.lights
+        colour = str(values.get("colour", li.colour))
+        parse_hex(colour)
+        brightness = float(values.get("brightness", li.brightness))
+        if not 0 <= brightness <= 1:
+            raise ValueError("brightness must be 0..1")
+        li.colour, li.brightness = "#" + colour.strip().lstrip("#").lower(), brightness
+        if li.enabled:
+            self.lights.preview()
+        return {"colour": li.colour, "brightness": li.brightness, "shown": li.enabled}
+
     def setup_picker_drop(self, lower: bool) -> dict[str, Any]:
         """Over the bin: lower to rim + drop_mm before letting go, or let go at the travel
         height (the default). Kept in machine.json."""
