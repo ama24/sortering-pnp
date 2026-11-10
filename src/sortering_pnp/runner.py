@@ -1677,6 +1677,7 @@ class Runner:
             "required": self.require_setup,
             "complete": not self.setup.missing(),
             "machine": self.machine_values(),
+            "photo_z": self.motion.photo_z(),  # the Z photos are really taken at
             "homed_now": self._setup_homed,
             "picker_tried": sorted(self._setup_picker),
             "tool": self._tool,  # the mounted tool, as Klipper last said (None: not asked yet)

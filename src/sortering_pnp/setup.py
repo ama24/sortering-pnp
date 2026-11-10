@@ -37,7 +37,7 @@ STEPS = (
     Step(
         "machine",
         "Machine",
-        "Bed limits, travel height, the photo and picker-change positions are right",
+        "Bed limits, travel height, the Photo / Parked and Tool Change positions are right",
     ),
     Step("picker", "Picker", "The kind of picker, wired to the Pi and put on the head"),
     Step("tip", "Tip height", "Where the picker tip touches the plate"),
