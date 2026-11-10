@@ -38,6 +38,8 @@ h2{font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercas
 .cols{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:16px;align-items:start}
 @media (max-width:860px){.cols{grid-template-columns:1fr}.right{margin-left:0}}
 p{margin:0 0 10px}.mut{color:var(--mut)}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.alert{display:inline-block;max-width:100%;box-sizing:border-box;background:var(--bad-soft);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);border-left:4px solid var(--bad);border-radius:8px;padding:7px 12px;font-weight:600;line-height:1.4;animation:alertin .3s ease-out}.alert::before{content:"⚠ "}
+@keyframes alertin{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
 .note{font-size:13px;color:var(--mut)}
 
 /* controls */
@@ -445,7 +447,8 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{liveTab(b.data
 setTimeout(()=>{const t=location.hash.slice(1),b=t&&document.querySelector(`nav button[data-t="${t}"]`);if(b)b.click();window.scrollTo(0,0);});
 if("scrollRestoration" in history)history.scrollRestoration="manual";
 async function api(path,body){const r=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();if(r.status===401){session();}if(!r.ok)throw new Error(j.error||r.status);return j;}
-function flash(id,text,bad){$(id).textContent=text;$(id).className=bad?"note bad":"note";}
+// a message under a button; a problem (bad) stands out in red, so it is seen and acted on
+function flash(id,text,bad){$(id).textContent=text;$(id).className=bad&&text?"note bad alert":"note";}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
 // ---------------------------------------------------------------- login
@@ -895,7 +898,7 @@ async function lightsKeep(){const c=$("lhex").value,br=+$("lbr").value/100;try{c
 async function noLights(){try{await api("api/setup/lights",{enabled:false});SU=await api("api/setup/confirm",{step:"lights"});renderSetup();}catch(e){flash("msg_lights",e.message,1);}}
 function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
  $("setupsum").innerHTML=SU.required?(left?`<b>${left}</b> step${left===1?"":"s"} to go.`:'<span class="ok">All done: the machine may sort.</span>'):"(Simulation: not required.)";
- $("steps").innerHTML=SU.steps.map((st,i)=>`<div class="card step"><span class="num ${st.done?"ok":""}">${st.done?"✓":i+1}</span><div><h3>${esc(st.title)}</h3><span class="note">${esc(st.goal)}${st.done?` · done ${esc(st.at||"")} ${esc(st.note||"")}`:""}</span></div><div class="body" style="margin-top:8px">${stepBody(st)}<p id="msg_${st.key}" class="note" style="margin:6px 0 0"></p></div></div>`).join("");}
+ $("steps").innerHTML=SU.steps.map((st,i)=>`<div class="card step"><span class="num ${st.done?"ok":""}">${st.done?"✓":i+1}</span><div><h3>${esc(st.title)}</h3><span class="note">${esc(st.goal)}${st.done?` · done ${esc(st.at||"")} ${esc(st.note||"")}`:""}</span></div><div class="body" style="margin-top:8px">${stepBody(st)}${["camera"].includes(st.key)?"":`<p id="msg_${st.key}" class="note" style="margin:6px 0 0"></p>`}</div></div>`).join("");}
 
 // ---------------------------------------------------------------- setup: jog, camera to printer, bins
 let LASTSCAN=null;
@@ -928,7 +931,7 @@ function cameraBody(st,redo){const C=SU.camera||{},mk=C.markers||[],pairs=C.pair
  const rows=mk.length?`<table style="margin-top:10px"><tr><th>code</th><th>bin</th><th>camera mm</th><th></th></tr>${mk.map(m=>`<tr><td><b>${m.marker}</b></td><td>${esc(m.what||"")}</td><td class="note">${m.plate.join(", ")}</td><td style="text-align:right">${done.has(m.marker)?`<span class="ok">✓ point</span> <button class="b s" onclick="setupCall('api/calib/goto_point',{marker:${m.marker}},'moving…','camera')">Move tip here</button> `:""}<button class="b s" onclick="setupCall('api/calib/record',{marker:${m.marker}},'','camera')">Tip is here</button>${C.fit?` <button class="b s" onclick="setupCall('api/calib/goto',{marker:${m.marker}},'moving…','camera')">Check</button>`:""}</td></tr>`).join("")}</table>`:(C.view?'<p class="bad" style="margin:8px 0 0">No codes seen: are bins in the picture, with even light?</p>':"");
  const fit=C.fit?`<p class="${C.fit.worst_mm<1?"ok":"bad"}" style="margin:8px 0 0">Fit: worst error ${C.fit.worst_mm} mm${C.fit.worst_mm<1?"":" (needs under 1 mm: record the points again, carefully)"} · rotation ${C.fit.angle_deg}° · scale ${C.fit.scale}</p>`:"";
  return cal+`<ol class="note" style="padding-left:18px;margin:0 0 10px"><li>Put 3 or more bins far apart on the bed, then <b>Take photo</b>: it shows what the camera sees and which codes it reads (no model needed).</li><li>Jog the tip onto the centre of a code, then <b>Tip is here</b> on its row. Do this for 3 or more codes, far apart.</li><li><b>Fit</b>. The step ticks itself when the worst error is under 1 mm.</li></ol>
-  <div class="row"><button class="b p s" onclick="setupCall('api/calib/photo',{},'taking a photo…','camera')">Take photo</button> <button class="b s" ${pairs.length<3?"disabled":""} onclick="setupCall('api/calib/fit',{},'fitting…','camera')">Fit (${pairs.length} point${pairs.length===1?"":"s"})</button> <button class="b s" onclick="setupCall('api/calib/clear',{},'','camera')">Clear points</button></div>`+fit+
+  <div class="row"><button class="b p s" onclick="setupCall('api/calib/photo',{},'taking a photo…','camera')">Take photo</button> <button class="b s" ${pairs.length<3?"disabled":""} onclick="setupCall('api/calib/fit',{},'fitting…','camera')">Fit (${pairs.length} point${pairs.length===1?"":"s"})</button> <button class="b s" onclick="setupCall('api/calib/clear',{},'','camera')">Clear points</button></div><p id="msg_camera" class="note" style="margin:6px 0 0"></p>`+fit+
   (C.view?`<div class="camview"><img src="runs/${encodeURIComponent(C.view)}" alt="" onload="camMarks(this)"><svg></svg></div>`:"")+rows+
   `<h4 style="margin:14px 0 4px;font-size:13px">Move the tip</h4><p class="note" style="margin:0">Seen from above, back at the top. Each ring is a distance; the corners move X and Y together. Hover a field to see the move.</p>${jogPad("camera",true)}`+redo;}
 function camMarks(img){const C=SU.camera||{},H=C.view_h,svg=img.nextElementSibling;if(!svg)return;const w=img.naturalWidth,h=img.naturalHeight,r=Math.max(w,h)/90;
