@@ -103,6 +103,18 @@ class Motion:
             if not (lim[0] - 1e-6 <= v <= lim[1] + 1e-6):
                 raise PrinterError(f"move outside the limits: toolhead {name}{v:.2f} not in {lim}")
 
+    def within_reach(self, x: float, y: float, most_mm: float) -> tuple[float, float]:
+        """The tip X/Y brought inside the soft limits, when that takes at most `most_mm` on an
+        axis. A point further out is left as it is: check() refuses it."""
+        pc = self.m.printer
+        ox, oy, _ = self.m.tool.offset
+
+        def inside(v: float, off: float, lim: list[float]) -> float:
+            near = min(max(v - off, lim[0]), lim[1]) + off
+            return near if abs(near - v) <= most_mm else v
+
+        return inside(x, ox, pc.limits_x), inside(y, oy, pc.limits_y)
+
     # ------------------------------------------------------------------ moves
     def current_tip(self) -> list[float]:
         if self.tip is None:

@@ -10,6 +10,7 @@ import pytest
 from sortering_pnp.io import read_json
 from sortering_pnp.layout import Layout
 from sortering_pnp.parts import Part
+from sortering_pnp.printer import PrinterError
 from sortering_pnp.printer.sim import SimPart, SimPrinter, SimVision, SimWorld
 from sortering_pnp.runner import Runner, same_parts
 from sortering_pnp.strategies import Plan, Planner
@@ -123,6 +124,34 @@ def P(cls, length, xy, pid):  # noqa: N802
     p = Part(pid, cls, 0.9, xy, 0.0, np.zeros((0, 2)), 4.0, length, True, False, length is not None)
     p.bed_xy, p.gap_mm = xy, 10.0
     return p
+
+
+@pytest.mark.parametrize(
+    ("wanted", "goes_to"),
+    [
+        ((100.0, 222.77), (100.0, 220.0)),
+        ((-3.0, 100.0), (0.0, 100.0)),
+        ((50.0, 50.0), (50.0, 50.0)),
+    ],
+)
+def test_drop_at_the_bed_edge_comes_inside_the_limits(machine, monkeypatch, wanted, goes_to):
+    runner, world, printer, lay = make(machine, n=0)
+    printer.gcode("G28")
+    layout = runner.layout()
+    monkeypatch.setattr(layout, "drop_centre", lambda b: wanted)
+    plan = Plan("pick", part=P("DIN7991_M4", 16.0, (100.0, 100.0), 1), bin=layout.bins[0])
+    runner._drop(plan, layout)
+    assert runner.motion.current_tip()[:2] == pytest.approx(goes_to)
+
+
+def test_drop_far_outside_the_limits_is_still_refused(machine, monkeypatch):
+    runner, world, printer, lay = make(machine, n=0)
+    printer.gcode("G28")
+    layout = runner.layout()
+    monkeypatch.setattr(layout, "drop_centre", lambda b: (100.0, 230.0))
+    plan = Plan("pick", part=P("DIN7991_M4", 16.0, (100.0, 100.0), 1), bin=layout.bins[0])
+    with pytest.raises(PrinterError, match="outside the limits"):
+        runner._drop(plan, layout)
 
 
 def test_census_order_finishes_a_kind_and_goes_back_to_one_that_turns_up(machine):
