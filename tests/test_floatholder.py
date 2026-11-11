@@ -47,13 +47,15 @@ def test_the_printers_interface_is_the_tool_holders_with_the_heads_sunk():
         assert _solid_at(PLATE, (x0 + x1) / 2, -P.standoff_h + 0.3, (z0 + z1) / 2) > 0
     for x in P.m3_spots():  # room for the standoffs
         assert _solid_at(PLATE, x, -P.standoff_h / 2, P.m3_z, r=1.0) == 0.0
-    # two pads higher up on the back, as deep as the standoffs: the plate does not lever
-    assert [z0 - P.plate_z0 for _, _, z0, _ in P.pads()] == [38.0, 45.0]
-    for _, _, z0, z1 in P.pads():
-        for x in (-10.0, 0.0, 10.0):
-            assert _solid_at(PLATE, x, -P.standoff_h + 0.3, (z0 + z1) / 2, r=0.2) > 0
-    gap = P.plate_z0 + 43.5  # between them, at the back
-    assert _solid_at(PLATE, 0.0, -P.standoff_h + 0.3, gap, r=0.2) == 0.0
+    # one pad higher up on the back, as deep as the standoffs: the plate does not lever. Its
+    # ramp starts at 38 mm above the plate's bottom, its step ends at 45
+    z38, z45 = P.plate_z0 + 38.0, P.plate_z0 + 45.0
+    for x in (-10.0, 0.0, 10.0):
+        assert _solid_at(PLATE, x, -P.standoff_h + 0.3, z45 - 1.0, r=0.2) > 0  # its face
+        assert _solid_at(PLATE, x, -0.3, z38 + 0.5, r=0.2) > 0  # the ramp's foot
+    assert _solid_at(PLATE, 0.0, -0.3, z38 - 0.5, r=0.2) == 0.0  # below the ramp
+    assert _solid_at(PLATE, 0.0, -2.0, z38 + 0.5, r=0.2) == 0.0  # the slope
+    assert _solid_at(PLATE, 0.0, -0.3, z45 + 0.5, r=0.2) == 0.0  # above the step
     assert PLATE.bounding_box()[1] == pytest.approx(-P.standoff_h)
 
 

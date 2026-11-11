@@ -47,10 +47,10 @@ class FloatHolder:
     below_room: float = 15.0
     shim_h: float = 4.0
     room_play: float = 0.4
-    # pads on the back, against the printer's head higher up: the plate does not lever about
-    # its two screws (where each starts, mm above the plate's bottom edge)
-    back_pads: tuple[float, ...] = (38.0, 45.0)
-    pad_h: float = 4.0
+    # a pad on the back, against the printer's head higher up: the plate does not lever about
+    # its two screws (mm above the plate's bottom edge: its ramp starts, its step ends)
+    pad_from: float = 38.0
+    pad_to: float = 45.0
     # the rail and its block (E-BMN12H = MGN12H sizes)
     rail_w: float = 12.0
     rail_h: float = 8.0
@@ -238,11 +238,11 @@ class FloatHolder:
         return [top, low]
 
     def pads(self) -> list[tuple[float, float, float, float]]:
-        """(x0, x1, z0, z1) of each pad on the back, as deep as the standoffs."""
+        """(x0, x1, z0, z1) of the pad's flat face on the back, as deep as the standoffs; its
+        45 deg ramp below starts at the plate's back at pad_from."""
         hw = self.plate_half - 1.0
-        return [
-            (-hw, hw, self.plate_z0 + z, self.plate_z0 + z + self.pad_h) for z in self.back_pads
-        ]
+        z0 = self.plate_z0 + self.pad_from + self.standoff_h
+        return [(-hw, hw, z0, self.plate_z0 + self.pad_to)]
 
 
 def _box(x0: float, x1: float, y0: float, y1: float, z0: float, z1: float) -> Manifold:
@@ -417,8 +417,8 @@ Screws and pins:
 - 2 x dowel pin Ø2.5 x 10: the top stop.
 
 Fitting, in this order:
-1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores. The two
-   pads on its back ({pads} mm above its bottom edge) rest on the head: it does not lever.
+1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores. The pad on
+   its back ({pads} mm above its bottom edge) rests on the head: it does not lever.
 2. The rail (with its block on it) on the strip, its foot end down in the notch of the
    column. Slide the block up to reach the two lower holes; screw all four.
 3. The lower spring screws, block slid up: about 3 mm of shank left out, a hook on each.
@@ -457,7 +457,7 @@ def holder_files(p: FloatHolder | None = None) -> list[tuple[str, bytes]]:
         m3_clamp=p.m3_clamp,
         car_thread=p.car_thread,
         travels=rows,
-        pads=" and ".join(f"{z:g}" for z in p.back_pads),
+        pads=f"ramp from {p.pad_from:g}, step at {p.pad_to:g}",
         dy=p.motor_y - t.motor_y,
         dz=(t.m3_z - 0.0) - (p.m3_z - p.base_z),
         pw=round(2 * p.plate_half, 1),

@@ -21,8 +21,8 @@ Screws and pins:
 - 2 x dowel pin Ø2.5 x 10: the top stop.
 
 Fitting, in this order:
-1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores. The two
-   pads on its back (38 and 45 mm above its bottom edge) rest on the head: it does not lever.
+1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores. The pad on
+   its back (ramp from 38, step at 45 mm above its bottom edge) rests on the head: it does not lever.
 2. The rail (with its block on it) on the strip, its foot end down in the notch of the
    column. Slide the block up to reach the two lower holes; screw all four.
 3. The lower spring screws, block slid up: about 3 mm of shank left out, a hook on each.
