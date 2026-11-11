@@ -47,6 +47,14 @@ def test_the_printers_interface_is_the_tool_holders_with_the_heads_sunk():
         assert _solid_at(PLATE, (x0 + x1) / 2, -P.standoff_h + 0.3, (z0 + z1) / 2) > 0
     for x in P.m3_spots():  # room for the standoffs
         assert _solid_at(PLATE, x, -P.standoff_h / 2, P.m3_z, r=1.0) == 0.0
+    # two pads higher up on the back, as deep as the standoffs: the plate does not lever
+    assert [z0 - P.plate_z0 for _, _, z0, _ in P.pads()] == [38.0, 45.0]
+    for _, _, z0, z1 in P.pads():
+        for x in (-10.0, 0.0, 10.0):
+            assert _solid_at(PLATE, x, -P.standoff_h + 0.3, (z0 + z1) / 2, r=0.2) > 0
+    gap = P.plate_z0 + 43.5  # between them, at the back
+    assert _solid_at(PLATE, 0.0, -P.standoff_h + 0.3, gap, r=0.2) == 0.0
+    assert PLATE.bounding_box()[1] == pytest.approx(-P.standoff_h)
 
 
 def test_the_rail_on_a_strip_as_wide_and_long_as_itself():
@@ -67,9 +75,10 @@ def test_the_rail_on_a_strip_as_wide_and_long_as_itself():
 
 
 def test_the_springs_have_room_behind_the_block():
-    assert (
-        P.car_y0 - P.plate_t >= P.spring_od + 1.0 - 1e-9
-    )  # the block was 3 mm off the rail's foot
+    # the block was 3 mm off the rail's foot; now a mm round each spring, front and back
+    assert P.car_y0 - P.plate_t == pytest.approx(P.spring_od + 2.0)
+    assert P.spring_y - P.spring_od / 2 - P.plate_t == pytest.approx(1.0)
+    assert P.car_y0 - (P.spring_y + P.spring_od / 2) == pytest.approx(1.0)
     assert (
         P.spring_x - P.spring_od / 2 > P.rail_w / 2 and P.spring_x + P.spring_od / 2 < P.car_w / 2
     )
@@ -94,6 +103,11 @@ def test_the_springs_have_room_behind_the_block():
             assert _solid_at(LPART, x, y, P.post_z, r=0.2) == 0.0
         assert _solid_at(LPART, x, P.spring_y, P.post_z - 2.5, r=0.3) == 0.0  # slot, open below
         assert _solid_at(LPART, x + 2.0, P.lid_y0 + 0.5, P.post_z, r=0.3) > 0
+        # its head sunk in the leg: an M3 x 20 reaches past the slot towards the printer
+        assert _solid_at(LPART, x + 2.5, P.leg_y1 - 0.5, P.post_z, r=0.2) == 0.0
+        assert _solid_at(LPART, x + 2.5, P.leg_y1 - 1.5, P.post_z, r=0.2) > 0
+        tip = P.leg_y1 - P.head_sink - 20.0
+        assert P.lid_y0 < tip < P.spring_y - P.slot_w / 2 - 1.5
 
 
 def test_it_moves_freely_and_stops_on_the_column_and_the_dowels():
@@ -108,7 +122,7 @@ def test_it_moves_freely_and_stops_on_the_column_and_the_dowels():
     assert _vol(F.block_box(P, -0.5), PLATE) > 1.0  # the column
     assert P.rail_z0 < 0 and P.car_l + max(P.travels) < P.rail_z1  # never off the rail
     travels = [t for t, _, _ in P.dowels()]
-    assert travels == sorted(travels) and min(travels) <= 10 and max(travels) >= 15
+    assert travels == sorted(travels) and min(travels) <= 4 and max(travels) >= 15
     for t, x, z in P.dowels():
         for s in (-1, 1):
             pin = F.dowel(P, s * x, z)
@@ -140,6 +154,11 @@ def test_the_l_takes_the_block_and_the_motor_below_its_screws():
     assert P.lid_y0 < P.car_y0
     assert _solid_at(LPART, P.spring_x + 2.0, P.lid_y0 + 0.5, P.lid_z1 - 1) > 0
     assert _solid_at(LPART, 0, P.rail_y0 + 1, P.lid_z1 - 1) == 0.0  # the rail goes on up
+    # with a mm of play round it, each side and in front
+    z = P.lid_z1 - 1
+    assert _solid_at(LPART, P.rail_w / 2 + 0.8, P.rail_y0 + 4, z, r=0.15) == 0.0
+    assert _solid_at(LPART, 0, P.rail_y1 + 0.8, z, r=0.15) == 0.0
+    assert _solid_at(LPART, P.rail_w / 2 + 1.3, P.rail_y0 + 4, z, r=0.15) > 0
 
 
 def test_each_part_prints_flat_without_supports():

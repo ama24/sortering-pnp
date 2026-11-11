@@ -21,7 +21,8 @@ Screws and pins:
 - 2 x dowel pin Ø2.5 x 10: the top stop.
 
 Fitting, in this order:
-1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores.
+1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores. The two
+   pads on its back (38 and 45 mm above its bottom edge) rest on the head: it does not lever.
 2. The rail (with its block on it) on the strip, its foot end down in the notch of the
    column. Slide the block up to reach the two lower holes; screw all four.
 3. The lower spring screws, block slid up: about 3 mm of shank left out, a hook on each.
@@ -30,17 +31,19 @@ Fitting, in this order:
    through the overhang and the hook.
 6. The motor on the L's foot (4 x M2 x 5 from below), then the tool.
 7. The dowel pins: one each side, pressed into the pair of holes for the travel you want:
-     10 mm: the holes 71.9 mm above the plate's bottom, 11.45 mm off the middle
-   12.5 mm: the holes 74.4 mm above the plate's bottom, 8.05 mm off the middle
-     15 mm: the holes 76.9 mm above the plate's bottom, 11.45 mm off the middle
-   17.5 mm: the holes 79.4 mm above the plate's bottom, 8.05 mm off the middle
-     20 mm: the holes 81.9 mm above the plate's bottom, 11.45 mm off the middle
-   22.5 mm: the holes 84.4 mm above the plate's bottom, 8.05 mm off the middle
-     25 mm: the holes 86.9 mm above the plate's bottom, 11.45 mm off the middle
+      4 mm: the holes 65.9 mm above the plate's bottom, 11.45 mm off the middle
+    6.5 mm: the holes 68.4 mm above the plate's bottom, 8.05 mm off the middle
+      9 mm: the holes 70.9 mm above the plate's bottom, 11.45 mm off the middle
+   11.5 mm: the holes 73.4 mm above the plate's bottom, 8.05 mm off the middle
+     14 mm: the holes 75.9 mm above the plate's bottom, 11.45 mm off the middle
+   16.5 mm: the holes 78.4 mm above the plate's bottom, 8.05 mm off the middle
+     19 mm: the holes 80.9 mm above the plate's bottom, 11.45 mm off the middle
+   21.5 mm: the holes 83.4 mm above the plate's bottom, 8.05 mm off the middle
+     24 mm: the holes 85.9 mm above the plate's bottom, 11.45 mm off the middle
    Each mm of travel stretches the springs by a mm: keep within what they take (a 15 mm core
    that stretches to 25 mm takes 10 mm).
 
 The block's screws stay reachable above the motor: the L comes off the block with the motor on.
 After fitting, redo Tip height and Camera to printer on the Setup tab: the tool's axis is
-24.2 mm further from the head than on the tool holder and 3.7 mm higher.
-Size: plate 30 wide x 108 high, 23.2 deep; it reaches 88 mm above the printer's screws.
+25.2 mm further from the head than on the tool holder and 3.7 mm higher.
+Size: plate 30 wide x 108 high, 24.2 deep; it reaches 88 mm above the printer's screws.

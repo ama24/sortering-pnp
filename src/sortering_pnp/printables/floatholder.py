@@ -47,6 +47,10 @@ class FloatHolder:
     below_room: float = 15.0
     shim_h: float = 4.0
     room_play: float = 0.4
+    # pads on the back, against the printer's head higher up: the plate does not lever about
+    # its two screws (where each starts, mm above the plate's bottom edge)
+    back_pads: tuple[float, ...] = (38.0, 45.0)
+    pad_h: float = 4.0
     # the rail and its block (E-BMN12H = MGN12H sizes)
     rail_w: float = 12.0
     rail_h: float = 8.0
@@ -80,6 +84,9 @@ class FloatHolder:
     rib_h: float = 20.0
     lid_h: float = 7.0  # the overhang over the block's top end
     lid_play: float = 0.3  # above the block's end
+    notch_play: float = 1.0  # round the rail in the overhang's notch, each side and in front
+    head_sink: float = 1.0  # the upper spring screws' heads, sunk in the leg's front
+    head_d: float = 6.0
     corner_r: float = 1.5
     # springs and stops
     spring_od: float = 5.5
@@ -89,7 +96,8 @@ class FloatHolder:
     slot_w: float = 2.0  # the hook's slot in the overhang
     dowel_d: float = 2.4  # Ø2.5 dowel pins, pressed
     dowel_in: float = 4.8  # hole depth: 5 mm of a 10 mm pin stands out
-    travels: tuple[float, ...] = (10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0)
+    travels: tuple[float, ...] = (4.0, 6.5, 9.0, 11.5, 14.0, 16.5, 19.0, 21.5, 24.0)
+    strip_extra: float = 1.0  # more room round the springs than they strictly need
     column_h: float = 8.0  # under the block
     plate_edge: float = 1.5  # beyond the block's sides
     plate_t: float = 7.2  # beside the strip: the printer's screw heads sink in it
@@ -98,7 +106,7 @@ class FloatHolder:
     @property
     def strip_h(self) -> float:
         """The strip under the rail: what the springs lack between the plate and the block."""
-        return self.spring_od + 2 * self.spring_play - self.car_gap
+        return self.spring_od + 2 * self.spring_play - self.car_gap + self.strip_extra
 
     @property
     def rail_y0(self) -> float:
@@ -115,7 +123,8 @@ class FloatHolder:
 
     @property
     def spring_y(self) -> float:
-        return self.plate_t + self.spring_play + self.spring_od / 2
+        """Half-way between the plate and the block's underside."""
+        return self.plate_t + (self.strip_h + self.car_gap) / 2
 
     @property
     def spring_r(self) -> float:
@@ -228,6 +237,13 @@ class FloatHolder:
         low = (-self.plate_half + 1.0, self.plate_half - 1.0, z0, z0 + self.shim_h)
         return [top, low]
 
+    def pads(self) -> list[tuple[float, float, float, float]]:
+        """(x0, x1, z0, z1) of each pad on the back, as deep as the standoffs."""
+        hw = self.plate_half - 1.0
+        return [
+            (-hw, hw, self.plate_z0 + z, self.plate_z0 + z + self.pad_h) for z in self.back_pads
+        ]
+
 
 def _box(x0: float, x1: float, y0: float, y1: float, z0: float, z1: float) -> Manifold:
     return Manifold.cube([x1 - x0, y1 - y0, z1 - z0]).translate([x0, y0, z0])
@@ -240,7 +256,7 @@ def _xz_plate(sec: CrossSection, y0: float, y1: float) -> Manifold:
 def _shims(p: FloatHolder) -> list[Manifold]:
     s = p.standoff_h
     out = []
-    for x0, x1, z0, z1 in p.shims():
+    for x0, x1, z0, z1 in p.shims() + p.pads():  # a 45 deg slope under each: no support
         sec = CrossSection([[(0.01, z0 - s), (0.01, z1), (-s, z1), (-s, z0)]])  # (y, z)
         out.append(sec.extrude(x1 - x0).rotate([90, 0, 90]).translate([x0, 0, 0]))
     return out
@@ -301,8 +317,8 @@ def build_l(p: FloatHolder | None = None) -> Manifold:
     rib = tri.extrude(p.rib_t).rotate([90, 0, 90])
     parts += [rib.translate([hw - p.rib_t, 0, 0]), rib.translate([-hw, 0, 0])]
     body = Manifold.batch_boolean(parts, OpType.Add)
-    rw = p.rail_w / 2 + 0.4
-    cuts = [_box(-rw, rw, 0, p.rail_y1 + 0.4, p.lid_z0 - 1, p.lid_z1 + 1)]  # the rail goes on up
+    rw = p.rail_w / 2 + p.notch_play
+    cuts = [_box(-rw, rw, 0, p.rail_y1 + p.notch_play, p.lid_z0 - 1, p.lid_z1 + 1)]  # the rail
     fd = p.flange_d + p.flange_play
     cuts.append(_teardrop_z(fd, 0.0, p.motor_y, p.base_z - 1, zb + 1))
     for x, y in p.m2_spots():
@@ -323,6 +339,8 @@ def build_l(p: FloatHolder | None = None) -> Manifold:
             )
         )
         cuts.append(_teardrop_y(p.tap_d, s * p.spring_x, p.post_z, p.lid_y0 - 1, p.leg_y1 + 1))
+        y = p.leg_y1 - p.head_sink  # the M3 x 20 still reaches past the hook's slot
+        cuts.append(_teardrop_y(p.head_d, s * p.spring_x, p.post_z, y, p.leg_y1 + 1))
     return body - Manifold.batch_boolean(cuts, OpType.Add)
 
 
@@ -399,7 +417,8 @@ Screws and pins:
 - 2 x dowel pin Ø2.5 x 10: the top stop.
 
 Fitting, in this order:
-1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores.
+1. The plate on the printer's standoffs, its two M3 screws sunk in their counterbores. The two
+   pads on its back ({pads} mm above its bottom edge) rest on the head: it does not lever.
 2. The rail (with its block on it) on the strip, its foot end down in the notch of the
    column. Slide the block up to reach the two lower holes; screw all four.
 3. The lower spring screws, block slid up: about 3 mm of shank left out, a hook on each.
@@ -438,6 +457,7 @@ def holder_files(p: FloatHolder | None = None) -> list[tuple[str, bytes]]:
         m3_clamp=p.m3_clamp,
         car_thread=p.car_thread,
         travels=rows,
+        pads=" and ".join(f"{z:g}" for z in p.back_pads),
         dy=p.motor_y - t.motor_y,
         dz=(t.m3_z - 0.0) - (p.m3_z - p.base_z),
         pw=round(2 * p.plate_half, 1),
