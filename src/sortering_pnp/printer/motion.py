@@ -103,6 +103,18 @@ class Motion:
             if not (lim[0] - 1e-6 <= v <= lim[1] + 1e-6):
                 raise PrinterError(f"move outside the limits: toolhead {name}{v:.2f} not in {lim}")
 
+    def within_reach(self, x: float, y: float, most_mm: float) -> tuple[float, float]:
+        """The tip X/Y brought inside the soft limits, when that takes at most `most_mm` on an
+        axis. A point further out is left as it is: check() refuses it."""
+        pc = self.m.printer
+        ox, oy, _ = self.m.tool.offset
+
+        def inside(v: float, off: float, lim: list[float]) -> float:
+            near = min(max(v - off, lim[0]), lim[1]) + off
+            return near if abs(near - v) <= most_mm else v
+
+        return inside(x, ox, pc.limits_x), inside(y, oy, pc.limits_y)
+
     # ------------------------------------------------------------------ moves
     def current_tip(self) -> list[float]:
         if self.tip is None:
@@ -252,12 +264,18 @@ class Motion:
         return pc.photo_position[2]
 
     def photo_position(self) -> None:
+        """Park for a photo. M400 ends when the moves do, but the bed still shakes for a moment
+        after a stop: printer.photo_settle_s of stillness follows every real move."""
         x, y, _ = self.m.printer.photo_position
         z = self.photo_z()
+        before = self.current_tip()
         self.travel(x, y)
         if abs(self.current_tip()[2] - z) > 1e-6:
             self.move(z=z)
         self.p.gcode("M400")
+        settle = self.m.printer.photo_settle_s
+        if settle > 0 and before != self.current_tip():
+            self.p.gcode(f"G4 P{round(settle * 1000)}\nM400")  # M400: really wait for the dwell
 
     def change_position(self) -> None:
         """Where the head waits while the picker is put on (printer.change_position)."""
@@ -283,19 +301,28 @@ class Motion:
         else:
             self.pins.turn(a)
 
-    def pick(self, x: float, y: float, z: float, angle_deg: float | None = None) -> None:
-        """Go to the part, descend slowly to z (tip height), grab, lift to the travel height."""
+    def pick(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        angle_deg: float | None = None,
+        top: float | None = None,
+    ) -> None:
+        """Go to the part, descend slowly to z (tip height), grab, lift to the travel height.
+        `top`: the part's top when z is below it (a cup going over it): slow from above that."""
         pk = self.m.picker
+        slow_from = max(z, top if top is not None else z) + pk.approach_mm
         self.travel(x, y)
         if angle_deg is not None and pk.kind.rotates:
             # the jaws close across the part: `angle_deg` = their closing direction (grip.py)
             self.turn(angle_deg)
-        self.move(z=z + pk.approach_mm)
+        self.move(z=slow_from)
         self.move(z=z, feed=pk.feed_z_slow)
         self.p.gcode("M400")  # the pins are not in Klipper's queue: wait for the moves first
         self.pins.grab()
         self.carrying = True  # gentler X until it is let go
-        self.move(z=z + pk.approach_mm, feed=pk.feed_z_slow)
+        self.move(z=slow_from, feed=pk.feed_z_slow)
         self.move(z=self.m.printer.travel_z)
 
     def drop(self, x: float, y: float, rim_z: float) -> None:

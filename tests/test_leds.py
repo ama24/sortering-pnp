@@ -99,6 +99,20 @@ def test_setup_lights_shows_saves_and_confirms(machine):
         r.setup_lights({"brightness": 2})
 
 
+def test_preview_shows_at_once_and_saves_nothing(machine):
+    r = _runner(machine)
+    r.setup_lights({"enabled": True, "colour": "#ffffff", "brightness": 1.0})
+    sim = r.lights.driver
+    out = r.lights_preview({"colour": "#FF0000", "brightness": 1.0})
+    assert out == {"colour": "#ff0000", "brightness": 1.0, "shown": True, "error": None}
+    assert sim.colours == [(255, 0, 0)] * 8  # on the LEDs at once
+    assert _runner(machine).m.lights.colour == "#ffffff"  # kept only when the bar is let go
+    r.setup_lights({"colour": "#ff0000"})
+    assert _runner(machine).m.lights.colour == "#ff0000"
+    with pytest.raises(ValueError):
+        r.lights_preview({"brightness": 3})
+
+
 def test_no_lights_completes_the_step_dark(machine):
     r = _runner(machine)
     r.setup_lights({"enabled": True})

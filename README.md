@@ -298,7 +298,7 @@ Go through the eight steps once, in order:
 4. **Picker:** choose yours and wire it as the page shows (see [The picker](#the-picker)).
    *Grab* and *Release* try it if you like. Put it on the head and press **OK**: from then on
    sorting may move it.
-5. **Tip height:** *Go to centre*, then jog the tip down with the Z buttons on the same row
+5. **Tip height:** *Go to X/Y centre*, then jog the tip down with the Z buttons
    until a sheet of paper just drags, and press *Set height*. Every height sortering-pnp uses
    counts from here.
 6. **Lights:** *Use lights* and pick the colour and brightness (shown live on the LEDs), or

@@ -40,6 +40,9 @@ class Bin:
     rot: int = 0  # where its marker side faces: 0 back (+Y), 90 left, 180 front, 270 right
     # its centre (printer X/Y) as the camera measured it: bins need not stand on the 42 mm grid
     seen: list[float] | None = None
+    # its exact turn (degrees) as the camera measured it; `rot` is that rounded to 90. Old layouts
+    # lack it: rot is used.
+    yaw: float | None = None
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> Bin:
@@ -124,8 +127,10 @@ class Layout:
 
     def surface_z(self) -> float:
         """Printer Z of the surface the parts lie on (plate frame z = 0): the tray's floor plus
-        the TPU sheet, or the TPU sheet on the bed in an older layout."""
-        if self.work_bin() is None:
+        the TPU sheet. An empty grid counts as having a tray too: every session starts with no
+        bins and the Tip step comes before Find bins, and both must mean the same height. Only
+        an older layout (bins, none of them the plate) has its TPU sheet on the bed."""
+        if self.work_marker is None and self.bins:
             return self.plate_thickness_mm
         return (
             self.bin_floor_mm + binspec.BASE_HEIGHT_MM + binspec.FLOOR_MM + self.plate_thickness_mm
@@ -154,17 +159,31 @@ class Layout:
         x0, y0, x1, y1 = self.cells_rect(b.x, b.y, b.w, b.d)
         return (x0 + x1) / 2, (y0 + y1) / 2
 
-    def drop_centre(self, b: Bin) -> tuple[float, float]:
-        """Where parts are let go over a bin: its centre as the camera measured it (bins loose
-        on the bed, turned any way, are off the grid by up to half a cell), else its cells'
-        centre. A measurement more than half a cell from its cells is an old one (the bin was
-        moved on the page): the cells then."""
+    def _measured_centre(self, b: Bin) -> tuple[float, float]:
+        """A bin's centre as the camera measured it, else its cells' centre (a measurement more
+        than half a cell from its cells is an old one: the cells then)."""
         cx, cy = self.bin_centre(b)
         if b.seen is not None and len(b.seen) == 2:
             sx, sy = float(b.seen[0]), float(b.seen[1])
             if abs(sx - cx) <= self.pitch / 2 + 1.0 and abs(sy - cy) <= self.pitch / 2 + 1.0:
                 return sx, sy
         return cx, cy
+
+    def drop_centre(self, b: Bin) -> tuple[float, float]:
+        """Where parts are let go over a bin: the middle of its open cavity. That is its centre
+        as the camera measured it (bins loose on the bed, turned any way, are off the grid by up
+        to half a cell), else its cells' centre; a measurement more than half a cell from its
+        cells is an old one (the bin was moved on the page): the cells then. A shelf bin's
+        shelf takes the back, so the point moves towards its front by half the shelf depth, along
+        the bin's real direction. A corner-post bin keeps its centre."""
+        cx, cy = self._measured_centre(b)
+        if b.style != "shelf":
+            return cx, cy
+        deg = (
+            b.yaw if b.yaw is not None and (round(b.yaw / 90.0) % 4) * 90 == b.rot % 360 else b.rot
+        )
+        dx, dy = _rotate((0.0, -binspec.SHELF_DEPTH_MM / 2), deg)
+        return cx + dx, cy + dy
 
     def marker_centre(self, b: Bin) -> tuple[float, float]:
         cx, cy = self.bin_centre(b)
@@ -244,6 +263,7 @@ class Layout:
         b.x = round((centre[0] - ox) / self.pitch - b.w / 2)
         b.y = round((centre[1] - oy) / self.pitch - b.d / 2)
         b.seen = [round(float(centre[0]), 2), round(float(centre[1]), 2)]
+        b.yaw = round(float(yaw_deg), 2)
         return b
 
     def _size_seen(self, marker: int, yaw_deg: float) -> tuple[int, int]:

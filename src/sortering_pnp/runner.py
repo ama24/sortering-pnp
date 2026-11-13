@@ -27,7 +27,7 @@ from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
 from .camera import mirrored, orientation, rotated
-from .config import PUMP_SWITCHES, Machine
+from .config import HOME_CORNERS, PUMP_SWITCHES, Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
 from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
@@ -137,6 +137,7 @@ class Runner:
         self.mask_checked = False  # the tray view was checked and saved (Calibrate tab)
         self._crop: dict[str, Any] = {}  # Camera cropping being tried (margin, colour), not saved
         self._layout_cache: tuple[tuple[str, int, int], Layout] | None = None
+        self._tip_touch: tuple[float, float] | None = None  # (offset, surface_z) of the Tip step
         self.markers_seen: set[int] = set()  # every code the camera has read
         self._load_tool()
         self._load_machine()
@@ -189,6 +190,7 @@ class Runner:
         cached = self._layout_cache
         if cached is None or cached[0] != key:
             cached = self._layout_cache = (key, Layout.load(p))
+            self._follow_surface(cached[1])
         return copy.deepcopy(cached[1])
 
     def calibration(self) -> BedCalibration | None:
@@ -952,9 +954,12 @@ class Runner:
         self.motion.z_home_xy = ((x0 + x1) / 2, (y0 + y1) / 2)  # Z is homed over the plate
         return layout, T
 
-    def _sort(self, strategy: str, steps: int | None, auto: bool = False) -> str:
+    def _sort(
+        self, strategy: str, steps: int | None, auto: bool = False, looked: Shot | None = None
+    ) -> str:
         """Sort until the working area is empty: "done", "stuck" (only when `auto`: then the
-        caller waits for the parts to change), "stopped" or "steps"."""
+        caller waits for the parts to change), "stopped" or "steps". `looked`: a photo just
+        taken from the photo position, used instead of taking the same one again."""
         missing = getattr(self.vision, "model_missing", lambda: None)()
         if missing:
             raise PrinterError(missing)
@@ -971,10 +976,11 @@ class Runner:
         ok, why = self.pins.status()
         if not ok:
             raise PrinterError(f"the picker's pins: {why}")
-        first: Shot | None = None
+        first: Shot | None = looked
         run = self.m.run
         if run.scan_bins_on_start or run.only_seen_bins:
-            first = self.take_shot(layout, T, area="bins")
+            if first is None:
+                first = self.take_shot(layout, T, area="bins")
             seen = {mk.marker for mk in first.markers}
             if run.scan_bins_on_start:
                 moved = self._place_bins(layout, first, T)
@@ -1118,12 +1124,12 @@ class Runner:
                 self._set(status="done", message=plan.reason)
                 self.note(f"done: {plan.reason}")
                 self.say("done: " + plan.reason)
-                self.motion.message("sortering-pnp: done")
+                self.motion.message("Sortering PNP: done")
                 return "done"
             if plan.kind == "stuck":
                 self.note(plan.reason)
                 self.say("stuck: " + plan.reason)
-                self.motion.message("sortering-pnp: needs a hand")
+                self.motion.message("Sortering PNP: needs a hand")
                 if auto:
                     self._set(
                         status="stuck", message=plan.reason + "; waiting until they are moved"
@@ -1197,6 +1203,15 @@ class Runner:
         margin = self.m.run.work_margin_mm
         return shot, [p for p in shot.parts if layout.in_work(p.bed_xy, margin)], layout
 
+    def _can_reuse_look(self) -> bool:
+        """May the run start from the standby photo? Not when the bed must home first (motors
+        off: homing moves the bed and can shift the parts), nor with a head camera (a standby
+        look covers only the tray, the run's first photo the bins too)."""
+        if self.m.camera.source == "head":
+            return False
+        st = self.printer.status(None)
+        return st.ready and all(a in st.homed for a in "xyz")
+
     def _auto(self, strategy: str) -> None:
         """Standby: look for parts every standby.interval_s; when some lie on the plate, sort
         them at once; then wait again. Runs until Stop (or too many errors in a row)."""
@@ -1238,13 +1253,15 @@ class Runner:
                 self._now.clear()
                 if now:
                     tried = None
-                _, parts, _ = self._look()
+                shot, parts, _ = self._look()
                 # parts on the plate don't move by themselves: sort them at once, no second look
                 if len(parts) >= sb.min_parts and not (
                     tried is not None and same_parts(parts, tried)
                 ):
                     self.say(f"{len(parts)} part(s) seen: sorting")
-                    outcome = self._sort(strategy, None, auto=True)
+                    outcome = self._sort(
+                        strategy, None, auto=True, looked=shot if self._can_reuse_look() else None
+                    )
                     tried = None
                     if outcome == "stuck" and self.last_shot is not None:
                         _, tried, _ = self._look()
@@ -1311,16 +1328,30 @@ class Runner:
             d = read_json(p) or {}
             if "offset_z" in d:
                 self.m.tool.offset[2] = float(d["offset_z"])
+                if "surface_z" in d:
+                    self._tip_touch = (float(d["offset_z"]), float(d["surface_z"]))
+
+    def _follow_surface(self, layout: Layout) -> None:
+        """The tip was touched on the surface the parts lie on, so that stays the height picks
+        count from when the number for it changes later (the TPU sheet field)."""
+        if self._tip_touch is None:
+            return
+        offset, surface = self._tip_touch
+        z = round(offset + layout.surface_z() - surface, 3)
+        if z != self.m.tool.offset[2]:
+            self.m.tool.offset[2] = z
+            self.motion.tip = None
 
     def tip_touches_plate(self) -> dict[str, Any]:
-        """The tip was jogged down until it just touches the TPU plate: from now on that is the
-        plate's height, whatever Z the homing gives (see "Homing" in docs/reference.md)."""
+        """The tip was jogged down until it just touches the surface the parts lie on: from now on
+        that is `surface_z()`, whatever Z the homing gives (see "Homing" in docs/reference.md)."""
         self._idle()
         layout = self.layout()
         with self._lock:
             pos = self.printer.status(None).position
             self.motion.tip = None
-        offset_z = round(layout.surface_z() - pos[2], 3)
+        surface = round(layout.surface_z(), 3)
+        offset_z = round(surface - pos[2], 3)
         p = self.m.path(self.m.paths.tool)
         assert p is not None
         write_json(
@@ -1328,15 +1359,18 @@ class Runner:
             {
                 "offset_z": offset_z,
                 "toolhead_z": pos[2],
+                "surface_z": surface,  # the printer Z the touched surface was taken to be
                 "measured": time.strftime("%Y-%m-%d %H:%M:%S"),
             },
         )
         self.m.tool.offset[2] = offset_z
+        self._tip_touch = (offset_z, surface)
         self.setup.mark("tip", f"offset {offset_z:+.2f} mm")
         self.note(
-            f"tip height: touches the plate at toolhead Z {pos[2]:.2f} (offset {offset_z:+.2f} mm)"
+            f"tip height: touches the plate (Z {surface:.2f}) at toolhead Z {pos[2]:.2f} "
+            f"(offset {offset_z:+.2f} mm)"
         )
-        return {"offset_z": offset_z, "toolhead_z": pos[2]}
+        return {"offset_z": offset_z, "toolhead_z": pos[2], "surface_z": surface}
 
     def _pick(self, plan: Plan, layout: Layout) -> None:
         p, b = plan.part, plan.bin
@@ -1346,17 +1380,24 @@ class Runner:
         if pk.kind.holds == "jaws":
             h = p.grip_height_mm if p.grip_height_mm is not None else p.top_mm * pk.grip_height
             z = surface + h
+        elif pk.kind.holds == "cup":  # the cup goes down over the part: its size doesn't matter
+            z = surface + pk.cup_above_mm
         else:
             z = surface + p.top_mm - pk.depth_mm
-        z = max(z, surface + 0.3)
+        if pk.kind.holds != "cup":
+            z = max(z, surface + 0.3)
         x, y = p.grip_bed if p.grip_method != "centre" else p.bed_xy
         jaws = jaw_angle(p.bed_angle, pk.rotate_offset_deg)
         name = p.cls + (f"x{p.length_mm:g}" if p.length_mm is not None else "")
-        self.note(f"pick {name} at ({x:.1f}, {y:.1f}) -> bin {b.marker} ({plan.reason})")
+        self.note(
+            f"pick {name} at ({x:.1f}, {y:.1f}) Z{z:.2f} (top {p.top_mm:.1f}) "
+            f"-> bin {b.marker} ({plan.reason})"
+        )
         turn = f", jaws {jaws:.0f}°" if pk.kind.rotates else ""
         self.phase(f"picking {name} at X{x:.0f} Y{y:.0f}{turn}, for bin {layout.bin_name(b)}")
         self.motion.message(f"pick {name}")
-        self.motion.pick(x, y, z, jaws)
+        top = surface + p.top_mm if pk.kind.holds == "cup" else None
+        self.motion.pick(x, y, z, jaws, top=top)
 
     def _drop(self, plan: Plan, layout: Layout) -> None:
         b = plan.bin
@@ -1365,6 +1406,9 @@ class Runner:
         p = plan.part
         name = (p.cls + (f"x{p.length_mm:g}" if p.length_mm is not None else "")) if p else "it"
         self.phase(f"leaving {name} in bin {layout.bin_name(b)} ({b.marker})")
+        # a bin at the bed's edge: its opening's middle may be just out of reach. Half a shelf's
+        # depth still lets the part go over the opening; further out the move is refused
+        cx, cy = self.motion.within_reach(cx, cy, binspec.SHELF_DEPTH_MM / 2)
         self.motion.drop(cx, cy, layout.bin_rim_z(b))
 
     # ------------------------------------------------------------------ web-page helpers
@@ -1549,6 +1593,7 @@ class Runner:
         "limits_x",
         "limits_y",
         "limits_z",
+        "home_corner",
     )
 
     def _load_machine(self) -> None:
@@ -1604,6 +1649,10 @@ class Runner:
                 raise ValueError(f"unknown machine value {k!r}")
             if k == "travel_z":
                 new[k] = float(v)
+            elif k == "home_corner":
+                if v not in HOME_CORNERS:
+                    raise ValueError(f"home_corner must be one of {', '.join(HOME_CORNERS)}")
+                new[k] = v
             else:
                 vals = [float(x) for x in v]
                 position = k.endswith("_position")
@@ -1638,6 +1687,7 @@ class Runner:
             "required": self.require_setup,
             "complete": not self.setup.missing(),
             "machine": self.machine_values(),
+            "photo_z": self.motion.photo_z(),  # the Z photos are really taken at
             "homed_now": self._setup_homed,
             "picker_tried": sorted(self._setup_picker),
             "tool": self._tool,  # the mounted tool, as Klipper last said (None: not asked yet)
@@ -1744,6 +1794,26 @@ class Runner:
             self.setup.reset("lights")
         return self.setup_state()
 
+    def lights_preview(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Setup tab, Lights, while a bar moves: the colour on the LEDs at once, nothing saved
+        and only a small answer, as it comes many times a second. setup_lights() keeps it
+        when the bar is let go."""
+        li = self.m.lights
+        colour = str(values.get("colour", li.colour))
+        parse_hex(colour)
+        brightness = float(values.get("brightness", li.brightness))
+        if not 0 <= brightness <= 1:
+            raise ValueError("brightness must be 0..1")
+        li.colour, li.brightness = "#" + colour.strip().lstrip("#").lower(), brightness
+        if li.enabled:
+            self.lights.preview()
+        return {
+            "colour": li.colour,
+            "brightness": li.brightness,
+            "shown": li.enabled,
+            "error": self.lights.error,  # e.g. no /dev/spidev0.0: the LEDs got nothing
+        }
+
     def setup_picker_drop(self, lower: bool) -> dict[str, Any]:
         """Over the bin: lower to rim + drop_mm before letting go, or let go at the travel
         height (the default). Kept in machine.json."""
@@ -1839,16 +1909,29 @@ class Runner:
         self.note("homed from the Setup tab")
         return self.setup_state()
 
-    def setup_goto(self, target: str) -> list[float]:
-        """Show a position: the photo position, two corners of the limits, the plate centre."""
-        self._idle()
+    def _limit_corners(self) -> dict[str, tuple[float, float]]:
+        """The four corners of the soft limits, as tip X/Y. The corner the printer homes to
+        has the X and Y minimum (printer.home_corner); the others follow from it."""
         pc = self.m.printer
         ox, oy, _ = self.m.tool.offset
+        right, back = pc.home_corner.endswith("right"), pc.home_corner.startswith("back")
+        x = {"left": pc.limits_x[1] if right else pc.limits_x[0]}
+        x["right"] = pc.limits_x[0] if right else pc.limits_x[1]
+        y = {"front": pc.limits_y[1] if back else pc.limits_y[0]}
+        y["back"] = pc.limits_y[0] if back else pc.limits_y[1]
+        return {
+            f"{fb}_{lr}": (x[lr] + ox, y[fb] + oy)
+            for fb in ("front", "back")
+            for lr in ("left", "right")
+        }
+
+    def setup_goto(self, target: str) -> list[float]:
+        """Show a position: the photo position, a corner of the limits, the plate centre."""
+        self._idle()
         layout = self.layout()
         x0, y0, x1, y1 = layout.work_rect()
         spots = {
-            "front_left": (pc.limits_x[0] + ox, pc.limits_y[0] + oy),
-            "back_right": (pc.limits_x[1] + ox, pc.limits_y[1] + oy),
+            **self._limit_corners(),
             "centre": ((x0 + x1) / 2, (y0 + y1) / 2),
         }
         with self._lock:

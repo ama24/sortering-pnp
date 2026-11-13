@@ -35,6 +35,7 @@ POST /api/setup/picker/type {"type"}, /api/setup/picker/offset {"deg"}, /api/set
 POST /api/setup/picker/drop {"lower": bool}  lower over the bin before letting go (else: travel height)
 POST /api/setup/picker/pump {"switch": "mosfet"|"bed"|"hotend"}  what switches a pump
 POST /api/setup/lights {"colour","brightness","always_on","enabled"}  the LEDs (shown at once)
+POST /api/lights/preview {"colour","brightness"}  shown while a bar moves, not saved
 POST /api/setup/tool {"tool": "picker"|"hotend"}  which tool is on the printer (TOOL_PICKER/_HOTEND)
 
 With accounts (the default), everything except the page itself and the session routes needs the
@@ -265,6 +266,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(r.setup_lights(self._body()))
         elif method == "POST" and path == "/api/setup/picker/pump":
             self._json(r.setup_picker_pump(str(self._body()["switch"])))
+        elif method == "POST" and path == "/api/lights/preview":
+            self._json(r.lights_preview(self._body()))
         elif method == "POST" and path == "/api/setup/picker/drop":
             self._json(r.setup_picker_drop(bool(self._body().get("lower"))))
         elif method == "POST" and path == "/api/setup/picker/offset":

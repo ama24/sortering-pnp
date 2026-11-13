@@ -55,6 +55,20 @@ def test_layout_default_is_valid_and_round_trips(tmp_path):
     assert lay.in_work((110, 110)) and not lay.in_work((20, 20))
 
 
+def test_the_surface_is_the_trays_also_on_an_empty_grid():
+    assert Layout.empty(5, 5, Layout.default()).surface_z() == pytest.approx(7.75)
+    raised = Layout.default()
+    raised.bin_floor_mm, raised.plate_thickness_mm = 4.0, 2.0
+    assert Layout.empty(5, 5, raised).surface_z() == pytest.approx(raised.surface_z())
+
+
+def test_an_older_layout_with_bins_but_no_plate_bin_has_its_sheet_on_the_bed():
+    lay = Layout.default()
+    lay.bins = [b for b in lay.bins if b.role != "work"]
+    lay.work_marker = None
+    assert lay.surface_z() == pytest.approx(lay.plate_thickness_mm)
+
+
 def test_layout_problems():
     lay = Layout.default()
     lay.bins.append(Bin(marker=100, x=2, y=2))  # duplicate marker, on the plate tray

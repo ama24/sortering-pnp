@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>sortering-pnp</title>
+<title>Sortering PNP</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2032%2032%22%3E%3Crect%20width=%2232%22%20height=%2232%22%20rx=%228%22%20fill=%22%230f766e%22/%3E%3Cpath%20d=%22M12%205h8v4l-2%202h-4l-2-2z%22%20fill=%22%23fff%22/%3E%3Cpath%20d=%22M16%2011v3%22%20stroke=%22%23fff%22%20stroke-width=%222%22/%3E%3Crect%20x=%2210%22%20y=%2214%22%20width=%2212%22%20height=%223%22%20rx=%221.5%22%20fill=%22%23fff%22/%3E%3Cpath%20d=%22M13%2018v9l3%202%203-2v-9z%22%20fill=%22%239fd6cf%22/%3E%3Cpath%20d=%22M13%2021h6M13%2024h6%22%20stroke=%22%230f766e%22%20stroke-width=%221.2%22/%3E%3C/svg%3E">
 <style>
 :root{
  --bg:#f3f4f1;--card:#fff;--ink:#1c2024;--mut:#5d6670;--soft:#8a9198;--line:#e3e5e0;--line2:#eef0ec;
@@ -18,7 +19,6 @@ code{font:12.5px ui-monospace,Menlo,Consolas,monospace;background:var(--line2);p
 header{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
 .bar{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
 .brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.01em}
-.logo{display:grid;grid-template-columns:repeat(2,7px);gap:2px}.logo i{width:7px;height:7px;border-radius:2px;background:var(--acc)}.logo i:nth-child(2),.logo i:nth-child(3){background:#a9c4c1}
 nav{display:flex;flex-wrap:wrap;gap:2px}
 nav button{background:none;border:0;border-radius:999px;padding:6px 12px;color:var(--mut);font:inherit;cursor:pointer}
 nav button:hover{color:var(--ink)}nav button.on{background:var(--acc-soft);color:var(--acc);font-weight:600}
@@ -38,6 +38,8 @@ h2{font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercas
 .cols{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:16px;align-items:start}
 @media (max-width:860px){.cols{grid-template-columns:1fr}.right{margin-left:0}}
 p{margin:0 0 10px}.mut{color:var(--mut)}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.alert{display:inline-block;max-width:100%;box-sizing:border-box;background:var(--bad-soft);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);border-left:4px solid var(--bad);border-radius:8px;padding:7px 12px;font-weight:600;line-height:1.4;animation:alertin .3s ease-out}.alert::before{content:"⚠ "}
+@keyframes alertin{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
 .note{font-size:13px;color:var(--mut)}
 
 /* controls */
@@ -84,6 +86,9 @@ details.man summary::-webkit-details-marker{display:none}details.man summary:hov
 details.man[open]>div{position:absolute;right:0;top:100%;z-index:20;display:flex;gap:6px;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.08);white-space:nowrap}
 .bchg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 8px 7px 12px;margin-bottom:10px;border-radius:var(--r2);background:var(--warn-soft);border:1px solid #ecdcbc;font-size:13px}
 .bchg>b{color:var(--warn)}.bchg button:disabled{opacity:.6;cursor:default}
+#lr{accent-color:#dc2626}#lg{accent-color:#16a34a}#lb{accent-color:#2563eb}#lbr{accent-color:var(--acc)}.lsw{box-shadow:0 0 14px 2px rgba(0,0,0,.12)}
+.ltop{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-bottom:14px}.ltick{color:var(--ink);font-size:14px}.ltick.dim{opacity:.45}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--line2)}.seg button{font:inherit;font-size:13px;font-weight:700;letter-spacing:.04em;border:0;background:none;color:var(--mut);padding:6px 18px;border-radius:999px;cursor:pointer}.seg button.on{background:var(--acc);color:#fff}.seg button.on.off{background:var(--ink)}
 .lights{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-start}.lpick{display:flex;gap:8px;align-items:center}
 .lpick input[type=color]{width:44px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}.lpick #lhex{width:86px;font-family:ui-monospace,monospace}
 .lsw{width:34px;height:34px;border-radius:50%;border:1px solid var(--line)}.lsl{display:grid;gap:4px;min-width:260px}
@@ -124,7 +129,29 @@ ul.plain{margin:8px 0 0;padding-left:18px}
 .badge{display:inline-block;min-width:18px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-size:12px;font-weight:600}
 .step{display:grid;grid-template-columns:34px 1fr;gap:4px 14px}.num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--line2);color:var(--mut);font-weight:600;font-size:13px}
 .num.ok{background:var(--ok);color:#fff}.step h3{margin:3px 0 2px;font-size:15px;font-weight:600}.step .body{grid-column:2}
-.checks{list-style:none;padding:0;margin:8px 0}.checks li{padding:2px 0}.mfield input{width:84px}
+.checks{list-style:none;padding:0;margin:8px 0}.checks li{padding:2px 0}.machwrap{display:flex;flex-wrap:wrap;gap:16px;align-items:stretch;margin:26px 0 4px}.machwrap .bedmap{margin-bottom:18px}
+@media(max-width:560px){.step:has(.machwrap)>.body{grid-column:1/-1;min-width:0}.step:has(.machwrap){grid-template-columns:34px minmax(0,1fr)}.machwrap .bedmap{padding:10px;flex-basis:100%;min-width:0;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.machwrap .bedxy{gap:5px}.machwrap .bedh{flex-direction:column!important;align-items:inherit;gap:3px}.machwrap{row-gap:30px}.machwrap .bedxy input{width:46px;padding:4px 5px;-moz-appearance:textfield;appearance:textfield}.machwrap .bedxy input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.machwrap .zcol{max-width:none}
+ .machwrap .bedc.back_left::before{left:-16px;top:-16px}.machwrap .bedc.back_right::before{right:-16px;top:-16px}.machwrap .bedc.front_left::before{left:-16px;bottom:-16px}.machwrap .bedc.front_right::before{right:-16px;bottom:-16px}}
+.bedh{display:flex;align-items:center;gap:6px}.bedc.back_right .bedh,.bedc.front_right .bedh{flex-direction:row-reverse}
+.homepick{font:inherit;font-size:11px;line-height:16px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}.homepick:hover{color:var(--mut);border-color:var(--soft)}.homepick.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.bedc.home::before{width:14px;height:14px;box-shadow:0 0 0 3px var(--acc-soft)}
+.jogbox{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:8px 0}.jogside{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.jogxy{width:300px;max-width:100%;height:auto;flex:none;touch-action:manipulation}.jw{stroke:var(--card);stroke-width:2;cursor:pointer;transition:fill .12s}
+.jw.r0{fill:color-mix(in srgb,var(--acc) 12%,var(--card))}.jw.r1{fill:color-mix(in srgb,var(--acc) 24%,var(--card))}.jw.r2{fill:color-mix(in srgb,var(--acc) 38%,var(--card))}.jw.r3{fill:color-mix(in srgb,var(--acc) 52%,var(--card))}.jw:hover{fill:var(--acc)}.jw:active{fill:var(--ink)}
+:is(.jogxy,.jogzr) text{font-size:11px;text-anchor:middle;dominant-baseline:middle;fill:var(--ink);pointer-events:none}:is(.jogxy,.jogzr) .jax{font-size:14px;font-weight:700;fill:var(--acc)}:is(.jogxy,.jogzr) .jc{fill:var(--card);stroke:var(--line);stroke-width:2}:is(.jogxy,.jogzr) .jcl{font-size:10px;fill:var(--mut)}
+.jogzr{width:192px;max-width:60%;height:auto;flex:none;touch-action:manipulation}
+.bedmid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1}
+.zcol{flex:1 1 300px;max-width:360px;background:var(--line2);border:2px solid var(--soft);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column}.zcol h4{margin:0 0 8px;font-size:13px}
+.zbody{display:flex;flex:1;gap:18px;align-items:stretch;min-height:210px}.zscale{position:relative;width:116px;flex:none;margin:8px 0}.zbar{position:absolute;left:34px;top:0;bottom:0;width:4px;border-radius:2px;background:var(--soft)}
+.ztick{position:absolute;left:0;width:26px;text-align:right;font-size:11px;line-height:1;color:var(--mut);transform:translateY(50%)}.ztick::after{content:"";position:absolute;left:30px;top:50%;width:8px;height:1px;background:var(--soft)}
+.zline{position:absolute;left:30px;width:20px;height:3px;border-radius:2px;transform:translateY(50%)}.ztag{position:absolute;left:52px;padding:1px 6px;border-radius:5px;font-size:11px;line-height:16px;color:#fff;white-space:nowrap;transform:translateY(50%)}
+.zrows{display:flex;flex-direction:column;justify-content:space-around;gap:10px;flex:1}.zrow{display:grid;grid-template-columns:10px 1fr;gap:2px 7px;align-items:center;font-size:13px;color:var(--ink)}.zrow i{width:10px;height:10px;border-radius:50%}.zletter{grid-column:2;display:flex;align-items:center;gap:5px;color:var(--mut)}.zletter input{width:68px}
+.poslist{display:flex;flex-direction:column;gap:8px;margin-top:12px;max-width:806px}.posrow{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:10px 14px;background:var(--line2);border:1px solid var(--line);border-radius:10px}.postxt{flex:1 1 220px;display:flex;flex-direction:column;gap:2px}.posxyz{display:flex;gap:10px}.posxyz label{gap:4px;font-size:13px}.posxyz input{width:62px}
+.bedmap{position:relative;flex:1 1 320px;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;row-gap:44px;max-width:430px;padding:14px;background:var(--line2);border:2px solid var(--soft);border-radius:10px}
+.bedxy{display:flex;gap:8px;font-size:13px;color:var(--mut)}.bedxy label{display:flex;align-items:center;gap:3px}.bedxy input{width:58px}
+.bedc{display:flex;flex-direction:column;gap:3px;align-items:flex-start;position:relative}.bedc.back_right,.bedc.front_right{align-items:flex-end;text-align:right}
+.bedc::before{content:"";position:absolute;width:10px;height:10px;border-radius:50%;background:var(--acc)}.bedc.back_left::before{left:-19px;top:-19px}.bedc.back_right::before{right:-19px;top:-19px}.bedc.front_left::before{left:-19px;bottom:-19px}.bedc.front_right::before{right:-19px;bottom:-19px}
+.bedl{position:absolute;left:0;right:0;text-align:center;font-size:12px;color:var(--mut);pointer-events:none}.bedl.bk{top:-20px}.bedl.fr{bottom:-20px}
 .jog{display:grid;grid-template-columns:repeat(3,54px);gap:6px}.jog button{height:44px;padding:0}
 
 /* device tab */
@@ -190,8 +217,8 @@ ul.plain{margin:8px 0 0;padding-left:18px}
 body{font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .app{display:flex;min-height:100vh}
 .side{position:sticky;top:0;height:100vh;flex:0 0 244px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:20px;padding:20px 14px;box-sizing:border-box;overflow:auto;z-index:4}
+.logo{flex:none;width:30px;height:30px}
 .side .brand{padding:0 8px;gap:10px}.side .brand .bl{display:flex;flex-direction:column;line-height:1.25}.side .brand b{font-size:16px;font-weight:700;letter-spacing:-.01em}.side .brand small{font-size:12px;color:var(--mut);font-weight:400}
-.logo{width:30px;height:30px;border-radius:8px;background:var(--acc);display:grid;grid-template-columns:repeat(2,7px);place-content:center;gap:3px}.logo i{width:7px;height:7px;border-radius:2px;background:#fff}.logo i:nth-child(2),.logo i:nth-child(3){background:#9fd6cf}
 nav{display:flex;flex-direction:column;gap:18px}
 .ngroup{display:flex;flex-direction:column;gap:2px}
 .glabel{font-size:11.5px;font-weight:600;letter-spacing:.06em;color:var(--mut);padding:0 10px 6px;text-transform:uppercase}
@@ -240,7 +267,7 @@ button.p{font-weight:600}button.big{padding:11px 18px}
 </style></head><body>
 <div class="app">
 <aside class="side">
- <div class="brand"><span class="logo"><i></i><i></i><i></i><i></i></span><span class="bl"><b>sortering-pnp</b><small id="machname">pick-and-place sorter</small></span></div>
+ <div class="brand"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--acc)"/><path d="M12 5h8v4l-2 2h-4l-2-2z" fill="#fff"/><path d="M16 11v3" stroke="#fff" stroke-width="2"/><rect x="10" y="14" width="12" height="3" rx="1.5" fill="#fff"/><path d="M13 18v9l3 2 3-2v-9z" fill="#9fd6cf"/><path d="M13 21h6M13 24h6" stroke="var(--acc)" stroke-width="1.2"/></svg><span class="bl"><b>Sortering PNP</b><small id="machname">pick-and-place sorter</small></span></div>
  <nav aria-label="Sections">
   <div class="ngroup"><span class="glabel">Operate</span><button data-t="device" class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Device</span><span id="devbadge" class="badge" hidden></span></button><div id="startup" aria-label="Start-up check"></div></div>
   <div class="ngroup"><span class="glabel">Prepare</span><button data-t="setup"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Setup</span><span id="setupbadge" class="badge" hidden></span></button><button data-t="calib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span>Camera Calibration</span></button><button data-t="print"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg><span>Print bins</span></button></div>
@@ -254,7 +281,7 @@ button.p{font-weight:600}button.big{padding:11px 18px}
 <div class="content">
 
 <div id="login"><form onsubmit="doLogin(event)">
- <div class="brand"><span class="logo"><i></i><i></i><i></i><i></i></span>sortering-pnp</div>
+ <div class="brand"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--acc)"/><path d="M12 5h8v4l-2 2h-4l-2-2z" fill="#fff"/><path d="M16 11v3" stroke="#fff" stroke-width="2"/><rect x="10" y="14" width="12" height="3" rx="1.5" fill="#fff"/><path d="M13 18v9l3 2 3-2v-9z" fill="#9fd6cf"/><path d="M13 21h6M13 24h6" stroke="var(--acc)" stroke-width="1.2"/></svg>Sortering PNP</div>
  <h3 id="logtitle">Log in</h3>
  <p id="loghelp" class="note" hidden>No account yet. Choose a user name and a password (6 characters or more). This account can add others later in Users.</p>
  <input id="luser" placeholder="User name" autocomplete="username" required>
@@ -420,7 +447,8 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{liveTab(b.data
 setTimeout(()=>{const t=location.hash.slice(1),b=t&&document.querySelector(`nav button[data-t="${t}"]`);if(b)b.click();window.scrollTo(0,0);});
 if("scrollRestoration" in history)history.scrollRestoration="manual";
 async function api(path,body){const r=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();if(r.status===401){session();}if(!r.ok)throw new Error(j.error||r.status);return j;}
-function flash(id,text,bad){$(id).textContent=text;$(id).className=bad?"note bad":"note";}
+// a message under a button; a problem (bad) stands out in red, so it is seen and acted on
+function flash(id,text,bad){$(id).textContent=text;$(id).className=bad&&text?"note bad alert":"note";}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
 // ---------------------------------------------------------------- login
@@ -684,7 +712,29 @@ let SU={steps:[]},CHECKS=null;
 async function loadSetup(){try{SU=await api("api/setup");renderSetup();loadTodo();}catch(e){flash("setupsum",e.message,1);}}
 async function setupCall(path,body,msg,key){const box=()=>key&&$("msg_"+key)?"msg_"+key:"setupsum";try{if(msg)flash(box(),msg);const j=await api(path,body||{});if(j.checks)CHECKS=j.checks;SU=j.steps?j:await api("api/setup");renderSetup();flash(box(),j.tip?`tip at ${j.tip.map(v=>(+v).toFixed(2)).join(", ")}`:"");poll();}catch(e){flash(box(),e.message,1);$(box()).scrollIntoView({block:"nearest",behavior:"smooth"});}}
 function mval(id){return +$(id).value;}
-function saveMachine(){setupCall("api/setup/machine",{values:{limits_x:[mval("mx0"),mval("mx1")],limits_y:[mval("my0"),mval("my1")],limits_z:[mval("mz0"),mval("mz1")],travel_z:mval("mtz"),photo_position:[mval("mpx"),mval("mpy"),mval("mpz")],change_position:[mval("mcx"),mval("mcy"),mval("mcz")]}},"saving…","machine");}
+// Setup, Machine: the limits' four corners as seen from above, front at the bottom
+let HOMEC=null;  // Setup, Machine: the corner the printer homes to, as chosen on the page
+function bedMap(L){const m=SU.machine||{};HOMEC=HOMEC||m.home_corner||"front_left";L=L||{x0:m.limits_x[0],x1:m.limits_x[1],y0:m.limits_y[0],y1:m.limits_y[1]};
+  const hr=HOMEC.endsWith("right"),hb=HOMEC.startsWith("back"),lim=k=>[k.endsWith("right")!==hr?"x1":"x0",k.startsWith("back")!==hb?"y1":"y0"],
+  box=(a,l,id)=>`<label>${a}<input ${id?`id="${id}"`:""} data-lim="${l}" type="number" value="${L[l]}" oninput="limSync(this)"></label>`,
+  card=(k,t)=>{const[x,y]=lim(k),ids=x==="x0"&&y==="y0"?["mx0","my0"]:x==="x1"&&y==="y1"?["mx1","my1"]:[],on=k===HOMEC;
+   return `<div class="bedc ${k}${on?" home":""}"><span class="bedh"><b>${t}</b><button class="homepick${on?" on":""}" aria-pressed="${on}" title="${on?"Your printer homes to this corner":"Does your printer home here? Choose it"}" onclick="pickHome('${k}')">⌂ Home</button></span><span class="bedxy">${box("X",x,ids[0])}${box("Y",y,ids[1])}</span><button class="b s" onclick="machGo('${k}')">Move tip here</button></div>`;};
+ return `<div class="bedmap" id="bedmap" role="group" aria-label="The corners of the limits, seen from above"><span class="bedl bk">back</span><span class="bedl fr">front</span>${card("back_left","back-left")}${card("back_right","back-right")}${card("front_left","front-left")}${card("front_right","front-right")}<button class="b s bedmid" onclick="machGo('centre')">Plate centre</button></div>`;}
+// another home corner: the same limits, swapped onto the corners (the home corner has X and Y minimum)
+function pickHome(k){const L={};document.querySelectorAll("#bedmap [data-lim]").forEach(e=>{L[e.dataset.lim]=e.value;});HOMEC=k;$("bedmap").outerHTML=bedMap(L);}
+// Setup, Machine: the Z scale, 0 to 300 mm: a line at each value, its label kept clear of the others
+const ZM=[["mz0","Min","var(--mut)"],["mtz","Travel","var(--acc)"],["mz1","Max","var(--warn)"]];
+function zSpots(v){const s=ZM.map(([id],i)=>({id,val:v[i],at:Math.min(100,Math.max(0,v[i]/3))}));let last=-99;[...s].sort((a,b)=>a.at-b.at).forEach(e=>{e.tag=Math.max(e.at,last+11);last=e.tag;});return s;}
+function zColumn(){const m=SU.machine||{},v=[m.limits_z[0],m.travel_z,m.limits_z[1]],s=zSpots(v),ticks=[0,50,100,150,200,250,300].map(t=>`<span class="ztick" style="bottom:${t/3}%">${t}</span>`).join(""),
+  marks=ZM.map(([id,l,c],i)=>`<i class="zline" data-z="${id}" style="bottom:${s[i].at}%;background:${c}"></i><span class="ztag" data-z="${id}" style="bottom:${s[i].tag}%;background:${c}">${l} <b>${v[i]}</b></span>`).join(""),
+  row=(id,l,c,val)=>`<label class="zrow"><i style="background:${c}"></i><span>${l}</span><span class="zletter">Z<input id="${id}" type="number" value="${val}" oninput="zMark()"></span></label>`;
+ return `<div class="zcol"><h4>Height (Z)</h4><div class="zbody"><div class="zscale" aria-hidden="true"><i class="zbar"></i>${ticks}${marks}</div><div class="zrows">${row("mz1","Maximum","var(--warn)",v[2])}${row("mtz","Travel height","var(--acc)",v[1])}${row("mz0","Minimum","var(--mut)",v[0])}</div></div></div>`;}
+function zMark(){zSpots(ZM.map(([id])=>mval(id))).forEach(e=>{const line=document.querySelector(`.zline[data-z="${e.id}"]`),tag=document.querySelector(`.ztag[data-z="${e.id}"]`);line.style.bottom=e.at+"%";tag.style.bottom=e.tag+"%";tag.querySelector("b").textContent=e.val;});}
+function posRow(k,title,hint,id,p){return `<div class="posrow"><div class="postxt"><b>${title}</b><span class="note">${hint}</span></div><div class="posxyz">${["X","Y","Z"].map((a,i)=>`<label>${a}<input id="${id}${a.toLowerCase()}" type="number" value="${p[i]}"></label>`).join("")}</div><button class="b s" onclick="machGo('${k}')">Move tip here</button></div>`;}
+// corners share their limits: X with the one in front or behind, Y with the one beside
+function limSync(el){document.querySelectorAll(`[data-lim="${el.dataset.lim}"]`).forEach(o=>{if(o!==el)o.value=el.value;});}
+function machGo(k){const m=SU.machine,same=(a,b)=>a.every((v,i)=>mval(v)===b[i]);if(!(same(["mx0","mx1"],m.limits_x)&&same(["my0","my1"],m.limits_y)&&same(["mz0","mz1","mtz"],[...m.limits_z,m.travel_z])&&same(["mpx","mpy","mpz"],m.photo_position)&&same(["mcx","mcy","mcz"],m.change_position)&&(HOMEC||m.home_corner)===m.home_corner)){flash("msg_machine","you changed a value: press Save first",1);return;}setupCall('api/setup/goto',{target:k},'moving…','machine');}
+function saveMachine(){setupCall("api/setup/machine",{values:{limits_x:[mval("mx0"),mval("mx1")],limits_y:[mval("my0"),mval("my1")],limits_z:[mval("mz0"),mval("mz1")],travel_z:mval("mtz"),photo_position:[mval("mpx"),mval("mpy"),mval("mpz")],change_position:[mval("mcx"),mval("mcy"),mval("mcz")],home_corner:HOMEC||"front_left"}},"saving…","machine");}
 const WC={sig:"#e8590c",sig2:"#7048e8",v5:"#d6336c",v33:"#0c8599",v24:"#a61e1e",gnd:"#343a40"};
 const PIREF={1:"3V3",17:"3V3",2:"5V",4:"5V",6:"GND",9:"GND",14:"GND",20:"GND",25:"GND",30:"GND",34:"GND",39:"GND"},REFC={"3V3":WC.v33,"5V":WC.v5,GND:WC.gnd};
 // the Pi's 2x20 header, odd pins on the left, pin 1 at the top: `hot` pins (number: colour) are
@@ -758,7 +808,7 @@ function pickerBody(st,redo){const PK=SU.picker||{types:[]},t=PK.types.find(x=>x
  const parts=heat?t.parts.filter(x=>!x.startsWith("MOSFET module")):t.parts;
  const opts=`<div class="pkgrid">${PK.types.map((x,i)=>`<button class="pkopt ${x.key===t.key?"on":""}" onclick="setupCall('api/setup/picker/type',{type:'${x.key}'})"><span class="pkn">${i+1}</span><b>${esc(x.title)}</b><span class="note">${esc(x.summary)}</span><span class="pktags"><span class="tag a">aims at the ${x.aim==="head"?"head":"centre of gravity"}</span>${x.rotates?'<span class="tag">turns 0–180°</span>':""}${x.pump?'<span class="tag">pump + MOSFET</span>':""}</span></button>`).join("")}</div>`;
  const notes=heat?[`Unplug the ${heater} from the board's ${out} terminals and connect the pump there instead (its + to the output's +). The thermistor stays connected: Klipper needs it.`,
-  `sortering-pnp asks Klipper for ${PK.pump_heater_target} °C on that heater to grab and for 0 to let go (SET_HEATER_TEMPERATURE): nothing to add to printer.cfg. The thermistor still reads the room, so the output is fully on.`,
+  `Sortering PNP asks Klipper for ${PK.pump_heater_target} °C on that heater to grab and for 0 to let go (SET_HEATER_TEMPERATURE): nothing to add to printer.cfg. The thermistor still reads the room, so the output is fully on.`,
   `Klipper's heater check stops the printer if the output stays on longer than about ${sw==="bed"?60:20} s without warming: a part is held only a few seconds. While the ${sw} reads over the hotend limit (the heater still plugged in), the pump is refused.`,
   "The pump runs on the board's supply (24 V on an Ender 3): it must draw less than the output is rated for.",
   `Put the ${heater} back on its output before printing again (Hotend mounted).`,
@@ -774,27 +824,26 @@ function pickerBody(st,redo){const PK=SU.picker||{types:[]},t=PK.types.find(x=>x
   <h4>Pins on the Raspberry Pi</h4>${pickerPins(t,sw)}
   <h4>You need</h4><ul>${parts.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
   <div><h4>Good to know</h4><ul class="note" style="padding-left:16px">${notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
-  <div>${heat?`<h4>Klipper switches the pump</h4><p class="note" style="margin:0 0 6px">SET_HEATER_TEMPERATURE HEATER=${sw==="bed"?"heater_bed":"extruder"}, through Moonraker.${t.rotates?` The Pi turns GPIO${PK.turn_pin} itself.`:""}${t.servos?" Servos use the Pi's hardware PWM: install-pi.sh turns it on (reboot once).":""}</p>`:`<h4>The Pi drives it</h4><p class="note" style="margin:0 0 6px">sortering-pnp switches GPIO${PK.action_pin}${t.rotates?` and GPIO${PK.turn_pin}`:""} itself: nothing to set up in Klipper.${t.servos?" Servos use the Pi's hardware PWM: install-pi.sh turns it on (reboot once).":""}</p>`}
+  <div>${heat?`<h4>Klipper switches the pump</h4><p class="note" style="margin:0 0 6px">SET_HEATER_TEMPERATURE HEATER=${sw==="bed"?"heater_bed":"extruder"}, through Moonraker.${t.rotates?` The Pi turns GPIO${PK.turn_pin} itself.`:""}${t.servos?" Servos use the Pi's hardware PWM: install-pi.sh turns it on (reboot once).":""}</p>`:`<h4>The Pi drives it</h4><p class="note" style="margin:0 0 6px">Sortering PNP switches GPIO${PK.action_pin}${t.rotates?` and GPIO${PK.turn_pin}`:""} itself: nothing to set up in Klipper.${t.servos?" Servos use the Pi's hardware PWM: install-pi.sh turns it on (reboot once).":""}</p>`}
   ${PK.pins?(PK.pins.ok?`<p class="ok" style="margin:0">✓ ${esc(PK.pins.message)}</p>`:`<p class="bad" style="margin:0">✗ ${esc(PK.pins.message)}</p>`):""}
  </div></div></div>
  <h4 style="margin:14px 0 6px;font-size:13px">Try it (optional)</h4><p class="note" style="margin:0 0 8px">Nothing moves. Hold a screw ${t.holds==="jaws"?"between the jaws":t.holds==="cup"?"against the cup":"against the rod's tip"} and press Grab, then Release.</p><button class="b s" onclick="setupCall('api/setup/picker',{action:'grab'},'','picker')">Grab</button> <button class="b s" onclick="setupCall('api/setup/picker',{action:'release'},'','picker')">Release</button>`+
   (SU.rotation?`<p class="note" style="margin-top:10px">Turning: at <b>0°</b> the jaws must close along the printer's X axis (left–right). If they don't, change the offset until they do.</p><div class="row"><button class="b s" onclick="setupCall('api/setup/rotate',{angle:0},'','picker')">Turn to 0°</button> <button class="b s" onclick="setupCall('api/setup/rotate',{angle:90},'','picker')">Turn to 90°</button> <span class="note">offset</span> <input id="pkoff" type="number" step="1" value="${PK.offset_deg||0}" style="width:76px"> <span class="note">°</span> <button class="b s" onclick="setupCall('api/setup/picker/offset',{deg:+$('pkoff').value||0},'','picker')">Save offset</button></div>`:"")+
   `<h4 style="margin:14px 0 6px;font-size:13px">Letting go</h4><label class="row note"><input type="checkbox" id="pkdrop" ${PK.lower_to_drop?"checked":""} onchange="setupCall('api/setup/picker/drop',{lower:this.checked},'','picker')"> Lower over the bin before letting go (to ${PK.drop_mm} mm above its rim). Off: the part is let go at the travel height.</label>`+
-  `<h4 style="margin:14px 0 6px;font-size:13px">Put it on</h4><p class="note" style="margin:0 0 8px">The head waits at the picker-change position (step 3). Put the picker on the head, connect it, then press <b>OK</b>.</p><div class="row"><button class="b ${st.done?"":"p"} s" onclick="setupCall('api/setup/confirm',{step:'picker'},'','picker')">OK</button> <button class="b s" onclick="setupCall('api/setup/goto',{target:'change'},'moving…','picker')">Change position</button></div>`+redo;}
+  `<h4 style="margin:14px 0 6px;font-size:13px">Put it on</h4><p class="note" style="margin:0 0 8px">The head waits at the Tool Change position (step 3). Put the picker on the head, connect it, then press <b>OK</b>.</p><div class="row"><button class="b ${st.done?"":"p"} s" onclick="setupCall('api/setup/confirm',{step:'picker'},'','picker')">OK</button> <button class="b s" onclick="setupCall('api/setup/goto',{target:'change'},'moving…','picker')">Change position</button></div>`+redo;}
 function stepBody(st){const m=SU.machine||{},k=st.key,redo=st.done?` <button class="b s" onclick="setupCall('api/setup/reset',{step:'${k}'},'','${k}')">Redo</button>`:"";
  switch(k){
  case "printer":return `<p class="note">Asks Klipper a few questions; nothing moves.</p><button class="b p s" onclick="setupCall('api/setup/printer',{},'asking Klipper…','printer')">Check</button>`+
   (CHECKS?`<ul class="checks">${CHECKS.map(c=>`<li><span class="${c.ok?"ok":"bad"}">${c.ok?"✓":"✗"}</span> ${esc(c.what)} <span class="note">${esc(c.detail||"")}</span></li>`).join("")}</ul>`:"");
  case "homing":return `<p class="note">Watch the printer. It lifts first, homes X and Y, moves over the <b>middle of the working area</b> and homes Z there. If it heads for a bin, press <b>STOP</b>.</p><button class="b p s" onclick="setupCall('api/setup/home',{},'homing…','homing')">Home now</button>`+
   (SU.homed_now&&!st.done?` <button class="b s" onclick="setupCall('api/setup/confirm',{step:'homing'},'','homing')">Z homed over plate</button>`:"")+redo;
- case "machine":{const pp=m.photo_position||[0,0,0],cp=m.change_position||[0,0,0];return `<p class="note">The toolhead limits (mm, as in printer.cfg), the travel height (above the tallest bins), the <b>photo position</b> (bed all the way out, head out of the picture) and the <b>picker-change position</b> (head high and in the middle: easy to put the picker on). <b>Show me</b> drives to each one.</p>
-  <div class="row mfield"><label>X<input id="mx0" type="number" value="${m.limits_x[0]}">–<input id="mx1" type="number" value="${m.limits_x[1]}"></label><label>Y<input id="my0" type="number" value="${m.limits_y[0]}">–<input id="my1" type="number" value="${m.limits_y[1]}"></label><label>Z<input id="mz0" type="number" value="${m.limits_z[0]}">–<input id="mz1" type="number" value="${m.limits_z[1]}"></label><label>travel height<input id="mtz" type="number" value="${m.travel_z}"></label></div>
-  <div class="row mfield" style="margin-top:8px"><label>photo X/Y/Z<input id="mpx" type="number" value="${pp[0]}"><input id="mpy" type="number" value="${pp[1]}"><input id="mpz" type="number" value="${pp[2]}"></label><label>picker change X/Y/Z<input id="mcx" type="number" value="${cp[0]}"><input id="mcy" type="number" value="${cp[1]}"><input id="mcz" type="number" value="${cp[2]}"></label><button class="b s" onclick="saveMachine()">Save</button></div>
-  <div class="row" style="margin-top:10px"><span class="note">show me:</span>${[["front_left","front-left limit"],["back_right","back-right limit"],["centre","plate centre"],["photo","photo position"],["change","picker change"]].map(([t,l])=>`<button class="b s" onclick="setupCall('api/setup/goto',{target:'${t}'},'moving…','machine')">${l}</button>`).join("")}</div>
-  <p style="margin-top:10px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'machine'},'moving to the picker-change position…','machine')">Confirm</button> <span class="note">the head then goes to the picker-change position</span>`}${redo}</p>`;}
+ case "machine":{HOMEC=null;const pp=m.photo_position||[0,0,0],cp=m.change_position||[0,0,0],parked=SU.photo_z!=null&&SU.photo_z!==pp[2];return `<p class="note">Where the printer may go and where the head waits. All values in mm. Mark the corner your printer homes to with <b>⌂ Home</b>: it has the X and Y minimum. <b>Move tip here</b> drives there.</p>
+  <div class="machwrap">${bedMap()}${zColumn()}</div>
+  <div class="poslist">${posRow("photo","Photo / Parked Position","Bed all the way out, head out of the picture."+(parked?` For photos the head stays at the travel height (${SU.photo_z}), so Z is not used.`:""),"mp",pp)}${posRow("change","Tool Change","Head high and in the middle, easy to put the picker on.","mc",cp)}</div>
+  <p style="margin-top:12px"><button class="b s" onclick="saveMachine()">Save</button> ${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'machine'},'moving to the Tool Change position…','machine')">Confirm</button> <span class="note">the head then goes to the Tool Change position</span>`}${redo}</p>`;}
  case "picker":return pickerBody(st,redo);
  case "tip":return `<p class="note">Over the TPU sheet in the tray, jog the tip down until a sheet of paper just drags under it (0.1 mm steps at the end), then <b>Set height</b>. Every height counts from here; redo it when the picker or the Z switch moved.</p>
-  <div class="row"><button class="b s" onclick="setupCall('api/setup/goto',{target:'centre'},'moving to the plate centre…','tip')">Go to centre</button>${jogPad("tip",false)}<button class="b p s" onclick="setupCall('api/calib/tip',{},'saving…','tip')">Set height</button></div>
+  ${jogPad("tip",false,`<button class="b s" onclick="setupCall('api/setup/goto',{target:'centre'},'moving to the plate centre…','tip')">Go to X/Y centre</button><button class="b p s" onclick="setupCall('api/calib/tip',{},'saving…','tip')">Set height</button>`)}
   <p class="note" style="margin:6px 0 0">tip offset now ${(SU.tip_offset_z>=0?"+":"")+(+SU.tip_offset_z||0).toFixed(2)} mm</p>`+redo;
  case "lights":return lightsBody(st,redo);
  case "camera":return cameraBody(st,redo);
@@ -824,7 +873,7 @@ function ledWiring(n){let s="";
  [["5V",212,WC.v5],["GND",240,WC.gnd],["DIN",268,WC.sig]].forEach(([l,y,c])=>{s+=`<rect x="470" y="${y-4}" width="8" height="8" fill="${c}"/>`+tx(482,y+4,l,'style="font-size:10px"');});
  const cx=576,cy=240,R=62,r=31;s+=tx(492,192,"JST XH",'text-anchor="middle" style="font-size:9.5px;opacity:.75"');
  s+=`<path d="M${cx-R},${cy}a${R},${R} 0 1,0 ${2*R},0a${R},${R} 0 1,0 ${-2*R},0ZM${cx-r},${cy}a${r},${r} 0 1,1 ${2*r},0a${r},${r} 0 1,1 ${-2*r},0Z" fill="#2b2f33" fill-rule="evenodd"/>`;
- for(let i=0;i<n;i++){const a=2*Math.PI*i/n,x=cx+46.5*Math.cos(a),y=cy+46.5*Math.sin(a);s+=`<rect x="${(x-5).toFixed(1)}" y="${(y-5).toFixed(1)}" width="10" height="10" rx="1.5" fill="#f8f8f4" stroke="#ffd43b" stroke-width="1.4"/>`;}
+ for(let i=0;i<n;i++){const a=2*Math.PI*i/n,x=cx+46.5*Math.cos(a),y=cy+46.5*Math.sin(a);s+=`<rect x="${(x-5).toFixed(1)}" y="${(y-5).toFixed(1)}" width="10" height="10" rx="1.5" class="ledpx" fill="${(SU.lights||{}).enabled?SU.lights.colour||"#ffffff":"#f8f8f4"}" fill-opacity="${(SU.lights||{}).enabled?0.25+0.75*(SU.lights.brightness==null?0.5:SU.lights.brightness):1}" stroke="#ffd43b" stroke-width="1.4"/>`;}
  s+=tx(cx,cy+R+20,"LED ring",'text-anchor="middle" font-weight="600"')+tx(cx,cy+R+35,`WS2812B × ${n} · OD 40 · ID 19.9 mm`,'text-anchor="middle" style="font-size:10.5px;opacity:.75"');
  // legend
  let lx=22;[["GPIO10: data (DIN)",WC.sig],["5 V",WC.v5],["24 V",WC.v24],["GND (all joined)",WC.gnd]].forEach(([l,c])=>{s+=`<rect x="${lx}" y="398" width="16" height="4" rx="2" fill="${c}"/>`+tx(lx+22,404,l,'font-size="11"');lx+=36+l.length*6.3;});
@@ -839,45 +888,73 @@ function ledWire(L){const n=L.count||8,rows=[[WC.sig,"19 · GPIO10","DIN of the 
   <h4>Pins on the Raspberry Pi</h4><table class="pins">${rows.map(([c,p,w])=>`<tr><td style="white-space:nowrap"><i style="background:${c}"></i><b>${p}</b></td><td>${w}</td></tr>`).join("")}</table>
   <h4>You need</h4><ul><li>LED ring, WS2812B (${n} LEDs, 3-pin JST XH)</li><li>5 V buck converter (LM2596 or MP1584, 1 A or more)</li><li>3-wire lead, 24 V pair from the PSU</li></ul></div>
   <div><h4>Good to know</h4><ul class="note" style="padding-left:16px">${notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div></div></div>`;}
-function lightsBody(st,redo){const L=SU.lights||{},c=L.colour||"#ffffff",[r,g,b]=hexRgb(c),pct=Math.round((L.brightness==null?0.5:L.brightness)*100);
- const sl=(id,lab,v,max)=>`<label class="lrow"><span>${lab}</span><input type="range" id="${id}" min="0" max="${max}" value="${v}" oninput="lightsInput('${id}')"><b id="${id}v">${v}</b></label>`;
- if(!L.enabled)return `<div class="row"><button class="b p s" onclick="setupCall('api/setup/lights',{enabled:true},'','lights')">Use lights</button> ${st.done?"":`<button class="b s" onclick="noLights()">No lights</button>`}</div>`+redo+ledWire(L);
- return `<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex')"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
+function lightsBody(st,redo){const L=SU.lights||{},on=!!L.enabled,c=L.colour||"#ffffff",[r,g,b]=hexRgb(c),pct=Math.round((L.brightness==null?0.5:L.brightness)*100);
+ const sl=(id,lab,v,max)=>`<label class="lrow"><span>${lab}</span><input type="range" id="${id}" min="0" max="${max}" value="${v}" oninput="lightsInput('${id}')" onchange="lightsKeep()"><b id="${id}v">${v}</b></label>`;
+ const top=`<div class="ltop"><div class="seg" role="group" aria-label="Lights"><button class="${on?"on":""}" aria-pressed="${on}" onclick="lightsMode(true)">ON</button><button class="${on?"":"on off"}" aria-pressed="${!on}" onclick="lightsMode(false)">OFF</button></div>
+  <label class="ltick${on?"":" dim"}"><input type="checkbox" ${L.always_on?"":"checked"} ${on?"":"disabled"} onchange="setupCall('api/setup/lights',{always_on:!this.checked},'','lights')"> On for photos only</label>
+  <span class="note">${on?(L.always_on?"Lit all the time while Sortering PNP runs.":"Lit only while a photo is taken."):"No lights: the photos use the room's light."}</span>
+  ${on?`${L.ok?"":`<span class="bad note">✗ ${esc(L.message||"")}</span>`}<span id="lsent" class="note"></span>`:""}</div>`;
+ if(!on)return top+redo+ledWire(L);
+ return top+`<div class="lights"><div class="lpick"><input type="color" id="lcol" value="${c}" oninput="lightsInput('lcol')" onchange="lightsKeep()"><input id="lhex" value="${c}" maxlength="7" spellcheck="false" onchange="lightsInput('lhex');lightsKeep()"><span id="lsw" class="lsw" style="background:${c};opacity:${0.25+0.75*pct/100}"></span></div>
   <div class="lsl">${sl("lr","R",r,255)}${sl("lg","G",g,255)}${sl("lb","B",b,255)}${sl("lbr","Intensity",pct,100)}</div></div>
-  <div class="row" style="margin-top:8px"><label class="row note"><input type="checkbox" ${L.always_on?"checked":""} onchange="setupCall('api/setup/lights',{always_on:this.checked},'','lights')"> Always on</label>
-  <button class="b s" onclick="setupCall('api/setup/lights',{enabled:false},'','lights')">Off</button>
-  <span class="${L.ok?"ok":"bad"} note">${L.ok?"✓":"✗"} ${esc(L.message||"")}</span></div>
   <div class="row" style="margin-top:8px">${st.done?"":`<button class="b p s" onclick="setupCall('api/setup/confirm',{step:'lights'},'','lights')">OK</button>`}</div>`+redo+ledWire(L);}
+// OFF is a choice too: no lights, and the step is done
+function lightsMode(on){if(on)setupCall('api/setup/lights',{enabled:true},'','lights');else noLights();}
 function hexRgb(h){const s=(h||"#ffffff").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)||0);}
 function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>(+v).toString(16).padStart(2,"0")).join("");}
-let LSEND=null,LPEND={};
+// the LEDs follow the bars: one request at a time, always the newest colour; saved when let go
+let LBUSY=false,LNEXT=null,LSENT=0;
 function lightsInput(id){let c;
  if(id==="lcol"||id==="lhex"){c=$(id).value.trim();if(!c.startsWith("#"))c="#"+c;if(!/^#[0-9a-f]{6}$/i.test(c)){flash("msg_lights","colour: #RRGGBB",1);return;}c=c.toLowerCase();const[r,g,b]=hexRgb(c);$("lr").value=r;$("lg").value=g;$("lb").value=b;}
  else c=rgbHex($("lr").value,$("lg").value,$("lb").value);
  for(const k of["lr","lg","lb","lbr"])$(k+"v").textContent=$(k).value;
  $("lcol").value=c;$("lhex").value=c;const br=+$("lbr").value/100;$("lsw").style.background=c;$("lsw").style.opacity=0.25+0.75*br;
- LPEND={colour:c,brightness:br};
- if(!LSEND)LSEND=setTimeout(async()=>{LSEND=null;const body=LPEND;LPEND={};try{const j=await api("api/setup/lights",body);SU.lights=j.lights;}catch(e){flash("msg_lights",e.message,1);}},120);}
+ document.querySelectorAll(".ledpx").forEach(e=>{e.setAttribute("fill",c);e.setAttribute("fill-opacity",0.25+0.75*br);});  // the ring in the drawing too
+ LNEXT={colour:c,brightness:br};lightsSend();}
+async function lightsSend(){if(LBUSY||!LNEXT)return;const body=LNEXT;LNEXT=null;LBUSY=true;
+ try{const j=await api("api/lights/preview",body);LSENT++;  // what the Pi got: shows that every move reaches it
+  if($("lsent")){$("lsent").textContent=j.error?`· the LEDs got nothing: ${j.error}`:`· the Pi sent ${j.colour} at ${Math.round(j.brightness*100)} % to the LEDs (${LSENT})${j.shown?"":", but the lights are off"}`;$("lsent").className=j.error?"note bad":"note";}}
+ catch(e){flash("msg_lights",e.message,1);}LBUSY=false;lightsSend();}
+async function lightsKeep(){const c=$("lhex").value,br=+$("lbr").value/100;try{const j=await api("api/setup/lights",{colour:c,brightness:br});SU.lights=j.lights;}catch(e){flash("msg_lights",e.message,1);}}
 async function noLights(){try{await api("api/setup/lights",{enabled:false});SU=await api("api/setup/confirm",{step:"lights"});renderSetup();}catch(e){flash("msg_lights",e.message,1);}}
 function renderSetup(){const left=SU.steps.filter(x=>!x.done).length;
  $("setupsum").innerHTML=SU.required?(left?`<b>${left}</b> step${left===1?"":"s"} to go.`:'<span class="ok">All done: the machine may sort.</span>'):"(Simulation: not required.)";
- $("steps").innerHTML=SU.steps.map((st,i)=>`<div class="card step"><span class="num ${st.done?"ok":""}">${st.done?"✓":i+1}</span><div><h3>${esc(st.title)}</h3><span class="note">${esc(st.goal)}${st.done?` · done ${esc(st.at||"")} ${esc(st.note||"")}`:""}</span></div><div class="body" style="margin-top:8px">${stepBody(st)}<p id="msg_${st.key}" class="note" style="margin:6px 0 0"></p></div></div>`).join("");}
+ $("steps").innerHTML=SU.steps.map((st,i)=>`<div class="card step"><span class="num ${st.done?"ok":""}">${st.done?"✓":i+1}</span><div><h3>${esc(st.title)}</h3><span class="note">${esc(st.goal)}${st.done?` · done ${esc(st.at||"")} ${esc(st.note||"")}`:""}</span></div><div class="body" style="margin-top:8px">${stepBody(st)}${["camera"].includes(st.key)?"":`<p id="msg_${st.key}" class="note" style="margin:6px 0 0"></p>`}</div></div>`).join("");}
 
 // ---------------------------------------------------------------- setup: jog, camera to printer, bins
 let LASTSCAN=null;
-function jogPad(key,xy){const b=(x,y,z,l)=>`<button class="b s" onclick="stepJog(${x},${y},${z},'${key}')">${l}</button>`;
- return ` <label class="note">step<select id="jstep_${key}"><option>0.1</option><option selected>1</option><option>10</option></select>mm</label>`+
-  (xy?b(-1,0,0,"X−")+b(1,0,0,"X+")+b(0,-1,0,"Y−")+b(0,1,0,"Y+"):"")+b(0,0,1,"Z+")+b(0,0,-1,"Z−")+` <span class="note">tip <b id="tip_${key}">–</b></span> `;}
-async function stepJog(x,y,z,key){const s=+$("jstep_"+key).value;try{const j=await api("api/jog",{dx:x*s,dy:y*s,dz:z*s});$("tip_"+key).textContent=j.tip.map(v=>(+v).toFixed(2)).join(", ");}catch(e){flash("msg_"+key,e.message,1);}}
+// jogging: an X/Y cross of rings (0.1, 1, 10 and 50 mm; straight or diagonal) and beside it the
+// same for Z, up and down only (0.1, 1 and 10 mm). X/Y is seen from above as the bed drawing: back
+// at the top; the home corner sets where X+ and Y+ point
+const JOGS=[0.1,1,10,50];
+function zRadial(key){const R=[20,56,92,128],rad=a=>a*Math.PI/180,P=(r,a)=>[(r*Math.cos(rad(a))).toFixed(1),(-r*Math.sin(rad(a))).toFixed(1)];let w="",t="";
+ for(const[a,sg]of[[90,1],[270,-1]])[0.1,1,10].forEach((s,i)=>{const r1=R[i],r2=R[i+1],p=(r,b)=>P(r,b).join(" "),[x,y]=P((r1+r2)/2,a);
+  w+=`<path class="jw r${i+1}" d="M${p(r2,a-40)}A${r2} ${r2} 0 0 0 ${p(r2,a+40)}L${p(r1,a+40)}A${r1} ${r1} 0 0 1 ${p(r1,a-40)}Z" onclick="jogBy(0,0,${sg*s},'${key}')"><title>Z${sg>0?"+":"−"}${s} mm</title></path>`;
+  t+=`<text x="${x}" y="${y}">${s}</text>`;});
+ return `<svg class="jogzr" viewBox="-96 -156 192 312" role="group" aria-label="Move Z: up and down, rings of 0.1, 1 and 10 mm">${w}<g>${t}</g><text class="jax" x="0" y="-143">Z+</text><text class="jax" x="0" y="145">Z−</text><circle r="17" class="jc"/><text class="jcl" y="1">mm</text></svg>`;}
+function jogPad(key,xy,side=""){const h=(SU.machine||{}).home_corner||"front_left",fx=h.endsWith("right")?-1:1,fy=h.startsWith("back")?-1:1;
+ const zcol=zRadial(key),
+  out=`<div class="jogside"><div class="note">tip at <b id="tip_${key}">–</b> (X, Y, Z)</div>${side}</div>`;
+ if(!xy)return `<div class="jogbox">${zcol}${out}</div>`;
+ const R=[20,47,74,101,128],rad=a=>a*Math.PI/180,P=(r,a)=>`${(r*Math.cos(rad(a))).toFixed(1)} ${(-r*Math.sin(rad(a))).toFixed(1)}`,sg=v=>v>0?"+":"−";
+ let w="",t="";
+ for(let d=0;d<8;d++){const a=d*45,ux=Math.round(Math.cos(rad(a))),uy=Math.round(Math.sin(rad(a)));
+  JOGS.forEach((s,i)=>{const r1=R[i],r2=R[i+1],dx=ux*fx*s,dy=uy*fy*s,tt=[dx?`X${sg(dx)}${s}`:"",dy?`Y${sg(dy)}${s}`:""].join(" ").trim();
+   w+=`<path class="jw r${i}" d="M${P(r2,a-21.5)}A${r2} ${r2} 0 0 0 ${P(r2,a+21.5)}L${P(r1,a+21.5)}A${r1} ${r1} 0 0 1 ${P(r1,a-21.5)}Z" onclick="jogBy(${dx},${dy},0,'${key}')"><title>${tt} mm</title></path>`;
+   if(d%2===0)t+=`<text x="${P((r1+r2)/2,a).split(" ")[0]}" y="${P((r1+r2)/2,a).split(" ")[1]}">${s}</text>`;});}
+ const ax=[[0,fx>0?"X+":"X−"],[90,fy>0?"Y+":"Y−"],[180,fx>0?"X−":"X+"],[270,fy>0?"Y−":"Y+"]].map(([a,l])=>`<text class="jax" x="${P(141,a).split(" ")[0]}" y="${P(141,a).split(" ")[1]}">${l}</text>`).join("");
+ const svg=`<svg class="jogxy" viewBox="-156 -156 312 312" role="group" aria-label="Move X and Y: rings of 0.1, 1, 10 and 50 mm">${w}<g class="jlab">${t}</g>${ax}<circle r="17" class="jc"/><text class="jcl" y="1">mm</text></svg>`;
+ return `<div class="jogbox">${svg}${zcol}${out}</div>`;}
+async function jogBy(x,y,z,key){const r=v=>Math.round(v*1000)/1000;try{const j=await api("api/jog",{dx:r(x),dy:r(y),dz:r(z)});$("tip_"+key).textContent=j.tip.map(v=>(+v).toFixed(2)).join(", ");flash("msg_"+key,"");}catch(e){flash("msg_"+key,e.message,1);}}
 async function stepScan(){flash("msg_layout","taking a photo, finding the bins…");try{LASTSCAN=await api("api/scan",{});SU=await api("api/setup");renderSetup();loadLayout(true);poll();}catch(e){flash("msg_layout",e.message,1);}}
 function cameraBody(st,redo){const C=SU.camera||{},mk=C.markers||[],pairs=C.pairs||[],done=new Set(pairs.map(x=>x.marker));
  const cal=C.calibrated?`<p class="note" style="margin:0 0 8px"><span class="ok">✓ camera calibration</span> (${esc(C.calibrated)}): the photo's millimetres are measured.</p>`:`<p class="note" style="margin:0 0 8px"><span class="bad">No camera calibration yet.</span> Without it the millimetres are rough. <button class="b s" onclick="go('calib')">Camera Calibration</button></p>`;
  const rows=mk.length?`<table style="margin-top:10px"><tr><th>code</th><th>bin</th><th>camera mm</th><th></th></tr>${mk.map(m=>`<tr><td><b>${m.marker}</b></td><td>${esc(m.what||"")}</td><td class="note">${m.plate.join(", ")}</td><td style="text-align:right">${done.has(m.marker)?`<span class="ok">✓ point</span> <button class="b s" onclick="setupCall('api/calib/goto_point',{marker:${m.marker}},'moving…','camera')">Move tip here</button> `:""}<button class="b s" onclick="setupCall('api/calib/record',{marker:${m.marker}},'','camera')">Tip is here</button>${C.fit?` <button class="b s" onclick="setupCall('api/calib/goto',{marker:${m.marker}},'moving…','camera')">Check</button>`:""}</td></tr>`).join("")}</table>`:(C.view?'<p class="bad" style="margin:8px 0 0">No codes seen: are bins in the picture, with even light?</p>':"");
  const fit=C.fit?`<p class="${C.fit.worst_mm<1?"ok":"bad"}" style="margin:8px 0 0">Fit: worst error ${C.fit.worst_mm} mm${C.fit.worst_mm<1?"":" (needs under 1 mm: record the points again, carefully)"} · rotation ${C.fit.angle_deg}° · scale ${C.fit.scale}</p>`:"";
  return cal+`<ol class="note" style="padding-left:18px;margin:0 0 10px"><li>Put 3 or more bins far apart on the bed, then <b>Take photo</b>: it shows what the camera sees and which codes it reads (no model needed).</li><li>Jog the tip onto the centre of a code, then <b>Tip is here</b> on its row. Do this for 3 or more codes, far apart.</li><li><b>Fit</b>. The step ticks itself when the worst error is under 1 mm.</li></ol>
-  <div class="row"><button class="b p s" onclick="setupCall('api/calib/photo',{},'taking a photo…','camera')">Take photo</button> <button class="b s" ${pairs.length<3?"disabled":""} onclick="setupCall('api/calib/fit',{},'fitting…','camera')">Fit (${pairs.length} point${pairs.length===1?"":"s"})</button> <button class="b s" onclick="setupCall('api/calib/clear',{},'','camera')">Clear points</button></div>`+fit+
+  <div class="row"><button class="b p s" onclick="setupCall('api/calib/photo',{},'taking a photo…','camera')">Take photo</button> <button class="b s" ${pairs.length<3?"disabled":""} onclick="setupCall('api/calib/fit',{},'fitting…','camera')">Fit (${pairs.length} point${pairs.length===1?"":"s"})</button> <button class="b s" onclick="setupCall('api/calib/clear',{},'','camera')">Clear points</button></div><p id="msg_camera" class="note" style="margin:6px 0 0"></p>`+fit+
   (C.view?`<div class="camview"><img src="runs/${encodeURIComponent(C.view)}" alt="" onload="camMarks(this)"><svg></svg></div>`:"")+rows+
-  `<div class="row" style="margin-top:10px">${jogPad("camera",true)}</div>`+redo;}
+  `<h4 style="margin:14px 0 4px;font-size:13px">Move the tip</h4><p class="note" style="margin:0">Seen from above, back at the top. Each ring is a distance; the corners move X and Y together. Hover a field to see the move.</p>${jogPad("camera",true)}`+redo;}
 function camMarks(img){const C=SU.camera||{},H=C.view_h,svg=img.nextElementSibling;if(!svg)return;const w=img.naturalWidth,h=img.naturalHeight,r=Math.max(w,h)/90;
  svg.setAttribute("viewBox",`0 0 ${w} ${h}`);
  svg.innerHTML=(C.markers||[]).map(m=>{let u,v;if(m.view_px){[u,v]=m.view_px;}else if(H){const [x,y]=m.plate,d=H[2][0]*x+H[2][1]*y+H[2][2];u=(H[0][0]*x+H[0][1]*y+H[0][2])/d;v=(H[1][0]*x+H[1][1]*y+H[1][2])/d;}else return "";

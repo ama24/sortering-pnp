@@ -74,11 +74,13 @@ printer:
   change_position: [110, 220, 100]  # tip X Y Z where the head waits while the picker is put on (head high, bed out)
   travel_z: 50                 # tip height for moves across the bed (above the bins)
   photo_at_travel_z: true      # fixed camera: park for photos at travel_z, not photo_position's Z (no extra rise each cycle; false: go to that Z)
+  photo_settle_s: 0.5          # wait this long after moving to the photo position, so the bed has stopped shaking (blurry photos: raise it)
   feed_xy: 6000
   feed_z: 1200
   limits_x: [0, 220]           # toolhead limits (soft limits, checked before every move)
   limits_y: [0, 220]
   limits_z: [0, 120]
+  home_corner: front_left     # the bed corner the printer homes to, its X/Y minimum (front_left | front_right | back_left | back_right)
   max_hotend_c: 50             # refuse to run while the hotend is hotter
   auto_home: true              # G28 when an axis is not homed
   home_macro: _SORTERING_HOME  # Z is homed over the middle of the working area (null: plain G28)
@@ -114,7 +116,8 @@ picker:
   rotate_home: null            # with rotate_macro: SORTERING_ROT_HOME finds 0 degrees before every sort
   grip_from_head_mm: 1.5       # tweezers close at least this far below a screw head
   approach_mm: 8               # slow descent over the last mm
-  depth_mm: 0.5                # vacuum: press this far below the part's top (spring-loaded cup)
+  depth_mm: 0.5                # magnet: press this far below the part's top
+  cup_above_mm: 0              # suction cup: goes over the part to this far above the Tip step's height (0: all the way)
   grip_height: 0.5             # gripper/tweezers: close at this share of the part's height (screws: the shank's middle)
   clearance_mm: 1.0            # parts with this much free space around them are picked first
   drop_mm: 10                  # release at least this far above the bin's rim

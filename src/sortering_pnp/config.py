@@ -24,6 +24,7 @@ from .pickers import MODES as PICKER_MODES
 from .pickers import PickerType, picker_type
 
 PRINTER_DRIVERS = ("moonraker", "sim")
+HOME_CORNERS = ("front_left", "front_right", "back_left", "back_right")
 # settings that are gone (section class, key): an old machine.yaml with them still loads
 RETIRED = {("Run", "pipeline"), ("Standby", "settle_s")}
 
@@ -165,6 +166,9 @@ class Printer:
     # extra rise and fall each cycle); False: it also goes to photo_position's Z. The head
     # camera always uses photo_position's Z (it sets the photo's scale)
     photo_at_travel_z: bool = True
+    photo_settle_s: float = 0.5  # wait this long after moving to the photo position (blur)
+    # the corner of the bed the printer homes to: its X and Y minimum (Setup tab, Machine)
+    home_corner: str = "front_left"  # front_left | front_right | back_left | back_right
     feed_xy: float = 6000.0
     feed_z: float = 1200.0
     limits_x: list[float] = field(default_factory=lambda: [0.0, 220.0])
@@ -217,7 +221,10 @@ class Picker:
     rotate_home: str | None = None  # with rotate_macro: finds 0 deg before every sort
     grip_from_head_mm: float = 1.5  # tweezers close at least this far below a screw head
     approach_mm: float = 8.0  # slow descent from this far above the part
-    depth_mm: float = 0.5  # go this far below the top of the part (spring-loaded cup)
+    depth_mm: float = 0.5  # magnet: go this far below the top of the part
+    # suction cup: the tip goes down over the part to this far above the height set in Setup's
+    # Tip step (0: all the way), whatever the part's size
+    cup_above_mm: float = 0.0
     grip_height: float = 0.5  # gripper: close at this share of the part height (0 bed, 1 top)
     clearance_mm: float = 1.0  # free space a part needs around it to be picked first
     drop_mm: float = 10.0  # release at least this far above the bin's rim
@@ -351,6 +358,10 @@ class Machine:
                 raise ConfigError(f"printer.{name}: wrong number of values {v}")
         if len(self.tool.offset) != 3:
             raise ConfigError("tool.offset needs X Y Z")
+        if self.printer.home_corner not in HOME_CORNERS:
+            raise ConfigError(
+                f"printer.home_corner must be one of {HOME_CORNERS}, got {self.printer.home_corner!r}"
+            )
         from .trayview import parse_colour
 
         try:
