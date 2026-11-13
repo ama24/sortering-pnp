@@ -2,8 +2,10 @@
 
 Used by the Calibrate tab (Lock the camera), with the bed at the photo position and the tray empty.
 (Before sortering-pnp, this was `screwrig lock`.)
-Steps: full-resolution still mode -> let AE/AWB settle -> freeze exposure/gain/colour gains ->
-manual focus sweep (variance of Laplacian on the centre) -> save camera_settings.json.
+Steps: full-resolution still mode -> let AE/AWB settle (spot metering) -> freeze them -> set the
+exposure and the colour gains again from the centre part (camera.centre_balance: the tray grey on
+average, the brightest of the whole picture, e.g. a white bin, not clipped) -> manual focus sweep
+(variance of Laplacian on the centre) -> save camera_settings.json.
 """
 
 from __future__ import annotations
@@ -16,9 +18,11 @@ from pathlib import Path
 
 import numpy as np
 
-from .camera import FULL_RES, best_focus, focus_metric
+from .camera import CENTRE_FRACTION, FULL_RES, best_focus, centre_balance, focus_metric
 
 log = logging.getLogger("sortering_pnp.camlock")
+
+BALANCE_STEPS = 8  # at most this many rounds of the centre balance (it is steady in 2-4)
 
 
 def _gray(picam2) -> np.ndarray:
@@ -66,14 +70,15 @@ def _lock(picam2, controls, args: argparse.Namespace) -> int:  # noqa: ANN001 - 
         buffer_count=2,
     )
     picam2.configure(config)
-    picam2.set_controls(
-        {
-            "AeEnable": True,
-            "AwbEnable": True,
-            "AfMode": controls.AfModeEnum.Manual,
-            "LensPosition": 1000.0 / args.distance_mm,
-        }
-    )
+    start = {
+        "AeEnable": True,
+        "AwbEnable": True,
+        "AfMode": controls.AfModeEnum.Manual,
+        "LensPosition": 1000.0 / args.distance_mm,
+    }
+    if "AeMeteringMode" in picam2.camera_controls:  # a first guess from the middle already
+        start["AeMeteringMode"] = controls.AeMeteringModeEnum.Spot
+    picam2.set_controls(start)
     picam2.start()
     time.sleep(args.settle)
     md = picam2.capture_metadata()
@@ -87,6 +92,27 @@ def _lock(picam2, controls, args: argparse.Namespace) -> int:  # noqa: ANN001 - 
     }
     picam2.set_controls(locked)
     time.sleep(1.0)
+    # the camera's own AE and AWB look at the whole picture (a white bin pulls them off): the
+    # exposure and the colours are set again from the centre part (camera.centre_balance)
+    steps = 0
+    while steps < BALANCE_STEPS:
+        steps += 1
+        picam2.capture_array("main")  # a frame still exposed with the old values
+        img = picam2.capture_array("main")
+        new_exp, gains, steady = centre_balance(img, exposure, tuple(locked["ColourGains"]))
+        if args.exposure_us:  # forced: only the colours
+            new_exp = exposure
+        exposure, locked["ExposureTime"], locked["ColourGains"] = new_exp, new_exp, list(gains)
+        picam2.set_controls({"ExposureTime": exposure, "ColourGains": tuple(gains)})
+        time.sleep(0.4)
+        if steady:
+            break
+    log.info(
+        "centre balance: %d steps, exposure %d us, colour gains %.3f / %.3f",
+        steps,
+        exposure,
+        *locked["ColourGains"],
+    )
 
     centre = 1000.0 / args.distance_mm  # dioptres
     coarse = list(np.round(np.arange(centre - 1.0, centre + 1.0001, 0.1), 3))
@@ -109,6 +135,7 @@ def _lock(picam2, controls, args: argparse.Namespace) -> int:  # noqa: ANN001 - 
         "sensor_mode": {"size": list(mode["size"]), "bit_depth": mode["bit_depth"]},
         "format": "RGB888 (BGR byte order, saved as PNG)",
         "focus_sweep": {"positions": [float(p) for p in pos], "scores": sc},
+        "centre_balance": {"fraction": CENTRE_FRACTION, "steps": steps},
         "metadata_after_lock": {
             k: (list(v) if isinstance(v, tuple) else v)
             for k, v in md.items()
