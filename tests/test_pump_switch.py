@@ -15,13 +15,16 @@ class FakeKlipper:
     def __init__(self, hotend_c: float | None = 24.0, bed_c: float | None = 23.0) -> None:
         self.sent: list[str] = []
         self.hotend_c, self.bed_c = hotend_c, bed_c
+        self.fan_speed: float | None = 0.0
         self.state = "ready"
 
     def gcode(self, script: str) -> None:
         self.sent.append(script)
 
     def status(self, tool_macro: str | None = None) -> PrinterStatus:
-        return PrinterStatus(state=self.state, hotend_c=self.hotend_c, bed_c=self.bed_c)
+        return PrinterStatus(
+            state=self.state, hotend_c=self.hotend_c, bed_c=self.bed_c, fan_speed=self.fan_speed
+        )
 
     def emergency_stop(self) -> None: ...
 
@@ -135,7 +138,7 @@ def test_long_hold_warns(caplog):
 
 def test_config_checks_the_pump_switch():
     m = Machine()
-    m.picker.pump_switch = "fan"
+    m.picker.pump_switch = "valve"
     with pytest.raises(ConfigError, match="pump_switch"):
         m.validate()
 
@@ -158,10 +161,37 @@ def test_the_setup_tab_choice_is_kept_over_a_restart(machine):
         "mosfet",
         "bed",
         "hotend",
+        "fan",
     ]
     with pytest.raises(ValueError):
-        runner.setup_picker_pump("fan")
+        runner.setup_picker_pump("valve")
     fresh = copy.deepcopy(machine)  # after a restart
     fresh.picker.pump_switch = "mosfet"
     again = Runner(fresh, SimPrinter(fresh, SimWorld()), vision)
     assert again.m.picker.pump_switch == "hotend"
+
+
+def test_the_fan_output_is_switched_with_m106_and_m107():
+    k = FakeKlipper()
+    p = pins("fan", k)
+    ok, why = p.status()
+    assert ok and "fan output" in why
+    p.grab()
+    p.release()
+    assert k.sent == ["M106 S255", "M107"]
+
+
+def test_the_fan_output_never_stops_a_print_fan_it_did_not_start():
+    k = FakeKlipper()
+    p = pins("fan", k)
+    p.status()
+    p.off()
+    p.close()
+    assert k.sent == []
+
+
+def test_no_part_cooling_fan_in_klipper():
+    k = FakeKlipper()
+    k.fan_speed = None
+    ok, why = pins("fan", k).status()
+    assert not ok and "[fan]" in why

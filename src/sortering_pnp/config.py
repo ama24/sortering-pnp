@@ -196,7 +196,7 @@ class Tool:
     offset: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])  # tip - toolhead, X Y Z
 
 
-PUMP_SWITCHES = ("mosfet", "bed", "hotend")  # picker.pump_switch (pins.py)
+PUMP_SWITCHES = ("mosfet", "bed", "hotend", "fan")  # picker.pump_switch (pins.py)
 
 
 @dataclass
@@ -208,7 +208,7 @@ class Picker:
     pwm_chip: int | None = None  # /sys/class/pwm/pwmchipN for the servos; None = the first one
     # what switches a pump (pins.py): mosfet = a MOSFET module on action_pin; bed / hotend =
     # the printer board's heated-bed or hotend output, through Klipper (the heater unplugged
-    # from it, the pump in its place)
+    # from it, the pump in its place); fan = the board's part-cooling fan output (M106 / M107)
     pump_switch: str = "mosfet"
     # bed / hotend: the target asked of that heater while the pump runs: far enough above the
     # room that Klipper switches the output fully on, and harmless if the heater is still on it

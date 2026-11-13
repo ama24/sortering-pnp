@@ -101,7 +101,8 @@ another repository.
   The simulator has `SimPins`. Tweezers on a stepper turn through a Klipper macro
   (`picker.rotate_macro`). A pump may instead be on the board's bed or hotend output
   (`picker.pump_switch`, `HeaterPump`): Klipper's `SET_HEATER_TEMPERATURE` switches it (the
-  heater unplugged, verify_heater left on); `off()` sends 0 only after an on().
+  heater unplugged, verify_heater left on), or on its part-cooling fan output (`FanPump`,
+  M106 S255 / M107); `off()` switches off only after an on().
 - **Lights:** `leds.py`. Addressable LEDs (WS2812B ring) on the Pi's SPI MOSI (GPIO10, pin 19),
   written to /dev/spidev0.0 with the standard library (3 SPI bits per LED bit at 2.4 MHz);
   `SimLeds` in the simulator. Lit always or only for photos (`Lights.for_photo`); the Setup
