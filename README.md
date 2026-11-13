@@ -517,7 +517,9 @@ Details in [prints/README.md](prints/README.md).
    display). After a start, the start-up check runs first. The machine sorts until the tray is
    empty, then waits and looks again every minute (*next look in 0:42*, **Look now** to look at
    once): just keep throwing parts in. Under **Manual**, **Sort once** sorts what's there and
-   stops, **One pick** takes a single part.
+   stops, **One pick** takes a single part. **Speed** (50–300 %) speeds every move up or down,
+   live; **Mode** chooses **Single** (a photo before every pick) or **Turbo** (several picks per
+   photo, the next photo analysed while it keeps picking).
 3. **Watch the Device tab** if you like: every photo as soon as it is taken, with the next part
    boxed, the bed, what lies in the tray (kept while the next photo is taken), and a line for
    everything the machine does (parking, taking a photo, running the model, picking X, leaving X

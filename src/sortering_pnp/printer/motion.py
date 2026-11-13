@@ -34,6 +34,16 @@ class Motion:
         self._scv: float | None = None  # Klipper's square corner velocity, read once
         self.carrying = False  # the picker holds a part (grab .. release): gentler X
 
+    @property
+    def speed(self) -> float:
+        """run.speed_pct as a factor: every feed rate and acceleration sent is scaled by it."""
+        return max(self.m.run.speed_pct, 1.0) / 100.0
+
+    def z_feed(self) -> float:
+        """Z with a part held (printer.feed_z) or with nothing held (feed_z_empty)."""
+        pc = self.m.printer
+        return pc.feed_z if self.carrying else pc.feed_z_empty
+
     # ------------------------------------------------------------------ checks
     def preflight(self, home: bool = True, tool: bool | None = None) -> PrinterStatus:
         """Refuse to move unless the printer is idle, cold, homed and carries the picker.
@@ -145,7 +155,9 @@ class Motion:
             words.append(f"Z{tz - oz:.3f}")
         if not words:
             return
-        f = feed or (self.m.printer.feed_z if x is None and y is None else self.m.printer.feed_xy)
+        f = (feed or (self.z_feed() if x is None and y is None else self.m.printer.feed_xy)) * (
+            self.speed
+        )
         last = f"G1 {' '.join(words)}"
         moves_xy = abs(tx - cur[0]) > 1e-6 or abs(ty - cur[1]) > 1e-6
         if self.m.printer.xy_motion.enabled and moves_xy:
@@ -201,10 +213,18 @@ class Motion:
     def _limits(self, delta: list[float], feed: float) -> tuple[float, float]:
         xm = self.m.printer.xy_motion
         k = xm.carrying if self.carrying else 1.0  # the part hangs on the head: X only
+        s = self.speed  # the speed slider scales the axes' own limits too
+
+        def cap(v: float | None) -> float | None:
+            return None if v is None else v * s
+
         length = math.sqrt(sum(d * d for d in delta))
         f, a = smooth.path_limits(
             length,
-            [(delta[0], xm.accel_x * k, xm.max_feed_x), (delta[1], xm.accel_y, xm.max_feed_y)],
+            [
+                (delta[0], xm.accel_x * k * s, cap(xm.max_feed_x)),
+                (delta[1], xm.accel_y * s, cap(xm.max_feed_y)),
+            ],
             feed,
         )
         normal = self._normal_accel()
@@ -286,7 +306,7 @@ class Motion:
 
     def jog(self, dx: float = 0.0, dy: float = 0.0, dz: float = 0.0) -> list[float]:
         x, y, z = self.current_tip()
-        self.move(x + dx, y + dy, z + dz, feed=self.m.printer.feed_z if dz else 1500.0)
+        self.move(x + dx, y + dy, z + dz, feed=self.z_feed() if dz else 1500.0)
         self.p.gcode("M400")
         return self.current_tip()
 

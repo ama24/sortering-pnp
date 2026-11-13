@@ -78,7 +78,8 @@ printer:
   photo_at_travel_z: true      # fixed camera: park for photos at travel_z, not photo_position's Z (no extra rise each cycle; false: go to that Z)
   photo_settle_s: 0.5          # wait this long after moving to the photo position, so the bed has stopped shaking (blurry photos: raise it)
   feed_xy: 6000
-  feed_z: 1200
+  feed_z: 600                  # Z while a part is held
+  feed_z_empty: 900            # Z with nothing held (down to a part); Klipper's max_z_velocity caps both
   limits_x: [0, 220]           # toolhead limits (soft limits, checked before every move)
   limits_y: [0, 220]
   limits_z: [0, 120]
@@ -139,6 +140,10 @@ run:
   scan_bins_on_start: true     # find the bins with the camera when a run starts (new markers = wild bins)
   only_seen_bins: true         # use only the bins the camera sees in that first photo
   startup_check: true          # first run after a start: home, resync, look into the bins (Device tab)
+  speed_pct: 100               # every move's speed in % (50..300; Device tab: Speed)
+  mode: single                 # single: a photo before every pick | turbo: turbo_picks picks per photo (Device tab: Mode)
+  turbo_picks: 5               # turbo: picks between two photos
+  turbo_keep_away_mm: 20       # turbo: parts this close to a pick made since their photo wait for the next photo
   shake:
     enabled: true              # shake the bed to spread clumps when nothing can be picked
     axis: Y                    # Y for bed-slingers (Ender 3, Prusa MK3)

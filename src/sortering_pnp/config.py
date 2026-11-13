@@ -177,7 +177,11 @@ class Printer:
     # the corner of the bed the printer homes to: its X and Y minimum (Setup tab, Machine)
     home_corner: str = "front_left"  # front_left | front_right | back_left | back_right
     feed_xy: float = 6000.0
-    feed_z: float = 1200.0
+    feed_z: float = 600.0  # Z while the picker holds a part (it must not shake loose)
+    # Z with nothing held: down to a part, up after a drop. Klipper caps every Z move at its
+    # [printer] max_z_velocity (5 mm/s = 300 mm/min on an Ender 3's printer.cfg): raise that
+    # for this to help (the console says so at the start of a run)
+    feed_z_empty: float = 900.0
     limits_x: list[float] = field(default_factory=lambda: [0.0, 220.0])
     limits_y: list[float] = field(default_factory=lambda: [0.0, 220.0])
     limits_z: list[float] = field(default_factory=lambda: [0.0, 120.0])
@@ -203,6 +207,8 @@ class Tool:
     offset: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])  # tip - toolhead, X Y Z
 
 
+RUN_MODES = ("single", "turbo")  # run.mode
+SPEED_RANGE = (50.0, 300.0)  # run.speed_pct
 PUMP_SWITCHES = ("mosfet", "bed", "hotend", "fan")  # picker.pump_switch (pins.py)
 
 
@@ -274,6 +280,16 @@ class Run:
     # the first run after sortering-pnp starts: home, resync, and look into the bins (a bin
     # with parts collects their kind, an empty one is a free wild bin): startup.py
     startup_check: bool = True
+    # speed of every move the program sends, in % (feed rates and accelerations; Klipper's own
+    # limits still apply): the Device tab's Speed slider, 50..300, kept in machine.json
+    speed_pct: float = 100.0
+    # single: a photo before every pick | turbo: `turbo_picks` picks from one photo, then a
+    # photo (analysed while it goes on picking from the list); Device tab: Mode
+    mode: str = "single"
+    turbo_picks: int = 5
+    # turbo: a part this close to a part picked since its photo is left for the next photo
+    # (it may have been nudged): the picks from one photo are spread apart
+    turbo_keep_away_mm: float = 20.0
     # census: the most numerous kind first, finished before the next, and back to a kind
     # done earlier when more of it turns up | largest_group: the biggest on each photo | nearest
     order: str = "census"
@@ -393,6 +409,12 @@ class Machine:
             raise ConfigError("bed.cols and bed.rows must be at least 1")
         if not 0.0 <= self.run.fill.take_out_at <= 1.0:
             raise ConfigError("run.fill.take_out_at must be 0..1 (a share of the bin's room)")
+        if self.run.mode not in RUN_MODES:
+            raise ConfigError(f"run.mode must be one of {RUN_MODES}, got {self.run.mode!r}")
+        if self.run.turbo_picks < 1:
+            raise ConfigError("run.turbo_picks must be 1 or more")
+        if not SPEED_RANGE[0] <= self.run.speed_pct <= SPEED_RANGE[1]:
+            raise ConfigError(f"run.speed_pct must be {SPEED_RANGE[0]:g}..{SPEED_RANGE[1]:g}")
         if self.run.when_no_bin not in ("ask", "overflow"):
             raise ConfigError("run.when_no_bin must be ask or overflow")
         if self.run.share_wild not in ("class", "family", "none"):

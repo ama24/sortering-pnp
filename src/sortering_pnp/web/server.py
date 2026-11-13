@@ -22,6 +22,7 @@ GET  /api/calibration        camera calibration (Calibrate tab); board.pdf; POST
                              (start: the whole calibration, calibjob.py); lock|view|lens|flat|reset
 GET  /api/camera/live.mjpg?view=live|crop|bins  the live picture (crop / bins: what the model sees); live.jpg
 GET  /api/crop; POST /api/crop/preview|save {"margin", "colour"}   Camera cropping
+POST /api/speed {"pct": 50..300}  every move's speed; /api/mode {"mode": single|turbo, "turbo_picks"?}
 GET  /api/binsview; POST /api/binsview/preview {"margin", "enabled"?}, /save {"margin", "enabled"}
 GET  /api/binsview/snippets.jpg  each bin's floor as the model sees it (Calibrate tab: Bins view)
 GET  /api/photos             real-photo sessions; POST /api/photos/new|take; GET /api/photos/zip?name=
@@ -372,6 +373,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._mjpeg(lambda: r.photos.live_jpeg(view))
         elif method == "GET" and path == "/api/camera/live.jpg":
             self._send(200, r.photos.live_jpeg(q.get("view", "live")), "image/jpeg")
+        elif method == "POST" and path == "/api/speed":
+            self._json(r.set_speed(float(self._body()["pct"])))
+        elif method == "POST" and path == "/api/mode":
+            b = self._body()
+            n = b.get("turbo_picks")
+            self._json(r.set_mode(str(b["mode"]), None if n is None else int(n)))
         elif method == "GET" and path == "/api/binsview":
             self._json(r.binsview_state())
         elif method == "POST" and path == "/api/binsview/preview":
