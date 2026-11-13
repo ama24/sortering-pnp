@@ -36,7 +36,8 @@ class Motion:
 
     @property
     def speed(self) -> float:
-        """run.speed_pct as a factor: every feed rate and acceleration sent is scaled by it."""
+        """run.speed_pct as a factor: every feed rate (top speed) sent is scaled by it; the
+        accelerations (the ramps, which keep loose parts still) never are."""
         return max(self.m.run.speed_pct, 1.0) / 100.0
 
     def z_feed(self) -> float:
@@ -213,7 +214,7 @@ class Motion:
     def _limits(self, delta: list[float], feed: float) -> tuple[float, float]:
         xm = self.m.printer.xy_motion
         k = xm.carrying if self.carrying else 1.0  # the part hangs on the head: X only
-        s = self.speed  # the speed slider scales the axes' own limits too
+        s = self.speed  # the speed slider: the axes' top speeds, never their ramps
 
         def cap(v: float | None) -> float | None:
             return None if v is None else v * s
@@ -222,8 +223,8 @@ class Motion:
         f, a = smooth.path_limits(
             length,
             [
-                (delta[0], xm.accel_x * k * s, cap(xm.max_feed_x)),
-                (delta[1], xm.accel_y * s, cap(xm.max_feed_y)),
+                (delta[0], xm.accel_x * k, cap(xm.max_feed_x)),
+                (delta[1], xm.accel_y, cap(xm.max_feed_y)),
             ],
             feed,
         )

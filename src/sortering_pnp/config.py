@@ -280,8 +280,9 @@ class Run:
     # the first run after sortering-pnp starts: home, resync, and look into the bins (a bin
     # with parts collects their kind, an empty one is a free wild bin): startup.py
     startup_check: bool = True
-    # speed of every move the program sends, in % (feed rates and accelerations; Klipper's own
-    # limits still apply): the Device tab's Speed slider, 50..300, kept in machine.json
+    # top speed of every move the program sends, in % (feed rates only: the accelerations, the
+    # ramps that keep loose parts still, never change; Klipper's own limits still apply): the
+    # Device tab's Speed slider, 50..300, kept in machine.json
     speed_pct: float = 100.0
     # single: a photo before every pick | turbo: `turbo_picks` picks from one photo, then a
     # photo (analysed while it goes on picking from the list); Device tab: Mode
