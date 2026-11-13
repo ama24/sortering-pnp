@@ -183,6 +183,7 @@ class SimPrinter:
             homed=self.homed,
             position=list(self.pos),
             hotend_c=24.0,
+            bed_c=24.0,
             tool=self.tool if tool_macro else None,
             max_accel=self.accel,
             square_corner_velocity=self.scv,

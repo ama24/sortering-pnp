@@ -349,8 +349,13 @@ Power comes straight from the printer's 24 V supply, as part of the conversion:
 - **Pumps:** they run from the 24 V supply through the MOSFET module, with a diode across the pump.
   A logic-level module (AOD4184 / D4184) switches fully at the Pi's 3.3 V; the classic IRF520
   module only switches halfway.
-- **Not the heater outputs:** don't take power from the bed or hotend heater outputs. Klipper
-  switches them under its heater safety checks.
+- **Or the printer board's bed or hotend output:** instead of a MOSFET module, the pump can go
+  on the board's heated-bed or hotend output, in place of that heater (unplug the heater; its
+  thermistor stays connected). Choose it in the Setup tab's Picker step (*the pump is switched
+  by*). Klipper switches it: sortering-pnp sends `SET_HEATER_TEMPERATURE` (60 °C to grab, 0 to
+  let go), so there is nothing to add to printer.cfg. Klipper's heater check stops the printer
+  if the output stays on longer than about 20 s (hotend) or 60 s (bed) without warming; a part
+  is held only a few seconds. Put the heater back before printing again.
 
 The page says whether the pins are ready. A pump is a plain on/off pin and needs nothing more.
 Servos use the Pi's hardware PWM, which `install-pi.sh` turns on (reboot once after the first

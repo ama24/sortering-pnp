@@ -97,12 +97,26 @@ the bend. It prints standing on the motor plate, with no supports.
   finished every move (`M400`). The pump goes off on Stop, on an error, on the emergency stop
   and when the program ends; a MOSFET module's pull-down keeps it off while nothing drives the
   pin.
-- **Signals:** always from the Pi, never from the printer's board (the same wiring on any printer).
-- **Power:** straight from the printer's 24 V supply, never from the heater outputs (Klipper
-  switches those under heater safety). Servos: a 24 V pair to the tip and a 5 V buck converter
-  there, never the Pi's 5 V pin. Pumps: 24 V through a MOSFET module (logic level, e.g. AOD4184:
-  the IRF520 module only half-opens at 3.3 V), with a flyback diode across the pump. All grounds
-  joined.
+- **Signals:** from the Pi (the same wiring on any printer), except a pump on the board's
+  output (below).
+- **Power:** straight from the printer's 24 V supply. Servos: a 24 V pair to the tip and a 5 V
+  buck converter there, never the Pi's 5 V pin. Pumps: 24 V through a MOSFET module (logic
+  level, e.g. AOD4184: the IRF520 module only half-opens at 3.3 V), with a flyback diode across
+  the pump. All grounds joined.
+- **Pump on the printer board** (`picker.pump_switch`, Setup tab → Picker: *the pump is switched
+  by*): `mosfet` (the default, a module on GPIO12), `bed` or `hotend`. With `bed` / `hotend`
+  the pump goes on the board's heated-bed or hotend output **in place of that heater** (unplug
+  the heater from it; its thermistor stays connected), with the diode across the pump. Klipper
+  owns those outputs, so sortering-pnp sends `SET_HEATER_TEMPERATURE HEATER=heater_bed|extruder
+  TARGET=<picker.pump_heater_target, 60>` to grab and `TARGET=0` to let go: the thermistor reads
+  the room, so the heater's control switches the output fully on. Nothing to add to
+  printer.cfg. Safety stays Klipper's: its heater check (`verify_heater`) stops the printer if
+  the output stays on longer than `check_gain_time` without warming (20 s for the hotend, 60 s
+  for the bed by default; a part is held a few seconds, and the log warns past 3/4 of it). The
+  pump is refused while that heater reads over `printer.max_hotend_c` (it is still plugged in),
+  never when letting go. `off()` (Stop, errors, exit) only sends `TARGET=0` after the pump was
+  switched on, so it never cools a heater someone is printing with. Put the heater back before
+  printing again.
 - **Servo angles:** each type has its own (jaws closed 20° / open 90°, magnet on 160° / off 20°,
   in [pickers.py](../src/sortering_pnp/pickers.py)); `picker.grab_angle` and
   `picker.release_angle` in `configs/machine.yaml` override them.

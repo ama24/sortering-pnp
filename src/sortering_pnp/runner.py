@@ -27,7 +27,7 @@ from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
 from .camera import mirrored, orientation, rotated
-from .config import Machine
+from .config import PUMP_SWITCHES, Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
 from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
@@ -1578,6 +1578,8 @@ class Runner:
                 self.m.picker.rotate_offset_deg = float(v)
             elif k == "lower_to_drop":  # Setup tab, Picker step
                 self.m.picker.lower_to_drop = bool(v)
+            elif k == "pump_switch" and v in PUMP_SWITCHES:  # Setup tab, Picker step
+                self.m.picker.pump_switch = str(v)
             elif k == "lights" and isinstance(v, dict):  # Setup tab, Lights step
                 for name in self.LIGHT_KEYS:
                     if name in v:
@@ -1658,6 +1660,9 @@ class Runner:
                 "drop_mm": self.m.picker.drop_mm,
                 "action_pin": self.m.picker.action_pin,
                 "turn_pin": self.m.picker.turn_pin,
+                "pump_switch": self.m.picker.pump_switch,
+                "pump_switches": list(PUMP_SWITCHES),
+                "pump_heater_target": self.m.picker.pump_heater_target,
                 "pins": dict(zip(("ok", "message"), self.pins.status(), strict=True)),
             },
         }
@@ -1680,6 +1685,23 @@ class Runner:
         self.note(
             f"picker: {t.title} (aims at the {'head' if t.aim == 'head' else 'centre of gravity'})"
         )
+        return self.setup_state()
+
+    def setup_picker_pump(self, switch: str) -> dict[str, Any]:
+        """What switches a pump (Setup tab): a MOSFET module on the Pi's pin, or the printer
+        board's bed or hotend output through Klipper. Un-checks the Picker step."""
+        self._idle()
+        if switch not in PUMP_SWITCHES:
+            raise ValueError(f"the pump switch must be one of {PUMP_SWITCHES}")
+        self.pins.off()  # let go through the old switch before the pins follow the new one
+        self.m.picker.pump_switch = switch
+        self.remember_machine({"pump_switch": switch})
+        self.setup.reset("picker")
+        self._setup_picker.clear()
+        where = (
+            "a MOSFET module on the Pi" if switch == "mosfet" else f"the board's {switch} output"
+        )
+        self.note(f"pump switched by {where}")
         return self.setup_state()
 
     def setup_picker_offset(self, deg: float) -> dict[str, Any]:
