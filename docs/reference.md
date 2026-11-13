@@ -719,15 +719,18 @@ that apply then (Look now, Pause, Resume, Stop); *Manual* has Sort once and One 
 
 Beside Pause and Stop on the Device tab (and also while idle):
 
-- **Speed** (`run.speed_pct`, 100 %): a slider from 50 to 300 %. Every feed rate and
-  acceleration the program sends is multiplied by it, the bed's and the head's own limits
-  (`printer.xy_motion`) too; Klipper's own limits still apply. It is used from the next move, so
-  it can be tuned while it sorts, and is kept in machine.json. The waits (grab, release, the
-  photo's settle) are not scaled.
+- **Speed** (`run.speed_pct`, 100 %): a slider from 50 to 300 %. Every feed rate (top speed)
+  the program sends is multiplied by it, the bed's and the head's top speeds
+  (`printer.xy_motion.max_feed_x/y`) too; Klipper's own limits still apply. The accelerations,
+  the ramps that keep loose parts still, never change: a faster move only cruises faster, it
+  starts and stops as gently as before (a short move may not reach the higher speed at all). It
+  is used from the next move, so it can be tuned while it sorts, and is kept in machine.json.
+  The waits (grab, release, the photo's settle) are not scaled.
 - **Z:** with nothing held the head goes down to a part and up after a drop at
   `printer.feed_z_empty` (900 mm/min); with a part held at `printer.feed_z` (600). Klipper caps
-  every Z move at its `max_z_velocity` (5 mm/s, 300 mm/min, in an Ender 3's printer.cfg): the
-  console says so at the start of a run, and klipper/sortering_pnp.cfg shows how to raise it.
+  every Z move at its `max_z_velocity` (5 mm/s, 300 mm/min, in an Ender 3's printer.cfg):
+  klipper/sortering_pnp.cfg raises it to 15 mm/s (`max_z_accel` 200), also for printing. The
+  console says so at the start of a run when Klipper still caps Z below what is asked.
 - **Mode** (`run.mode`):
   - **Single** (the default): a photo before every pick; each photo also shows whether the pick
     before it worked.

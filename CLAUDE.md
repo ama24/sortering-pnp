@@ -129,8 +129,8 @@ another repository.
 - **Head camera** (optional, `camera.source: head`): `headcam.py` tiles the tray (or the grid
   and `margin_cells` around it for bins), shifts each photo by A^-1(tip - photo_position) into
   the calibration photo's frame and merges duplicates. Own model role "head", own calibration.
-- **Speed and mode:** `run.speed_pct` scales every feed and acceleration in `Motion` (from the
-  next move); Z uses `printer.feed_z_empty` with nothing held, `feed_z` with a part. `run.mode`:
+- **Speed and mode:** `run.speed_pct` scales every feed rate in `Motion` (from the next
+  move), never the accelerations (the ramps keep loose parts still); Z uses `printer.feed_z_empty` with nothing held, `feed_z` with a part. `run.mode`:
   `Runner._single_loop` (a photo per pick) or `_turbo_loop` (`run.turbo_picks` picks per photo,
   the next photo analysed in a background thread, `_snap`; parts within `turbo_keep_away_mm` of a
   pick since their photo wait; each pick checked by the next photo, `_turbo_absorb`). They hand

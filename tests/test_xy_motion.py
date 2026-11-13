@@ -342,3 +342,25 @@ def test_the_default_bed_move_is_one_g1_with_klippers_ramp(machine):
     ms = moves(fp.sent[-1])
     assert len(ms) == 1 and ms[0]["Y"] == 200.0  # no steps: the speed rises in a straight line
     assert "SET_VELOCITY_LIMIT ACCEL=1000" in fp.sent[-1].splitlines()
+
+
+@pytest.mark.parametrize("pct", [50.0, 100.0, 300.0])
+def test_the_speed_slider_changes_top_speeds_never_the_ramps(machine, pct):
+    """Loose screws roll when a move starts or stops hard: Speed (run.speed_pct) scales the
+    feed rates (and the bed's top speed), the accelerations stay as tuned."""
+    xm = machine.printer.xy_motion
+    xm.profile = "trapezoid"
+
+    def bed_move() -> tuple[str, float]:
+        fp = FakePrinter([10.0, 20.0, 50.0])
+        Motion(fp, machine).move(y=200.0)  # a long bed move: it reaches its top speed
+        text = fp.sent[-1]
+        accel = re.search(r"SET_VELOCITY_LIMIT ACCEL=(\d+)", text).group(1)
+        feed = float(re.search(r"G1 Y200\.000 F(\d+)", text).group(1))
+        return accel, feed
+
+    accel, feed = bed_move()
+    machine.run.speed_pct = pct
+    accel2, feed2 = bed_move()
+    assert accel2 == accel  # the same ramp at any speed
+    assert feed2 == pytest.approx(feed * pct / 100.0, rel=0.01)

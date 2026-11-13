@@ -140,7 +140,7 @@ run:
   scan_bins_on_start: true     # find the bins with the camera when a run starts (new markers = wild bins)
   only_seen_bins: true         # use only the bins the camera sees in that first photo
   startup_check: true          # first run after a start: home, resync, look into the bins (Device tab)
-  speed_pct: 100               # every move's speed in % (50..300; Device tab: Speed)
+  speed_pct: 100               # every move's top speed in % (50..300; Device tab: Speed); the ramps never change
   mode: single                 # single: a photo before every pick | turbo: turbo_picks picks per photo (Device tab: Mode)
   turbo_picks: 5               # turbo: picks between two photos
   turbo_keep_away_mm: 20       # turbo: parts this close to a pick made since their photo wait for the next photo
