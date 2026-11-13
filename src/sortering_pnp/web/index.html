@@ -367,6 +367,17 @@ button.p{font-weight:600}button.big{padding:11px 18px}
    <button class="b p s" style="margin-left:auto" onclick="cropSave()">Save</button><span id="cropmsg" class="note"></span></div>
   <p class="note" style="margin:6px 0 0"><b>+</b> keeps more wall, <b>−</b> cuts more floor.</p>
  </div>
+ <div class="card"><h2>Bins view</h2>
+  <p class="note" style="margin:0 0 10px">When it looks into the bins (start-up check, Resync, after a bin change), the model sees only the floors of the bins whose codes are in the picture; their walls and codes are painted over. Each floor is found from its code, so it follows the bins wherever they stand.</p>
+  <p id="binswait" class="bad" hidden></p>
+  <div class="pair"><figure><figcaption class="note">camera</figcaption><img id="live3" alt=""></figure><figure><figcaption class="note">model</figcaption><img id="livebins" alt=""></figure></div>
+  <div class="row" style="margin-top:10px"><label class="note"><input type="checkbox" id="binson" onchange="binsTry(BINS?BINS.margin_mm:0,this.checked)"> use it</label>
+   <span class="note" style="margin-left:14px">edge</span><button class="b s" onclick="binsStep(-1)">−1</button><button class="b s" onclick="binsStep(-0.5)">−0.5</button><b id="binsm">0</b><span class="note">mm</span><button class="b s" onclick="binsStep(0.5)">+0.5</button><button class="b s" onclick="binsStep(1)">+1</button>
+   <button class="b s" style="margin-left:14px" onclick="binsSnips()">Snippets</button>
+   <button class="b p s" style="margin-left:auto" onclick="binsSave()">Save</button><span id="binsmsg" class="note"></span></div>
+  <p class="note" style="margin:6px 0 0"><b>+</b> keeps more of each floor's edge, <b>−</b> paints more of it. <b>Snippets</b>: each bin's floor cut out, as the model sees it: check every bin is there, whole.</p>
+  <div id="binsnips" hidden style="margin-top:10px"><img id="binsnipimg" alt="each bin's floor as the model sees it" style="max-width:100%"></div>
+ </div>
 </section>
 
 <section id="print">
@@ -968,9 +979,9 @@ function camMarks(img){const C=SU.camera||{},H=C.view_h,svg=img.nextElementSibli
 
 
 // ---------------------------------------------------------------- camera calibration
-let CAL=null,calTimer=null,CROP=null;
-function liveTab(on){for(const[id,v]of[["live1","live"],["live2","live"],["livecrop","crop"]]){const el=$(id);if(!el)continue;if(on){if(!el.src.includes("live.mjpg"))el.src=`api/camera/live.mjpg?view=${v}&t=${Date.now()}`;}else el.removeAttribute("src");}
- clearInterval(calTimer);calTimer=on?setInterval(()=>{if(CAL&&CAL.job&&CAL.job.running)loadCal();},1000):null;if(on){loadCrop();loadCam();}}
+let CAL=null,calTimer=null,CROP=null,BINS=null;
+function liveTab(on){for(const[id,v]of[["live1","live"],["live2","live"],["livecrop","crop"],["live3","live"],["livebins","bins"]]){const el=$(id);if(!el)continue;if(on){if(!el.src.includes("live.mjpg"))el.src=`api/camera/live.mjpg?view=${v}&t=${Date.now()}`;}else el.removeAttribute("src");}
+ clearInterval(calTimer);calTimer=on?setInterval(()=>{if(CAL&&CAL.job&&CAL.job.running)loadCal();},1000):null;if(on){loadCrop();loadBins();loadCam();}}
 async function loadCal(){try{renderCal(await api("api/calibration"));}catch(e){flash("calmsg2",e.message,1);}}
 function renderCal(c){CAL=c;const b=c.board,j=c.job;
  $("calboard").textContent=`${b.squares_x}×${b.squares_y} squares, ${b.size_mm[0].toFixed(0)} × ${b.size_mm[1].toFixed(0)} mm`;
@@ -1005,6 +1016,13 @@ const ADJ_DEFAULTS={focus:"auto",white_balance:"auto",exposure:"auto",brightness
 async function camAdjust(v){try{const j=await api("api/camera/adjust",v);renderAdj({...ADJ,...j});flash("adjmsg","");}catch(e){flash("adjmsg",e.message,1);}}
 async function camFocus(){flash("adjmsg","focusing…");try{const j=await api("api/camera/focus",{});renderAdj({...ADJ,...j});flash("adjmsg","");}catch(e){flash("adjmsg",e.message,1);}}
 async function calPark(){flash("parkmsg","moving…");try{await api("api/setup/goto",{target:"photo"});flash("parkmsg","");}catch(e){flash("parkmsg",e.message,1);}}
+async function loadBins(){try{renderBins(await api("api/binsview"));}catch(e){flash("binsmsg",e.message,1);}}
+function renderBins(b){BINS=b;$("binswait").hidden=!b.head;$("binswait").textContent=b.head?"The head camera looks into the bins unpainted.":"";
+ $("binsm").textContent=(b.margin_mm>0?"+":"")+b.margin_mm;$("binson").checked=b.enabled;flash("binsmsg",b.changed?"not saved yet":"");}
+async function binsTry(margin,enabled){try{renderBins(await api("api/binsview/preview",{margin,enabled}));}catch(e){flash("binsmsg",e.message,1);}}
+function binsStep(d){if(!BINS)return;binsTry(Math.round((BINS.margin_mm+d)*10)/10,BINS.enabled);}
+async function binsSave(){if(!BINS)return;try{renderBins(await api("api/binsview/save",{margin:BINS.margin_mm,enabled:BINS.enabled}));flash("binsmsg","saved");}catch(e){flash("binsmsg",e.message,1);}}
+function binsSnips(){$("binsnips").hidden=false;$("binsnipimg").src=`api/binsview/snippets.jpg?t=${Date.now()}`;}
 async function loadCrop(){try{renderCrop(await api("api/crop"));}catch(e){flash("cropmsg",e.message,1);}}
 function renderCrop(c){CROP=c;$("cropwait").hidden=c.ready;$("cropwait").textContent=c.ready?"":"Needs first: "+c.missing.join(", ")+".";
  $("cropm").textContent=(c.margin_mm>0?"+":"")+c.margin_mm;const auto=c.colour==="auto";

@@ -48,10 +48,10 @@ def test_resync_looks_into_every_bin(machine, tmp_path):
     runner, vision = _runner(machine, lay, world, tmp_path / "runs")
     runner.claims[105] = "ISO7380_M4x8"  # from an earlier session: empty now
     res = runner.scan_bins()
-    assert vision.painted[-1] is False  # the whole board, nothing painted over
+    assert vision.painted[-1] is True  # the bins view: only the bins' floors
     assert runner.claims == {104: "DIN912_M3"} and runner.bin_counts[104] == 2
     assert "1 with parts" in res["bins_check"] and "2 empty" in res["bins_check"]
-    assert "1 on codes" in res["bins_check"]
+    assert "on codes" not in res["bins_check"]  # the codes are painted before the model looks
     view = runner.snapshot()["view"]
     assert view.endswith("_bins.jpg") and (tmp_path / "runs" / view).is_file()
 

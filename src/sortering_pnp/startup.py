@@ -2,8 +2,8 @@
 
   homing        home the printer (and the usual checks before moving)
   layout check  one photo of the bins: resync (where the grid and every bin stand)
-  bins check    the model on that same photo (once, on the whole calibrated picture, nothing
-                painted over): a bin with parts in it collects their kind, an empty one is a
+  bins check    the model on that same photo (once, through the bins view: only the floors of
+                the bins seen, trayview.py): a bin with parts in it collects their kind, an empty one is a
                 free wild bin. Nothing is counted on a bin's code (its shelf or post): the
                 printed code looks like parts to the model. binscheck.py; Resync does it too
   ready
@@ -22,6 +22,7 @@ from . import binspec
 from .layout import Bin, Layout
 from .parts import Part
 from .rules import UNKNOWN, wild_key
+from .trayview import CODE_KEEPOUT_MM  # around a code: the code, its shelf or post, a little more
 
 STEPS = (
     ("homing", "Homing"),
@@ -29,9 +30,6 @@ STEPS = (
     ("bins", "Bins check"),
     ("ready", "Ready"),
 )
-
-# around a code: the code itself, its shelf or post, and a little more
-CODE_KEEPOUT_MM = max(binspec.SHELF_DEPTH_MM, binspec.POST_MM) / 2 + 3.0
 
 
 class Checklist:

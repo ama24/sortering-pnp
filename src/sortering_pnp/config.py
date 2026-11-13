@@ -98,6 +98,13 @@ class Camera:
     # + keeps this much of the wall's foot, - paints this much more of the floor's edge
     # (Calibrate tab: Camera cropping)
     mask_margin_mm: float = 0.0
+    # looking into the bins (start-up check, Resync, after a bin change): only the floors of
+    # the bins whose codes are in the photo go to the model, their codes painted too
+    # (trayview.py: the bins view); False: the whole photo
+    bins_mask: bool = True
+    # bins view: + keeps this much more of each floor's edge, - paints more of it (Calibrate
+    # tab: Bins view)
+    bins_margin_mm: float = 0.0
     # the picture flipped by the camera itself (photos and live picture; Calibrate tab):
     # both = turned 180 degrees, e.g. a camera mounted the other way round
     # (on by default: the camera on this machine is mounted the other way round)
@@ -384,6 +391,8 @@ class Machine:
                 raise ConfigError(f"camera.adjust.{key} must be auto or manual")
         if self.bed.cols < 1 or self.bed.rows < 1:
             raise ConfigError("bed.cols and bed.rows must be at least 1")
+        if not 0.0 <= self.run.fill.take_out_at <= 1.0:
+            raise ConfigError("run.fill.take_out_at must be 0..1 (a share of the bin's room)")
         if self.run.when_no_bin not in ("ask", "overflow"):
             raise ConfigError("run.when_no_bin must be ask or overflow")
         if self.run.share_wild not in ("class", "family", "none"):

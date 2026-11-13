@@ -31,6 +31,9 @@ class Fill:
     shape: float = 0.5  # item volume = outline area x height x this
     packing: float = 0.3  # loose items fill this share of a bin's room
     full_at: float = 0.9  # a bin this full (estimated) asks to be emptied
+    # a bin is offered to be taken out (its kind done) or given up for a new kind only when it
+    # is at least this full (estimated): a bin with a few items in it stays where it is
+    take_out_at: float = 0.5
     default_mm3: float = 300.0  # an item without an outline (nothing measured)
     catalogue: bool = True  # exact volumes from items.json (Files tab), when there is one
     learn: bool = True  # "Full" on a bin teaches how densely its kind really packs

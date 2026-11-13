@@ -407,8 +407,19 @@ size, so the parts stay exactly as large as in the training pictures: cropping a
 would change their scale and spoil the classes and the lengths. The photo with the outlines on
 the Device tab's camera shows what the model saw.
 
-The codes are always read from the photo itself, and the check after a bin change looks at it
-unpainted (it must see into the bins).
+The codes are always read from the photo itself.
+
+**Looking into the bins** (the start-up check, Resync, the checks after a bin change) uses the
+**bins view** instead (`camera.bins_mask`, on by default): the codes are read first, and each
+bin's floor (inside its walls) is worked out from its code alone, the size from the code's
+number and the place and turn from the code itself. Only those floors go to the model; the walls,
+the gaps between bins and the codes with their shelf or post are painted over, at the same
+picture size. As it is made from the codes in that very photo, it follows the bins wherever they
+stand. **Camera Calibration tab → Bins view** shows it live beside the camera, with an edge
+setting (`camera.bins_margin_mm`: + keeps more of each floor's edge, − paints more; about 2.4 mm
+is the middle of the wall between two bins) and **Snippets**: each bin's floor cut out as the
+model sees it, with its code and size, to check that every bin is there, whole. With the head
+camera the bins are looked at unpainted.
 
 **Set it once, in the Camera Calibration tab → Camera cropping**, after the camera calibration, Camera
 to printer and Find bins (it follows the tray of the layout): the live picture and, next to
@@ -462,6 +473,11 @@ Cells are named like a chess board: a column letter from the left and a row numb
 front (A1 is front-left), so the machine can say "bin E1". Every bin on the Device tab's bed shows
 how many parts went in since it was last emptied (the small number at its top right), and a
 bar for how full it is, turning amber when it is full (`run.fill.full_at`, 90 %).
+
+A bin is only offered to be **taken out** when it is well filled (`run.fill.take_out_at`, 50 %):
+when nothing on the plate goes to it any more, and when a new kind needs a bin and no wild bin is
+free. A bin with a few items in it stays where it is for the next ones; a new kind with no bin
+full enough to give up goes to the overflow bin, or waits for a bin.
 
 How full is an estimate:
 - **each part's volume**, the best known:
@@ -710,8 +726,8 @@ in the left menu, under Device (**Recheck** runs it alone, also while sorting). 
 1. **Homing**, with the usual checks before moving.
 2. **Layout check:** one photo of the bins, then a resync: where the grid and every bin stand.
    The tray stays the bin it was.
-3. **Bins check:** the model runs once on that same photo: the whole calibrated picture, at
-   the scale it was trained at, with nothing painted over. A wild bin with parts on its floor
+3. **Bins check:** the model runs once on that same photo, at the scale it was trained at,
+   through the bins view (only the bins' floors, their codes painted: see above). A wild bin with parts on its floor
    collects their kind (the most common one; the class when no length was measured: it then
    takes every length of it), and its count is what the camera sees (more when it was already
    counting that kind: the camera sees only the top). An empty bin is a free wild bin, and an

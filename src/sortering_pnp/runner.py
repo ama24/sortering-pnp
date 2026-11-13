@@ -46,7 +46,15 @@ from .startup import Checklist, kind_of, parts_in_bin
 from .strategies import STRATEGIES, Plan, Planner
 from .todo import TodoList
 from .transform import MIN_SPREAD_MM, BedCalibration, Transform2D
-from .trayview import WorkArea, paint_outside, parse_colour
+from .trayview import (
+    BinsView,
+    WorkArea,
+    bin_floor,
+    bins_area,
+    code_quads_px,
+    paint_outside,
+    parse_colour,
+)
 from .trayview import rect as tray_rect
 from .vision import Shot, Vision
 
@@ -136,6 +144,7 @@ class Runner:
         self._no_swap_said = ""
         self.mask_checked = False  # the tray view was checked and saved (Calibrate tab)
         self._crop: dict[str, Any] = {}  # Camera cropping being tried (margin, colour), not saved
+        self._binsview: dict[str, Any] = {}  # Bins view being tried (margin, on), not saved
         self._layout_cache: tuple[tuple[str, int, int], Layout] | None = None
         self._tip_touch: tuple[float, float] | None = None  # (offset, surface_z) of the Tip step
         self.markers_seen: set[int] = set()  # every code the camera has read
@@ -503,16 +512,22 @@ class Runner:
         T: Transform2D | None,
         move: bool = True,
         area: str = "work",
-        paint: bool = True,
+        paint: bool | str = True,
     ) -> Shot:
         """Photo position, photo, parts (with printer X/Y when T is known), markers. `move`
         False: photograph where the bed is (standby with the motors off: still parked).
         A head camera photographs `area`: work (the tray), bins (the grid and around it) or
-        here (one photo at the photo position: calibration). `paint`: the model sees only the
-        tray's inside (trayview.py); False to look into the bins too."""
-        work = self._work_area(layout, T) if paint else None
+        here (one photo at the photo position: calibration). `paint`: True, the model sees only
+        the tray's inside; "bins", only the floors of the bins whose codes are in the photo
+        (camera.bins_mask, trayview.py); False, the whole photo."""
+        work: WorkArea | BinsView | None
+        if paint == "bins":
+            c = self.m.camera
+            work = BinsView(c.bins_margin_mm) if c.bins_mask and c.source != "head" else None
+        else:
+            work = self._work_area(layout, T) if paint else None
         if self.m.camera.source == "head":
-            return self._head_shot(layout, T, area, work)
+            return self._head_shot(layout, T, area, work if isinstance(work, WorkArea) else None)
         with self._lock:
             if move:
                 self.phase("parking at the photo position")
@@ -784,6 +799,134 @@ class Runner:
             img = img[y0 : y0 + int(roi["h"] * s), x0 : x0 + int(roi["w"] * s)]
         return img
 
+    # ------------------------------------------------------------------ bins view
+    def binsview_state(self) -> dict[str, Any]:
+        """Bins view (Calibrate tab): what the model sees when it looks into the bins: the
+        floors of the bins whose codes are in the picture (trayview.py). Needs the camera
+        calibration (or the straight-down camera) and the codes in view; nothing else."""
+        c = self.m.camera
+        return {
+            "enabled": bool(self._binsview.get("enabled", c.bins_mask)),
+            "margin_mm": float(self._binsview.get("margin", c.bins_margin_mm)),
+            "saved_enabled": c.bins_mask,
+            "saved_margin_mm": c.bins_margin_mm,
+            "changed": bool(self._binsview),
+            "head": c.source == "head",  # the head camera looks at the bins unpainted
+        }
+
+    def binsview_preview(self, margin_mm: float, enabled: bool | None = None) -> dict[str, Any]:
+        """Try a margin on the live picture (not saved)."""
+        self._binsview["margin"] = float(margin_mm)
+        if enabled is not None:
+            self._binsview["enabled"] = bool(enabled)
+        return self.binsview_state()
+
+    def binsview_save(self, margin_mm: float, enabled: bool) -> dict[str, Any]:
+        c = self.m.camera
+        c.bins_margin_mm, c.bins_mask = float(margin_mm), bool(enabled)
+        self.remember_machine({"bins_margin_mm": c.bins_margin_mm, "bins_mask": c.bins_mask})
+        self._binsview = {}
+        self.note(
+            f"bins view saved: margin {c.bins_margin_mm:g} mm"
+            if c.bins_mask
+            else "bins view off: the model looks at the whole photo"
+        )
+        return self.binsview_state()
+
+    def _bins_painted(
+        self, frame: np.ndarray
+    ) -> tuple[np.ndarray, list[tuple[int, np.ndarray]]] | str:
+        """A live frame painted as the bins view (the margin being tried), cut to the
+        calibration's ROI, and each bin's floor in its pixels; or why it cannot be."""
+        from .markers import detect, marker_pose
+
+        st = self.binsview_state()
+        cam = getattr(self.vision, "cam_full", None)
+        if cam is None:
+            return "Bins view needs the camera"
+        if not st["enabled"]:
+            return "Bins view is off: the model looks at the whole photo"
+        s = frame.shape[1] / float(cam.image_size[0])
+        layout = self.layout()
+        found = detect(frame)
+        poses = [
+            marker_pose(
+                m,
+                lambda px, mid=m.marker: cam.pixel_to_plate(
+                    px / s, _marker_plate_height(layout, mid)
+                ),
+            )
+            for m in found
+        ]
+        area = bins_area(poses, st["margin_mm"])
+        if area is None:
+            return "no bin codes in the picture"
+
+        def px(poly: np.ndarray) -> np.ndarray:
+            return cam.project(np.c_[poly, np.zeros(len(poly))]) * s
+
+        img = paint_outside(
+            frame,
+            [px(o) for o in area.outlines],
+            [px(h) for h in area.holes] + code_quads_px(m.corners_px for m in found),
+            parse_colour(self.m.camera.mask_colour),
+        )
+        floors = []
+        for m in poses:
+            got = bin_floor(m.marker, m.centre, m.up_deg, st["margin_mm"])
+            if got is not None:
+                floors.append((m.marker, px(got[0])))
+        calib = getattr(self.vision, "calibration", None)
+        roi = (calib or {}).get("roi")
+        if roi:  # the model gets this part of the photo (its size unchanged)
+            x0, y0 = int(roi["x0"] * s), int(roi["y0"] * s)
+            img = img[y0 : y0 + int(roi["h"] * s), x0 : x0 + int(roi["w"] * s)]
+            floors = [(mk, f - (x0, y0)) for mk, f in floors]
+        return img, floors
+
+    def bins_frame(self, frame: np.ndarray) -> np.ndarray:
+        """The live picture as the model sees the bins (Calibrate tab: Bins view)."""
+        from .photos import placeholder
+
+        got = self._bins_painted(frame)
+        return placeholder(got) if isinstance(got, str) else got[0]
+
+    def bins_snippets(self) -> bytes:
+        """One JPEG: each bin's floor cut out of the bins view, side by side at the photo's own
+        scale, with its code and size: does the model see every bin, and all of its floor?"""
+        import cv2
+
+        from .binspec import size_for_marker
+        from .photos import placeholder
+
+        frame = getattr(self.vision, "frame", lambda: None)()
+        got = "no camera picture yet" if frame is None else self._bins_painted(np.asarray(frame))
+        if isinstance(got, str):
+            img = placeholder(got, (960, 200))
+        else:
+            view, floors = got
+            tiles = []
+            for mk, f in sorted(floors, key=lambda t: t[0]):
+                x0, y0 = np.floor(f.min(axis=0)).astype(int)
+                x1, y1 = np.ceil(f.max(axis=0)).astype(int)
+                x0, y0 = max(x0 - 4, 0), max(y0 - 4, 0)
+                x1, y1 = min(x1 + 4, view.shape[1]), min(y1 + 4, view.shape[0])
+                if x1 - x0 < 8 or y1 - y0 < 8:
+                    continue
+                cut = view[y0:y1, x0:x1]
+                size = size_for_marker(mk)
+                head = np.full((26, max(cut.shape[1], 150), 3), 40, np.uint8)
+                text = f"{mk}  {size.name if size else '?'}"
+                cv2.putText(head, text, (6, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255,) * 3, 1)
+                body = np.full((cut.shape[0], head.shape[1], 3), 255, np.uint8)
+                body[:, : cut.shape[1]] = cut
+                tiles.append(np.vstack([head, body]))
+            img = _tile(tiles) if tiles else placeholder("no bin floors in view", (960, 200))
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not ok:
+            raise OSError("could not encode the bins snippets")
+        return buf.tobytes()
+
     # ------------------------------------------------------------------ on the machine
     def todo_state(self) -> dict[str, Any]:
         return {"items": self.todo.state(self)}
@@ -1037,14 +1180,14 @@ class Runner:
                 first = None
             if self._ok.is_set():  # after a bin change: a new photo, with the bins
                 first = None
-            check = self._ok.is_set()  # it must look into the bins: nothing painted over
+            check = self._ok.is_set()  # it must look into the bins: the bins view
             area = "bins" if check else "work"
             # one cycle: photo (parked, picker empty) -> pick -> drop -> back here for the next
             t0 = time.perf_counter()
             shot, first = (
                 (first, None)
                 if first is not None
-                else (self.take_shot(layout, T, area=area, paint=not check), None)
+                else (self.take_shot(layout, T, area=area, paint="bins" if check else True), None)
             )
             if self._layout_changed.is_set():  # changes from the page (also during the photo)
                 self._layout_changed.clear()
@@ -1185,7 +1328,7 @@ class Runner:
             layout, T = self._prepare()
             st = self.printer.status(None)
             homed = st.ready and all(a in st.homed for a in "xyz")
-            shot = self.take_shot(layout, T, move=homed, area="bins", paint=False)
+            shot = self.take_shot(layout, T, move=homed, area="bins", paint="bins")
             for text in self._resolve_requests(layout, shot, T):
                 self.say(text)
             self._add_seen_bins(layout, shot, T)
@@ -1564,7 +1707,7 @@ class Runner:
         if not parked:
             with self._lock:
                 self.motion.preflight(home=False)
-        shot = self.take_shot(layout, T, move=not parked, area="bins", paint=False)
+        shot = self.take_shot(layout, T, move=not parked, area="bins", paint="bins")
         report = layout.resync(self._seen_bins(layout, shot, T))
         layout.save(self.layout_path)
         checked = None
@@ -1606,6 +1749,10 @@ class Runner:
             elif k == "mask_margin_mm":
                 self.m.camera.mask_margin_mm = float(v)
                 self.mask_checked = True
+            elif k == "bins_margin_mm":  # Calibrate tab: Bins view
+                self.m.camera.bins_margin_mm = float(v)
+            elif k == "bins_mask":
+                self.m.camera.bins_mask = bool(v)
             elif k == "mask_colour":  # Camera cropping, Calibrate tab
                 self.m.camera.mask_colour = str(v)
             elif k in ("camera_hflip", "camera_vflip", "camera_turn90"):  # Rotate / Mirror
@@ -2051,7 +2198,7 @@ class Runner:
             sc.set("layout", "running")
             self.phase("start-up: finding the bins")
             layout, T = self.layout(), self.transform()
-            shot = self.take_shot(layout, T, area="bins", paint=False)
+            shot = self.take_shot(layout, T, area="bins", paint="bins")
             sc.set("layout", "done", self._startup_layout(layout, shot, T))
 
             sc.set("bins", "running")
@@ -2186,7 +2333,7 @@ class Runner:
     def _look_for_bins(self, layout: Layout, T: Transform2D) -> bool:
         """Waiting for a bin: a photo of the bins first. A bin this run left out (its code was
         covered at the start), back from aside or new is used at once; True when one was."""
-        shot = self.take_shot(layout, T, area="bins", paint=False)
+        shot = self.take_shot(layout, T, area="bins", paint="bins")
         return bool(self._add_seen_bins(layout, shot, T))
 
     def _add_seen_bins(self, layout: Layout, shot: Shot, T: Transform2D) -> list[str]:
@@ -2348,14 +2495,18 @@ class Runner:
         )
 
     def _update_ready(self, planner: Planner, layout: Layout, parts: list[Any]) -> None:
-        """Mark filled bins that nothing on the plate goes to any more: they can be taken out."""
+        """Mark bins that nothing on the plate goes to any more and that are well filled
+        (run.fill.take_out_at): they can be taken out. A bin with a few items in it is not
+        flagged when its kind is done: it stays for the next ones."""
         need = planner.needed_bins(parts)
+        fill = self.bin_fill(layout)
+        at = self.m.run.fill.take_out_at
         with self._claims_lock:
             filled = {mk for mk, n in self.bin_counts.items() if n > 0} | set(self.claims)
             ready: dict[int, dict[str, Any]] = {}
             for mk in sorted(filled - need):
                 b = layout.bin_by_marker(mk)
-                if b is None:
+                if b is None or mk not in fill or fill[mk]["share"] < at:
                     continue
                 what = self.claims.get(mk) or b.label or ", ".join(b.holds) or b.role
                 ready[mk] = {"marker": mk, "what": what, "count": self.bin_counts.get(mk, 0)}
@@ -2458,7 +2609,9 @@ class Runner:
         for need, value in sorted(planner.needs, key=str):
             if need != "new" or any(r.for_kind == value for r in self.requests + new):
                 continue
-            taken = asked | {r.marker for r in new}
+            # only a well-filled bin is given up (run.fill.take_out_at)
+            low = {mk for mk, f in fill.items() if f["share"] < self.m.run.fill.take_out_at}
+            taken = asked | {r.marker for r in new} | low
             share = {mk: f["share"] for mk, f in fill.items()}
             pick = choose_swap(layout, self.claims, share, on_plate, taken)
             if pick is None:  # no wild bin to give up: overflow, else wait for a bin
@@ -2466,7 +2619,7 @@ class Runner:
                 if self._no_swap_said != value:
                     has = any(b.role in ("all", "overflow") for b in layout.bins)
                     self.note(
-                        f"{value} needs a bin and there is none to ask for: "
+                        f"{value} needs a bin and none is full enough to ask for: "
                         + ("into the overflow bin" if has else "add a bin")
                     )
                     self._no_swap_said = str(value)
@@ -2539,7 +2692,7 @@ class Runner:
         layout, T = self.layout(), self.transform()
         with self._lock:
             self.motion.preflight(home=False)
-        shot = self.take_shot(layout, T, area="bins", paint=False)
+        shot = self.take_shot(layout, T, area="bins", paint="bins")
         return {"resolved": self._resolve_requests(layout, shot, T), **self.bins_state()}
 
     def bin_emptied(self, marker: int | None) -> dict[str, Any]:
@@ -2722,8 +2875,35 @@ class Runner:
 
 
 def _marker_plate_height(layout: Layout, marker: int) -> float:
+    """A code's height: its bin's in the layout, else the size its number gives (3u if none)."""
+    from .binspec import size_for_marker
+
     b = layout.bin_by_marker(marker)
-    return layout.marker_plate_height(b.height_u if b else 3)
+    size = size_for_marker(marker)
+    return layout.marker_plate_height(b.height_u if b else size.height_u if size else 3)
+
+
+def _tile(tiles: list[np.ndarray], max_w: int = 1600, gap: int = 8) -> np.ndarray:
+    """Pictures side by side in rows at most `max_w` wide (each at its own size)."""
+    rows: list[list[np.ndarray]] = [[]]
+    w = 0
+    for t in tiles:
+        if rows[-1] and w + gap + t.shape[1] > max_w:
+            rows.append([])
+            w = 0
+        rows[-1].append(t)
+        w += t.shape[1] + gap
+    width = max(sum(t.shape[1] + gap for t in r) for r in rows) + gap
+    height = sum(max(t.shape[0] for t in r) + gap for r in rows) + gap
+    out = np.full((height, width, 3), 235, np.uint8)
+    y = gap
+    for r in rows:
+        x = gap
+        for t in r:
+            out[y : y + t.shape[0], x : x + t.shape[1]] = t
+            x += t.shape[1] + gap
+        y += max(t.shape[0] for t in r) + gap
+    return out
 
 
 def _poly_for_page(poly: Any, most: int = 32) -> list[list[float]]:
