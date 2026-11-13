@@ -1,10 +1,11 @@
 """The four kinds of picker and how each is wired to the Raspberry Pi.
 
 Everything hangs on two pins of the Pi, which sortering-pnp switches itself (pins.py): no
-Klipper set-up for the picker. Every signal comes from the Pi, never from the printer's board,
-so the wiring is the same on any printer (Ender 3, Prusa MK3, ...). Power comes straight from the
-printer's 24 V supply (never its heater outputs): a 24 V pair to the tip, with the 5 V buck
-converter for the servos there.
+Klipper set-up for the picker. Every signal comes from the Pi, so the wiring is the same on any
+printer (Ender 3, Prusa MK3, ...); only a pump may instead sit on the printer board's bed or
+hotend output, switched by Klipper (`picker.pump_switch`, pins.py). Power comes straight from
+the printer's 24 V supply: a 24 V pair to the tip, with the 5 V buck converter for the servos
+there.
 
 - GPIO12 (header pin 32), the "action" pin: jaw servo, magnet servo (hardware PWM 0), or the
   signal of a MOSFET module that switches a pump (on/off).

@@ -196,6 +196,9 @@ class Tool:
     offset: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])  # tip - toolhead, X Y Z
 
 
+PUMP_SWITCHES = ("mosfet", "bed", "hotend")  # picker.pump_switch (pins.py)
+
+
 @dataclass
 class Picker:
     mode: str = "suction"  # servo_tweezers | suction | magnet | pneumatic_tweezers (pickers.py)
@@ -203,6 +206,13 @@ class Picker:
     action_pin: int = 12  # header pin 32: the pump's MOSFET module, or the jaw / magnet servo
     turn_pin: int = 13  # header pin 33: the tweezers' turning servo
     pwm_chip: int | None = None  # /sys/class/pwm/pwmchipN for the servos; None = the first one
+    # what switches a pump (pins.py): mosfet = a MOSFET module on action_pin; bed / hotend =
+    # the printer board's heated-bed or hotend output, through Klipper (the heater unplugged
+    # from it, the pump in its place)
+    pump_switch: str = "mosfet"
+    # bed / hotend: the target asked of that heater while the pump runs: far enough above the
+    # room that Klipper switches the output fully on, and harmless if the heater is still on it
+    pump_heater_target: float = 60.0
     grab_angle: float | None = None  # servo angle that holds; None = the type's (pickers.py)
     release_angle: float | None = None  # servo angle that lets go; None = the type's
     rotate_offset_deg: float = 0.0  # fine trim of the jaw angle
@@ -334,6 +344,10 @@ class Machine:
                 f"picker.mode must be one of {PICKER_MODES}, got {self.picker.mode!r}"
             )
         self.picker.set_type(self.picker.mode)
+        if self.picker.pump_switch not in PUMP_SWITCHES:
+            raise ConfigError(
+                f"picker.pump_switch must be one of {PUMP_SWITCHES}, got {self.picker.pump_switch!r}"
+            )
         if self.printer.driver not in PRINTER_DRIVERS:
             raise ConfigError(
                 f"printer.driver must be one of {PRINTER_DRIVERS}, got {self.printer.driver!r}"

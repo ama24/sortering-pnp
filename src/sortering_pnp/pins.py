@@ -6,6 +6,15 @@ or drives the jaw / magnet servo; the turn pin (GPIO13, pin 33) drives the tweez
 servo. Servos get hardware PWM from /sys/class/pwm (the pwm-2chan overlay, which install-pi.sh
 adds to config.txt); a pump is a plain output through gpiozero (part of Raspberry Pi OS).
 
+A pump can instead go on the printer board's heated-bed or hotend output (`picker.pump_switch`:
+bed / hotend), in place of that heater, which is unplugged from it. Klipper owns those outputs,
+so sortering-pnp asks it with G-code: SET_HEATER_TEMPERATURE to `pump_heater_target` (its PID
+then switches the output fully on, the thermistor still reading the room) and back to 0.
+Klipper's verify_heater stays on: it stops the printer if the output stays on longer than
+`check_gain_time` without the heater warming (20 s for the hotend, 60 s for the bed by
+default), so a part is never held that long; if the heater is still plugged in, it warms and
+the pump is refused above `printer.max_hotend_c`.
+
 Motion waits until Klipper has finished every move (M400) before it calls grab or release.
 When the program stops, fails or ends, `off()` switches the pump off; a MOSFET module's
 pull-down also keeps it off while nothing drives the pin.
@@ -20,7 +29,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .config import Machine
-from .printer.base import PrinterError
+from .printer.base import Printer, PrinterError
 
 log = logging.getLogger("sortering_pnp.pins")
 
@@ -30,6 +39,9 @@ SERVO_MIN_NS, SERVO_MAX_NS = 500_000, 2_500_000  # 0 and 180 degrees
 PWM_CHANNEL = {12: 0, 13: 1, 18: 0, 19: 1}  # GPIO -> PWM channel (pwm-2chan overlay)
 TURN_S = 0.35  # a turn of the tweezers takes this long
 PERMS_WAIT_S = 3.0  # udev hands a newly exported channel's files to the gpio group within this
+HEATERS = {"bed": "heater_bed", "hotend": "extruder"}  # picker.pump_switch -> Klipper heater
+HEATER_LAG_S = 0.4  # Klipper sets a heater's output at its next temperature reading (0.3 s)
+HEATER_ON_LIMIT_S = {"heater_bed": 60.0, "extruder": 20.0}  # verify_heater's check_gain_time
 
 
 def _write(path: Path, value: str, sleep: Callable[[float], None] = time.sleep) -> None:
@@ -96,6 +108,76 @@ class _Servo:
             self.enabled = True
 
 
+class HeaterPump:
+    """A pump on the printer board's bed or hotend output, switched by Klipper (the heater is
+    unplugged from that output). on() asks for `target` C; off() for 0, only after an on(): so
+    stopping the program never touches a heater someone is printing with."""
+
+    def __init__(
+        self,
+        printer: Printer,
+        switch: str,
+        target: float,
+        limit_c: float,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.printer = printer
+        self.switch = switch
+        self.heater = HEATERS[switch]
+        self.target = target
+        self.limit_c = limit_c
+        self._clock = clock
+        self._since: float | None = None  # when it was switched on
+
+    @property
+    def is_on(self) -> bool:
+        return self._since is not None
+
+    def temperature(self) -> float | None:
+        st = self.printer.status()
+        if not st.ready:
+            raise PrinterError(f"Klipper is not ready ({st.state}): it switches the pump")
+        return st.bed_c if self.switch == "bed" else st.hotend_c
+
+    def check(self) -> None:
+        """Klipper has the heater, and it is cold: nothing but the pump is on its output."""
+        t = self.temperature()
+        if t is None:
+            raise PrinterError(f"Klipper has no {self.heater}: choose another pump switch")
+        if t > self.limit_c:
+            raise PrinterError(
+                f"the {self.switch} reads {t:.0f} C (limit {self.limit_c:.0f} C): unplug its "
+                f"heater from the board's {self.switch} output, the pump goes there"
+            )
+
+    def on(self) -> None:
+        self.check()
+        self._send(self.target)
+        self._since = self._clock()
+
+    def off(self) -> None:
+        if self._since is None:
+            return
+        held = self._clock() - self._since
+        self._since = None
+        self._send(0.0)
+        limit = HEATER_ON_LIMIT_S[self.heater]
+        if held > 0.75 * limit:
+            log.warning(
+                "the pump ran %.0f s on the %s output: Klipper stops the printer after about "
+                "%.0f s",
+                held,
+                self.switch,
+                limit,
+            )
+
+    def close(self) -> None:
+        self.off()
+
+    def _send(self, target: float) -> None:
+        self.printer.gcode(f"SET_HEATER_TEMPERATURE HEATER={self.heater} TARGET={target:g}")
+
+
 def _gpiozero_output(pin: int) -> Any:
     from gpiozero import DigitalOutputDevice  # Raspberry Pi OS: python3-gpiozero
 
@@ -112,14 +194,16 @@ class PiPins:
         pwm_root: Path = PWM_ROOT,
         output: Callable[[int], Any] = _gpiozero_output,
         sleep: Callable[[float], None] = time.sleep,
+        printer: Printer | None = None,  # switches a pump on the board's bed / hotend output
     ) -> None:
         self.m = m
+        self.printer = printer
         self.pwm_root = pwm_root
         self._output = output
         self._sleep = sleep
         self._pump: Any = None
         self._servos: dict[int, _Servo] = {}
-        self._mode: str | None = None  # the picker type the pins were opened for
+        self._mode: tuple[str, str] | None = None  # the picker type and pump switch opened
 
     # ------------------------------------------------------------------ opening
     def _chip(self) -> Path:
@@ -146,12 +230,22 @@ class PiPins:
 
     def _open(self) -> None:
         pk = self.m.picker
-        if self._mode == pk.mode:
+        mode = (pk.mode, pk.pump_switch)
+        if self._mode == mode:
             return
         self.close()  # another type was chosen: let go of the old pins
         t = pk.kind
         try:
-            if t.pump:
+            if t.pump and pk.pump_switch in HEATERS:
+                if self.printer is None:
+                    raise PrinterError("no printer to switch the pump through")
+                self._pump = HeaterPump(
+                    self.printer,
+                    pk.pump_switch,
+                    pk.pump_heater_target,
+                    self.m.printer.max_hotend_c,
+                )
+            elif t.pump:
                 self._pump = self._output(pk.action_pin)
             else:
                 self._servo(pk.action_pin)
@@ -165,7 +259,7 @@ class PiPins:
             ) from exc
         except Exception as exc:  # noqa: BLE001 - OSError, lgpio's "GPIO busy", gpiozero's own
             raise PrinterError(f"the Pi's pins cannot be used: {exc}") from exc
-        self._mode = pk.mode
+        self._mode = mode
 
     def status(self) -> tuple[bool, str]:
         try:
@@ -174,7 +268,15 @@ class PiPins:
             return False, str(exc)
         pk = self.m.picker
         t = pk.kind
-        used = [f"GPIO{pk.action_pin} ({'pump' if t.pump else 'servo'})"]
+        if isinstance(self._pump, HeaterPump):
+            try:
+                if not self._pump.is_on:  # letting go is never refused
+                    self._pump.check()
+            except PrinterError as exc:
+                return False, str(exc)
+            used = [f"the board's {pk.pump_switch} output (pump, through Klipper)"]
+        else:
+            used = [f"GPIO{pk.action_pin} ({'pump' if t.pump else 'servo'})"]
         if t.rotates:
             used.append(
                 f"turning: {pk.rotate_macro} in Klipper"
@@ -198,6 +300,8 @@ class PiPins:
                 self._pump.on()
             else:
                 self._pump.off()
+            if isinstance(self._pump, HeaterPump):
+                self._sleep(HEATER_LAG_S)
         else:
             angle = pk.grab_angle if holding else pk.release_angle
             if angle is None:
@@ -235,10 +339,10 @@ class PiPins:
         self._mode = None
 
 
-def make_pins(m: Machine, printer: object) -> Pins:
+def make_pins(m: Machine, printer: Printer) -> Pins:
     """The simulator's pins with the simulated printer, the Pi's pins otherwise."""
     from .printer.sim import SimPins, SimPrinter
 
     if isinstance(printer, SimPrinter):
         return SimPins(printer)
-    return PiPins(m)
+    return PiPins(m, printer=printer)

@@ -62,6 +62,7 @@ class Moonraker:
         objs = {
             "toolhead": "position,homed_axes,max_accel,square_corner_velocity",
             "extruder": "temperature",
+            "heater_bed": "temperature",  # left out of the answer when there is none
             "print_stats": "state",
         }
         if tool_macro:
@@ -76,6 +77,8 @@ class Moonraker:
         st.square_corner_velocity = None if scv is None else float(scv)
         t = s.get("extruder", {}).get("temperature")
         st.hotend_c = None if t is None else float(t)
+        t = s.get("heater_bed", {}).get("temperature")
+        st.bed_c = None if t is None else float(t)
         st.printing = s.get("print_stats", {}).get("state") in ("printing", "paused")
         if tool_macro:
             tool = s.get(f"gcode_macro {tool_macro}", {}).get("tool")

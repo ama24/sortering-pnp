@@ -107,6 +107,8 @@ picker:
   action_pin: 12               # GPIO (header pin 32): pump's MOSFET module, or jaw/magnet servo (sortering-pnp switches it, not Klipper)
   turn_pin: 13                 # GPIO (header pin 33): the tweezers' turning servo
   pwm_chip: null               # /sys/class/pwm/pwmchipN for the servos (null: the first one)
+  pump_switch: mosfet          # what switches a pump: mosfet (module on action_pin) | bed | hotend (the board's heater output, through Klipper; Setup tab: Picker)
+  pump_heater_target: 60       # bed / hotend: C asked of that heater while the pump runs (it switches the output fully on)
   grab_angle: null             # servo angle that holds (null: the type's, e.g. jaws 20, magnet 160)
   release_angle: null          # servo angle that lets go (null: the type's, e.g. jaws 90, magnet 20)
   rotate_offset_deg: 0         # fine trim of the jaw angle
