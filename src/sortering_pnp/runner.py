@@ -15,7 +15,8 @@ import math
 import threading
 import time
 from collections import Counter, deque
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,7 @@ from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
 from .camera import mirrored, orientation, rotated
-from .config import HOME_CORNERS, PUMP_SWITCHES, Machine
+from .config import HOME_CORNERS, PUMP_SWITCHES, RUN_MODES, SPEED_RANGE, Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
 from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
@@ -283,6 +284,7 @@ class Runner:
             "swap_phase": self.swap_phase,
             **self.mode(),
             "tip_offset_z": self.m.tool.offset[2],
+            "speed": self.speed_state(),
             "timing": self.state.timing,
             "phase": self.state.phase,
             "target": self.state.target,
@@ -799,6 +801,46 @@ class Runner:
             img = img[y0 : y0 + int(roi["h"] * s), x0 : x0 + int(roi["w"] * s)]
         return img
 
+    # ------------------------------------------------------------------ speed and mode
+    def speed_state(self) -> dict[str, Any]:
+        """The Device tab's Speed and Mode buttons: what is set now (used from the next move,
+        and for the mode from the next photo)."""
+        r = self.m.run
+        return {
+            "pct": r.speed_pct,
+            "range": list(SPEED_RANGE),
+            "mode": r.mode,
+            "turbo_picks": r.turbo_picks,
+        }
+
+    def set_speed(self, pct: float) -> dict[str, Any]:
+        """Speed of every move, 50..300 % (feed rates and accelerations; Klipper's limits still
+        apply). Used from the next move, also while sorting; kept in machine.json."""
+        pct = float(pct)
+        lo, hi = SPEED_RANGE
+        if not lo <= pct <= hi:
+            raise ValueError(f"speed: {lo:g} to {hi:g} %")
+        self.m.run.speed_pct = round(pct)
+        self.remember_machine({"speed_pct": self.m.run.speed_pct})
+        self.note(f"speed {self.m.run.speed_pct:g} %")
+        return self.speed_state()
+
+    def set_mode(self, mode: str, turbo_picks: int | None = None) -> dict[str, Any]:
+        """Single (a photo before every pick) or turbo (`turbo_picks` picks per photo, the photo
+        analysed while it goes on picking). Used from the next photo, also while sorting."""
+        if mode not in RUN_MODES:
+            raise ValueError(f"mode: one of {', '.join(RUN_MODES)}")
+        r = self.m.run
+        if turbo_picks is not None:
+            n = int(turbo_picks)
+            if not 1 <= n <= 100:
+                raise ValueError("turbo: 1 to 100 picks per photo")
+            r.turbo_picks = n
+        r.mode = mode
+        self.remember_machine({"run_mode": r.mode, "turbo_picks": r.turbo_picks})
+        self.note("mode: single" if mode == "single" else f"mode: turbo, {r.turbo_picks} per photo")
+        return self.speed_state()
+
     # ------------------------------------------------------------------ bins view
     def binsview_state(self) -> dict[str, Any]:
         """Bins view (Calibrate tab): what the model sees when it looks into the bins: the
@@ -1156,10 +1198,32 @@ class Runner:
         self.note(f"started: {STRATEGIES[strategy]}")
         self.say(f"sorting: {strategy}")
         self._last_seen = ""
-        prev: Plan | None = None
-        done_steps = 0
+        self._z_limit_note()
+        c = _RunCtx(layout, T, planner, first, steps, auto)
+        loop = "turbo" if self._turbo_now(c) else "single"
+        while True:  # single and turbo hand over to each other (Device tab: Mode)
+            res = self._turbo_loop(c) if loop == "turbo" else self._single_loop(c)
+            if res not in ("single", "turbo"):
+                return res
+            loop = res  # the loop handed over to
+
+    def _single_loop(self, c: _RunCtx) -> str:
+        """A photo before every pick: photo -> pick -> drop -> photo (which shows whether the
+        pick worked). "turbo" when the mode is switched to turbo (from the next photo)."""
+        layout, T, planner, steps, auto = c.layout, c.T, c.planner, c.steps, c.auto
+        first, prev, done_steps = c.first, c.prev, c.done_steps
+        c.first, c.prev = None, None
         waiting_for = ""  # the bin change last announced
+        cycles = 0
         while not self._stop.is_set():
+            if (
+                cycles
+                and self._turbo_now(c)
+                and not (self._pause.is_set() or self._park.is_set() or self._ok.is_set())
+            ):
+                c.layout, c.first, c.prev, c.done_steps = layout, first, prev, done_steps
+                return "turbo"
+            cycles += 1
             if self._pause.is_set():
                 self._set(
                     status="paused", message="paused: resume from the web page or the printer menu"
@@ -1300,6 +1364,200 @@ class Runner:
             prev = plan  # the next photo shows whether the pick worked
             done_steps += 1
         return "stopped"
+
+    def _turbo_now(self, c: _RunCtx) -> bool:
+        """Turbo (run.mode) for this run: not for One pick, the kit (counted on each photo) nor
+        the head camera (its photos are many and cannot wait)."""
+        return (
+            self.m.run.mode == "turbo"
+            and c.steps is None
+            and c.planner.strategy != "kit"
+            and self.m.camera.source != "head"
+            and hasattr(self.vision, "snap")
+            and hasattr(self.vision, "analyse")
+        )
+
+    def _snap(self, layout: Layout, T: Transform2D | None) -> Callable[[], Shot]:
+        """Turbo's photo: park and take it (the page shows it at once); its analysis is
+        returned, to run while the machine goes on picking."""
+        work = self._work_area(layout, T)
+        heights = lambda mid: _marker_plate_height(layout, mid)  # noqa: E731
+        with self._lock:
+            self.phase("parking at the photo position")
+            self.motion.photo_position()
+            name = self._photo_name()
+            self.phase("taking a photo")
+            with self.lights.for_photo():
+                photo = self.vision.snap(name)
+            self._show_photo(photo, name)
+
+        def analyse() -> Shot:
+            try:
+                shot = (
+                    self.vision.analyse(photo, name, heights, work)
+                    if work is not None
+                    else self.vision.analyse(photo, name, heights)
+                )
+            finally:
+                self._set(analysing=False)
+            return self._finish_shot(shot, layout, T)
+
+        return analyse
+
+    def _turbo_absorb(self, c: _RunCtx, shot: Shot, checks: list[Plan]) -> None:
+        """A turbo photo's results: each pick made before it is checked (did it work?) and
+        counted, then everything the single loop does with a new photo (bins, census)."""
+        planner, layout = c.planner, c.layout
+        missed = []
+        for plan in checks:
+            with self._claims_lock:
+                ok = planner.report(plan, shot.parts)
+                if ok and plan.kind == "pick" and plan.bin is not None:
+                    mk = plan.bin.marker
+                    self.bin_counts[mk] = self.bin_counts.get(mk, 0) + 1
+                    if plan.part is not None:
+                        vol = part_volume_mm3(plan.part, self.m.run.fill, self.volumes)
+                        self.bin_volume[mk] = self.bin_volume.get(mk, 0.0) + vol
+                        self.bin_family[mk] = family(plan.part.cls)
+            if not ok and plan.part is not None:
+                missed.append(plan.part.cls)
+        if checks:
+            with self._claims_lock:
+                self._save_claims()
+        for cls in missed:
+            self.note(f"pick of {cls} failed: the part is still there")
+            self.say(f"missed {cls}: try again")
+        self._set(
+            counts=dict(planner.sorted_count),
+            failed_picks=planner.failed_picks,
+            picks=sum(planner.sorted_count.values()),
+        )
+        self._update_ready(planner, layout, shot.parts)
+        planner.full = {mk for mk, f in self.bin_fill(layout).items() if f["full"]}
+        self._say_seen(shot.parts, layout)
+        self._ask_bins(planner, layout, shot.parts)
+
+    def _turbo_loop(self, c: _RunCtx) -> str:
+        """Turbo: run.turbo_picks picks from one photo, then a photo, analysed in the background
+        while it goes on picking from the same list; its results replace the list when they
+        come. A part within run.turbo_keep_away_mm of a pick made since its photo waits for the
+        next photo (it may have been nudged), so the picks from one photo are spread apart.
+        Every pick is checked by the first photo taken after it. Pause, Change bin, layout
+        changes and a list with nothing left to pick go to the single loop ("single"), which
+        comes back here from its next photo."""
+        run = self.m.run
+        planner = c.planner
+        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="turbo-analysis")
+        pending: Future[Shot] | None = None
+        checked_by_pending: list[Plan] = []  # the picks the photo in flight will check
+        unchecked: list[Plan] = []  # picks made since the last photo was taken
+        near: list[tuple[float, float]] = []  # picks made since the list's own photo
+        made = 0  # picks since the last photo was taken
+
+        def take_now() -> Shot:
+            nonlocal unchecked, near, made
+            shot = self.take_shot(c.layout, c.T)
+            self._turbo_absorb(c, shot, unchecked)
+            unchecked, near, made = [], [], 0
+            return shot
+
+        def landed(shot: Shot) -> list[Part]:
+            nonlocal checked_by_pending, near
+            self._turbo_absorb(c, shot, checked_by_pending)
+            checked_by_pending = []
+            near = [p.part.bed_xy for p in unchecked if p.part is not None]  # after that photo
+            return list(shot.parts)
+
+        try:
+            if c.first is not None:
+                shot, c.first = c.first, None
+                self._turbo_absorb(c, shot, [c.prev] if c.prev is not None else [])
+            else:
+                if c.prev is not None:
+                    unchecked = [c.prev]
+                shot = take_now()
+            c.prev = None
+            parts = list(shot.parts)
+            if c.turbo_said != run.turbo_picks:  # said once (and when the number changes)
+                c.turbo_said = run.turbo_picks
+                self.note(f"turbo: {run.turbo_picks} picks per photo")
+            while not self._stop.is_set():
+                if (
+                    self._pause.is_set()
+                    or self._park.is_set()
+                    or self._ok.is_set()
+                    or self._layout_changed.is_set()
+                    or not self._turbo_now(c)
+                ):  # finish what is in flight; the single loop deals with it
+                    if pending is not None:
+                        landed(pending.result())
+                        pending = None
+                    if unchecked:
+                        c.first = None if self._pause.is_set() else take_now()
+                    return "single"
+                if pending is not None and pending.done():
+                    parts = landed(pending.result())
+                    pending = None
+                if made >= run.turbo_picks and pending is None:
+                    pending = pool.submit(self._snap(c.layout, c.T))
+                    checked_by_pending, unchecked, made = unchecked, [], 0
+                keep = run.turbo_keep_away_mm
+                cands = [p for p in parts if all(_dist(p.bed_xy, q) > keep for q in near)]
+                here = tuple(self.motion.current_tip()[:2])
+                plan = planner.next(cands, here)  # type: ignore[arg-type]
+                if plan.kind == "pick" and plan.part is not None:
+                    self._set(plan=_describe(plan), target=self._target(plan, c.layout))
+                    if plan.note:
+                        self.note(plan.note)
+                        self.say(plan.note)
+                    t0 = time.perf_counter()
+                    with self._lock:
+                        self._pick(plan, c.layout)
+                        self._drop(plan, c.layout)
+                    self._set(timing={"cycle_s": round(time.perf_counter() - t0, 2)})
+                    if plan.claim is not None and plan.bin is not None:
+                        # held for this kind from now on: the next picks of it go there too
+                        with self._claims_lock:
+                            if self.claims.get(plan.bin.marker) != plan.claim:
+                                self.claims[plan.bin.marker] = plan.claim
+                                self._save_claims()
+                                self.note(f"wild bin {plan.bin.marker} now collects {plan.claim}")
+                                self.say(f"bin {plan.bin.marker} now holds {plan.claim}")
+                    unchecked.append(plan)
+                    near.append(plan.part.bed_xy)
+                    parts = [p for p in parts if p is not plan.part]
+                    made += 1
+                    c.done_steps += 1
+                    continue
+                # nothing to pick from this list
+                if pending is not None:  # the next photo is on its way: wait for it
+                    self.phase("waiting for the photo's analysis")
+                    parts = landed(pending.result())
+                    pending = None
+                    continue
+                if near or unchecked:  # the list is out of date: a fresh photo first
+                    parts = list(take_now().parts)
+                    continue
+                # a fresh list and still nothing to pick: done, stuck, a shake or a bin change
+                c.first = self.last_shot
+                return "single"
+            return "stopped"
+        finally:
+            pool.shutdown(wait=False)
+
+    def _z_limit_note(self) -> None:
+        """Once: Klipper caps every Z move at its max_z_velocity; say so when that is below the
+        Z speed asked for (printer.feed_z_empty at this speed)."""
+        if getattr(self, "_z_noted", False):
+            return
+        self._z_noted = True
+        limit = getattr(self.printer, "z_velocity_limit", lambda: None)()
+        want = self.m.printer.feed_z_empty * self.motion.speed / 60.0
+        if limit is not None and want > limit + 0.05:
+            self.note(
+                f"Klipper caps Z at {limit:g} mm/s (printer.cfg [printer] max_z_velocity): "
+                f"the empty Z moves run at that, not {want:.0f} mm/s"
+            )
 
     # ------------------------------------------------------------------ automatic mode
     def _wait(self, seconds: float, wake: bool = False) -> bool:
@@ -1749,6 +2007,12 @@ class Runner:
             elif k == "mask_margin_mm":
                 self.m.camera.mask_margin_mm = float(v)
                 self.mask_checked = True
+            elif k == "speed_pct":  # Device tab: Speed
+                self.m.run.speed_pct = float(v)
+            elif k == "run_mode" and v in RUN_MODES:  # Device tab: Mode
+                self.m.run.mode = str(v)
+            elif k == "turbo_picks":
+                self.m.run.turbo_picks = max(1, int(v))
             elif k == "bins_margin_mm":  # Calibrate tab: Bins view
                 self.m.camera.bins_margin_mm = float(v)
             elif k == "bins_mask":
@@ -2912,6 +3176,25 @@ def _poly_for_page(poly: Any, most: int = 32) -> list[list[float]]:
     if len(pts) > most:
         pts = pts[np.linspace(0, len(pts) - 1, most).astype(int)]
     return [[round(float(x), 1), round(float(y), 1)] for x, y in pts]
+
+
+@dataclass
+class _RunCtx:
+    """What a run carries between its single and turbo loops."""
+
+    layout: Layout
+    T: Transform2D
+    planner: Planner
+    first: Shot | None  # a photo just taken: used instead of taking the same one again
+    steps: int | None
+    auto: bool
+    prev: Plan | None = None  # the last pick, not yet checked by a photo
+    done_steps: int = 0
+    turbo_said: int = 0  # the turbo picks per photo last told
+
+
+def _dist(a: Sequence[float], b: Sequence[float]) -> float:
+    return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
 def _describe(plan: Plan) -> str:

@@ -302,7 +302,10 @@ button.p{font-weight:600}button.big{padding:11px 18px}
 
 <section id="device" class="on">
  <div class="phead"><div class="pt"><h1>Device</h1><p>The tray, the bins and what the machine does, live</p><div id="msg" class="note"></div></div>
-  <div class="acts"><div id="runbox"></div><details class="man" id="runman"><summary>Manual</summary><div><button class="b s" onclick="manual('start')" title="Sort what lies in the tray now, then stop">Sort once</button><button class="b s" onclick="manual('step')" title="One part, then stop">One pick</button></div></details></div></div>
+  <div class="acts"><div id="runbox"></div>
+   <details class="man opt" id="spdbox"><summary id="spdsum" title="Speed of every move">Speed 100 %</summary><div><span class="note">50 %</span><input type="range" id="spd" min="50" max="300" step="5" value="100" oninput="spdShow()" onchange="spdSet()" style="width:220px"><span class="note">300 %</span><b id="spdv" style="min-width:52px;text-align:right">100 %</b><button class="b s" onclick="$('spd').value=100;spdShow();spdSet()">100 %</button></div></details>
+   <details class="man opt" id="modebox"><summary id="modesum" title="Single: a photo before every pick. Turbo: several picks per photo">Mode: Single</summary><div><label class="note"><input type="radio" name="rmode" value="single" onchange="modeSet()"> Single</label><label class="note" title="This many picks from one photo, spread apart; the next photo is analysed while it goes on picking"><input type="radio" name="rmode" value="turbo" onchange="modeSet()"> Turbo</label><input type="number" id="turbon" min="1" max="100" step="1" value="5" style="width:64px" onchange="modeSet()"><span class="note">picks per photo</span></div></details>
+   <details class="man" id="runman"><summary>Manual</summary><div><button class="b s" onclick="manual('start')" title="Sort what lies in the tray now, then stop">Sort once</button><button class="b s" onclick="manual('step')" title="One part, then stop">One pick</button></div></details></div></div>
  <div id="attn"></div>
  <div class="dgrid">
   <div class="card dcard">
@@ -486,7 +489,7 @@ async function poll(){try{S=await api("api/state");}catch(e){$("status").innerHT
  const cls={running:"ok",done:"ok",standby:"ok",error:"bad",stuck:"warn",waiting:"warn",parked:"warn",paused:"warn",stopping:"warn"}[S.status]||"";
  $("status").innerHTML=`<span class="dot ${cls}"></span><b>${esc(S.status)}</b>${S.mode==="auto"?" · automatic":""}${S.driver==="sim"?" · simulation":""}`;
  NEXT=S.next_look_s==null?null:Date.now()+S.next_look_s*1000;SHOT_T=S.shot_age_s==null?null:Date.now()-S.shot_age_s*1000;
- $("msg").textContent=live(S.message);renderStartup();renderRun();
+ $("msg").textContent=live(S.message);renderStartup();renderRun();renderSpeed();
  const st=$("strategy");if(!st.options.length){for(const[k,v]of Object.entries(S.strategies)){const o=document.createElement("option");o.value=k;o.textContent=v;st.appendChild(o);}st.value=S.strategy;}
  const img=S.view||S.shot;if(img&&img!==shownView){shownView=img;$("view").src="runs/"+encodeURIComponent(img);}
  $("camempty").hidden=!!img;drawOverlay();renderStats();renderActivity();
@@ -524,6 +527,18 @@ function renderRun(){const r=runState(),m=S.mode||"",st=S.status,b=(c,l,t="")=>`
  else h+=b("auto","Start automatic","Looks for parts every minute and sorts them, until Stop. Stays on after a restart.");
  if($("runbox").innerHTML!==h)$("runbox").innerHTML=h;$("runman").hidden=!!m;}
 function manual(c){$("runman").open=false;cmd(c);}
+// speed (50..300 %) and mode (single | turbo N): from the runner, never over what is being dragged
+function renderSpeed(){const v=S&&S.speed;if(!v)return;
+ $("spdsum").textContent=`Speed ${Math.round(v.pct)} %`;
+ if(document.activeElement!==$("spd")&&!SPD_DRAG){$("spd").value=v.pct;$("spdv").textContent=`${Math.round(v.pct)} %`;}
+ $("modesum").textContent=v.mode==="turbo"?`Mode: Turbo ${v.turbo_picks}`:"Mode: Single";
+ if(document.activeElement!==$("turbon"))$("turbon").value=v.turbo_picks;
+ document.querySelectorAll('input[name="rmode"]').forEach(r=>{if(document.activeElement!==r)r.checked=r.value===v.mode;});}
+let SPD_DRAG=false;
+function spdShow(){SPD_DRAG=true;$("spdv").textContent=`${$("spd").value} %`;}
+async function spdSet(){try{const v=await api("api/speed",{pct:+$("spd").value});SPD_DRAG=false;if(S){S.speed=v;renderSpeed();}}catch(e){SPD_DRAG=false;flash("msg",e.message,1);}}
+async function modeSet(){const r=document.querySelector('input[name="rmode"]:checked');if(!r)return;
+ try{const v=await api("api/mode",{mode:r.value,turbo_picks:Math.max(1,Math.round(+$("turbon").value||1))});if(S){S.speed=v;renderSpeed();}}catch(e){flash("msg",e.message,1);}}
 // the start-up check (startup.py): homing, layout check, bins check, ready
 function renderStartup(){const su=S.startup||{},steps=su.steps||[],box=$("startup");if(!box)return;
  const icon={done:"✓",failed:"✗",skipped:"–",running:"•",pending:""},run=steps.some(s=>s.state==="running");

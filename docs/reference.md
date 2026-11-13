@@ -708,6 +708,33 @@ that apply then (Look now, Pause, Resume, Stop); *Manual* has Sort once and One 
 4. **Stuck parts** (a clump that shaking can't spread) are left alone. It tries again as soon
    as they've been moved.
 
+### Speed and mode
+
+Beside Pause and Stop on the Device tab (and also while idle):
+
+- **Speed** (`run.speed_pct`, 100 %): a slider from 50 to 300 %. Every feed rate and
+  acceleration the program sends is multiplied by it, the bed's and the head's own limits
+  (`printer.xy_motion`) too; Klipper's own limits still apply. It is used from the next move, so
+  it can be tuned while it sorts, and is kept in machine.json. The waits (grab, release, the
+  photo's settle) are not scaled.
+- **Z:** with nothing held the head goes down to a part and up after a drop at
+  `printer.feed_z_empty` (900 mm/min); with a part held at `printer.feed_z` (600). Klipper caps
+  every Z move at its `max_z_velocity` (5 mm/s, 300 mm/min, in an Ender 3's printer.cfg): the
+  console says so at the start of a run, and klipper/sortering_pnp.cfg shows how to raise it.
+- **Mode** (`run.mode`):
+  - **Single** (the default): a photo before every pick; each photo also shows whether the pick
+    before it worked.
+  - **Turbo N** (`run.turbo_picks`): N picks from one photo. The machine then parks, takes a
+    photo and goes on at once with the rest of the list while the photo is analysed; when the
+    results come, they replace the list. A part within `run.turbo_keep_away_mm` (20 mm) of a
+    pick made since its photo waits for the next photo (it may have been nudged), so the picks
+    from one photo are spread apart. Every pick is checked by the first photo taken after it:
+    a missed part is still in the list and is picked again; bins are counted then. Pause,
+    Change bin, a layout change, and a list with nothing left to pick (done, a shake, stuck,
+    waiting for a bin) are handled as in Single, then Turbo goes on. One pick, the kit
+    strategy and the head camera always use Single. The mode can be changed while it sorts:
+    from the next photo.
+
 Automatic mode **stays on after a restart** or power cut: when `sortering-pnp serve` starts, it
 carries on. Stop (or STOP) switches it off. After `standby.max_errors` errors in a row (printer
 off, camera unplugged…) it switches itself off and says why on the page.

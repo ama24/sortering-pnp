@@ -88,6 +88,18 @@ class Moonraker:
             st.tool = None if tool is None else str(tool).strip("\"'").lower()
         return st
 
+    def z_velocity_limit(self) -> float | None:
+        """Klipper's [printer] max_z_velocity (mm/s): every Z move is capped at it. None when
+        it cannot be read."""
+        try:
+            s = (self._request("GET", "/printer/objects/query?configfile=settings") or {}).get(
+                "status", {}
+            )
+            v = s.get("configfile", {}).get("settings", {}).get("printer", {}).get("max_z_velocity")
+            return None if v is None else float(v)
+        except (PrinterError, TypeError, ValueError):
+            return None
+
     def emergency_stop(self) -> None:
         self._request("POST", "/printer/emergency_stop")
 

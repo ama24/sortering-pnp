@@ -82,7 +82,15 @@ def test_moves_apply_tool_offset_and_limits(machine):
     mo.move(x=50.0, y=60.0)
     assert fp.sent[-1] == "G90\nG1 X45.000 Y62.000 F6000"
     mo.move(z=11.0)
-    assert fp.sent[-1] == "G90\nG1 Z10.000 F1200"
+    assert fp.sent[-1] == "G90\nG1 Z10.000 F900"  # nothing held: printer.feed_z_empty
+    mo.carrying = True
+    mo.move(z=12.0)
+    assert fp.sent[-1] == "G90\nG1 Z11.000 F600"  # a part held: printer.feed_z
+    mo.carrying = False
+    machine.run.speed_pct = 200.0  # the speed slider: every feed rate doubled
+    mo.move(z=11.0)
+    assert fp.sent[-1] == "G90\nG1 Z10.000 F1800"
+    machine.run.speed_pct = 100.0
     with pytest.raises(PrinterError, match="limits"):
         mo.move(x=300.0)
     with pytest.raises(PrinterError, match="Z"):
@@ -125,7 +133,8 @@ def test_pick_and_drop_sequence(machine):
     # the pins are not in Klipper's queue: every move has finished (M400) before the grab
     grab = fp.sent.index("PINS grab")
     assert fp.sent[grab - 1] == "M400" and "G1 Z3.000 F300" in fp.sent[grab - 2]
-    assert fp.sent[-1].endswith("Z50.000 F1200")
+    assert fp.sent[-1].endswith("Z50.000 F600")  # up with the part: printer.feed_z
+    assert "G1 Z11.000 F900" in text  # down with nothing held: printer.feed_z_empty
     fp.sent.clear()
     machine.picker.lower_to_drop = True
     mo.drop(20.0, 20.0, rim_z=21.0)

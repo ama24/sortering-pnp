@@ -154,7 +154,7 @@ def test_x_moves_get_the_heads_accel_and_an_s_curve(machine):
 def test_z_moves_are_unchanged(machine):
     fp = FakePrinter([10.0, 20.0, 50.0])
     Motion(fp, machine).move(z=10.0)
-    assert fp.sent[-1] == "G90\nG1 Z10.000 F1200"
+    assert fp.sent[-1] == "G90\nG1 Z10.000 F900"  # a plain Z move, nothing held
 
 
 @pytest.mark.parametrize(
