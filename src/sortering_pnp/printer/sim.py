@@ -24,6 +24,7 @@ from ..layout import Layout
 from ..markers import MarkerPose
 from ..parts import Part
 from ..transform import Transform2D
+from ..trayview import BinsView, bins_area
 from ..vision import Shot, top_height_mm
 from .base import PrinterError, PrinterStatus
 
@@ -308,6 +309,9 @@ class SimVision:
                 return abs(x - cx) <= hw and abs(y - cy) <= hh
 
         plate = [sp for sp in plate if seen(sp.x, sp.y)]
+        markers = self._markers(lay, Ti, d, seen)
+        if isinstance(work, BinsView):  # the floors of the bins whose codes are seen
+            work = bins_area(markers, work.margin_mm)
         if work is not None:  # painted over: the model cannot see what lies outside the tray
             plate = [
                 sp for sp in plate if work.contains(tuple(Ti.apply([sp.x - d[0], sp.y - d[1]])))
@@ -331,21 +335,9 @@ class SimVision:
                     has_length=sp.length is not None,
                 )
             )
-        markers = []
-        for b in lay.bins:  # each code on its bin's shelf or post, its top edge to the back
-            mx, my = lay.marker_centre(b)
-            if not seen(mx, my):
-                continue
-            markers.append(
-                MarkerPose(
-                    b.marker,
-                    tuple(float(v) for v in Ti.apply([mx - d[0], my - d[1]])),
-                    (90.0 + b.rot - T.angle_deg) % 360.0,
-                )
-            )
         shot = Shot(name, parts, markers)
         if self.out is not None:
-            painted = [T.apply(work.outline)] if work is not None else None
+            painted = [T.apply(o) for o in work.outlines] if work is not None else None
             shot.vis = self._draw(name, lay, plate, painted)  # what the model saw
             shot.view = self._draw(name, lay, plate, None, "view")  # the whole picture
             if self._px is not None:  # plate -> bed (T) -> picture pixels
@@ -357,6 +349,25 @@ class SimVision:
                     u, v, w = Hv @ np.array([mk.centre[0], mk.centre[1], 1.0])
                     markers[i] = dataclasses.replace(mk, view_px=(float(u / w), float(v / w)))
         return shot
+
+    def _markers(
+        self, lay: Layout, Ti: Transform2D, d: np.ndarray, seen: Callable[[float, float], bool]
+    ) -> list[MarkerPose]:
+        """Each code on its bin's shelf or post, its top edge to the back (plate frame)."""
+        T = Ti.inverse()
+        out = []
+        for b in lay.bins:
+            mx, my = lay.marker_centre(b)
+            if not seen(mx, my):
+                continue
+            out.append(
+                MarkerPose(
+                    b.marker,
+                    tuple(float(v) for v in Ti.apply([mx - d[0], my - d[1]])),
+                    (90.0 + b.rot - T.angle_deg) % 360.0,
+                )
+            )
+        return out
 
     def _draw(
         self,

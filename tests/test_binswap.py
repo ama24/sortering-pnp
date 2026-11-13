@@ -75,6 +75,7 @@ def _wait_for(runner: Runner, status: str, timeout: float = 30.0) -> None:
 def test_a_new_kind_asks_for_a_bin_and_the_ok_checks_it(machine, swap):
     """Three wild bins, four kinds: the fourth waits; the bin of a finished kind is asked for.
     swap: another (empty) bin is put there; else the same bin comes back emptied."""
+    machine.run.fill.take_out_at = 0.0  # any bin with something in it may go (the old rule)
     machine.run.shake.enabled = False
     lay = _lay()
     lay.bins = [b for b in lay.bins if b.marker != 105]  # two wild bins, three kinds
@@ -293,6 +294,7 @@ def test_requests_survive_a_restart(machine):
 
 
 def test_a_new_kind_with_no_bin_to_ask_for_goes_to_overflow(machine):
+    machine.run.fill.take_out_at = 0.0  # any bin with something in it may go (the old rule)
     lay = Layout.default()
     lay.bins = [b for b in lay.bins if b.marker in (102, 103)] + [lay.work_bin()]
     lay.bin_by_marker(103).role = "wild"  # one wild bin, and the overflow bin 102
@@ -315,3 +317,22 @@ def test_a_new_kind_with_no_bin_to_ask_for_goes_to_overflow(machine):
     plan = planner.next(shot.parts)
     assert plan.kind == "pick" and plan.bin.marker == 102  # the other: into overflow
     assert any("into the overflow bin" in e for e in runner.events)
+
+
+def test_a_bin_with_a_few_items_is_not_given_up_for_a_new_kind(machine):
+    """run.fill.take_out_at (0.5 by default): only a well-filled bin is asked to be emptied for
+    a new kind; with none, the new kind waits (or goes to the overflow bin)."""
+    machine.run.shake.enabled = False
+    lay = _lay()
+    lay.bins = [b for b in lay.bins if b.marker != 105]  # two wild bins, three kinds
+    lay.save(machine.path(machine.paths.layout))
+    world = _world(lay)
+    runner = Runner(
+        machine, SimPrinter(machine, world), SimVision(world, lambda: lay, Transform2D.identity)
+    )
+    runner.command("start", "sort")
+    _wait_for(runner, "waiting")
+    assert runner.requests == []  # three nuts in a bin are no reason to empty it
+    assert any("none is full enough" in e for e in runner.events)
+    assert not runner.bins_state()["ready"]  # nor to take a bin out when its kind is done
+    runner.command("stop")

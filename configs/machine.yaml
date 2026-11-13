@@ -33,6 +33,8 @@ camera:
   mask: true                   # only the tray's inside goes to the model (the rest painted over)
   mask_colour: auto            # auto: the tray floor's colour | #RRGGBB, e.g. #FFFFFF
   mask_margin_mm: 0            # + keeps the wall's foot, - paints more of the floor's edge (Calibrate tab)
+  bins_mask: true              # looking into the bins: only the floors of the bins seen in the photo go to the model
+  bins_margin_mm: 0            # bins view: + keeps more of each floor's edge, - paints more of it (Calibrate tab)
   hflip: true                  # the camera flips its picture left-right (both flips: turned 180 deg, a camera mounted the other way round)
   vflip: true                  # ... and top-bottom (Camera Calibration tab: Rotate 90° / Mirror)
   turn90: false                # then turned 90 deg clockwise (in software)
@@ -148,6 +150,7 @@ run:
     shape: 0.5                 # a part's volume = outline area x height x this
     packing: 0.3               # loose parts fill this share of a bin's room
     full_at: 0.9               # a bin this full asks to be emptied
+    take_out_at: 0.5           # only a bin at least this full is offered to be taken out or given up for a new kind
     catalogue: true            # exact volumes from items.json (Files tab), when there is one
     learn: true                # Full on a bin teaches how densely its family packs
   when_no_bin: ask             # a new kind, no free wild bin: ask for a bin change | overflow

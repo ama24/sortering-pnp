@@ -141,8 +141,12 @@ another repository.
 - **The model** runs on the full calibrated ROI at its trained scale. Everything outside the
   tray's inside (and the corner post) is painted over first (`trayview.py`, `camera.mask`), the
   image size unchanged; never crop and resize to the working area: that changes the scale the
-  model sees. Markers are read from the unpainted photo; the check after a bin change
-  (`take_shot(paint=False)`) looks at it unpainted.
+  model sees. Markers are read from the unpainted photo. Looking into the bins (start-up
+  check, Resync, after a bin change: `take_shot(paint="bins")`) uses the bins view
+  (`BinsView`, `camera.bins_mask`): only the floors of the bins whose codes are in that photo
+  (`trayview.bins_area`, each floor from its code alone), the codes painted too.
+- **Taking bins out:** only a bin at least `run.fill.take_out_at` full (0.5) is flagged ready
+  when its kind is done (`_update_ready`) or given up for a new kind (`_ask_bins`).
 
 ## Conventions
 - Lengths in mm, speeds in mm/min, angles in degrees.

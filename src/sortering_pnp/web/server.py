@@ -20,8 +20,10 @@ POST /api/models/test       {"id"}: run it on the last photo, nothing is switche
 POST /api/bins/emptied      {"marker": id or null}: a bin was emptied (null: all ready ones)
 GET  /api/calibration        camera calibration (Calibrate tab); board.pdf; POST settings|start|cancel
                              (start: the whole calibration, calibjob.py); lock|view|lens|flat|reset
-GET  /api/camera/live.mjpg?view=live|crop  the live picture (crop: what the model sees); live.jpg
+GET  /api/camera/live.mjpg?view=live|crop|bins  the live picture (crop / bins: what the model sees); live.jpg
 GET  /api/crop; POST /api/crop/preview|save {"margin", "colour"}   Camera cropping
+GET  /api/binsview; POST /api/binsview/preview {"margin", "enabled"?}, /save {"margin", "enabled"}
+GET  /api/binsview/snippets.jpg  each bin's floor as the model sees it (Calibrate tab: Bins view)
 GET  /api/photos             real-photo sessions; POST /api/photos/new|take; GET /api/photos/zip?name=
 GET  /api/todo               the Setup tab's "On the machine" list; POST /api/todo {"key", "done"}
 POST /api/mask/preview      {"margin"}: a photo painted as the model will see it; /api/mask/save {"margin"}
@@ -370,6 +372,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._mjpeg(lambda: r.photos.live_jpeg(view))
         elif method == "GET" and path == "/api/camera/live.jpg":
             self._send(200, r.photos.live_jpeg(q.get("view", "live")), "image/jpeg")
+        elif method == "GET" and path == "/api/binsview":
+            self._json(r.binsview_state())
+        elif method == "POST" and path == "/api/binsview/preview":
+            b = self._body()
+            on = b.get("enabled")
+            self._json(
+                r.binsview_preview(float(b.get("margin", 0.0)), None if on is None else bool(on))
+            )
+        elif method == "POST" and path == "/api/binsview/save":
+            b = self._body()
+            self._json(r.binsview_save(float(b.get("margin", 0.0)), bool(b.get("enabled", True))))
+        elif method == "GET" and path == "/api/binsview/snippets.jpg":
+            self._send(200, r.bins_snippets(), "image/jpeg")
         elif method == "GET" and path == "/api/crop":
             self._json(r.crop_state())
         elif method == "POST" and path == "/api/crop/preview":

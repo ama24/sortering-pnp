@@ -82,6 +82,7 @@ def _wait_for(runner: Runner, status: str, timeout: float = 30.0) -> None:
 
 
 def test_a_bin_covered_at_the_start_is_used_once_seen(machine):
+    machine.run.fill.take_out_at = 0.0  # any bin with something in it may go (the old rule)
     machine.run.shake.enabled = False
     machine.standby.interval_s = 0.3
     lay = Layout.default()

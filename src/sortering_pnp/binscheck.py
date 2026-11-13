@@ -1,12 +1,13 @@
 """The bins check: what each storage bin holds, from one model pass on the whole board.
 
 Only Resync and the start-up check's Bins check do it (sorting photos keep the tray only,
-painted, see trayview.py). The model runs once on the whole calibrated picture at its trained
-scale (nothing cropped or painted); every detection is given to the bin whose floor (inside its
-walls) holds it. Detections on or next to a bin's code are dropped: the printed code looks like
-parts to the model ("unknown", or any class). The code is kept out twice: where the layout puts
-it, and where the photo shows it (a code sits on the rim, so seen from above it appears shifted
-outwards on the floor plane the parts are measured on).
+painted, see trayview.py). The model runs once on the calibrated picture at its trained scale,
+through the bins view (trayview.py: only the floors of the bins whose codes are seen, the codes
+painted; nothing cropped); every detection is given to the bin whose floor (inside its walls)
+holds it. Detections on or next to a bin's code are still dropped (the bins view off, or a code
+it missed): the printed code looks like parts to the model. The code is kept out twice: where
+the layout puts it, and where the photo shows it (a code sits on the rim, so seen from above it
+appears shifted outwards on the floor plane the parts are measured on).
 
 The picture (`draw`) shows it: each bin's floor with its cell and code, the parts counted
 in it, the dropped ones crossed out, the code areas, and what each bin collects now.

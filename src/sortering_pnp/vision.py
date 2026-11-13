@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -26,7 +26,7 @@ from .grip import Shape, axis_grip, head_grip, outline_grip, ring_grip, washer_h
 from .markers import MarkerPose, detect, marker_pose
 from .models import ModelStore
 from .parts import Part
-from .trayview import WorkArea, paint_outside, parse_colour
+from .trayview import BinsView, WorkArea, bins_area, code_quads_px, paint_outside, parse_colour
 
 log = logging.getLogger("sortering_pnp.vision")
 
@@ -45,7 +45,10 @@ class Shot:
 
 class Vision(Protocol):
     def capture(
-        self, name: str, marker_height: Callable[[int], float], work: WorkArea | None = None
+        self,
+        name: str,
+        marker_height: Callable[[int], float],
+        work: WorkArea | BinsView | None = None,
     ) -> Shot:
         """Take a photo, find parts and markers; `marker_height(id)` = plate-frame height of a
         marker (bins differ in height); `work`: the model sees only the tray's inside."""
@@ -58,7 +61,7 @@ class Vision(Protocol):
         photo: Any,
         name: str,
         marker_height: Callable[[int], float],
-        work: WorkArea | None = None,
+        work: WorkArea | BinsView | None = None,
     ) -> Shot: ...
 
     def close(self) -> None: ...
@@ -288,7 +291,8 @@ class CameraVision:
         H, _ = cv2.findHomography(plate[ok], px[ok])
         return path, (np.diag([k, k, 1.0]) @ H).tolist(), k
 
-    def _painted(self, scene: Any, work: WorkArea) -> Any:
+    def _painted(self, scene: Any, work: WorkArea, holes_px: Sequence[np.ndarray] = ()) -> Any:
+        """The scene with all but `work` painted (and `holes_px`: scene pixels, the codes)."""
         import dataclasses
 
         def px(poly: np.ndarray) -> np.ndarray:
@@ -296,8 +300,8 @@ class CameraVision:
 
         img = paint_outside(
             scene.image,
-            px(work.outline),
-            [px(h) for h in work.holes],
+            [px(o) for o in work.outlines],
+            [px(h) for h in work.holes] + list(holes_px),
             parse_colour(self.m.camera.mask_colour),
         )
         return dataclasses.replace(scene, image=img, gray=None)
@@ -475,7 +479,10 @@ class CameraVision:
             cv2.imwrite(str(path), turn_image(img, True), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
     def capture(
-        self, name: str, marker_height: Callable[[int], float], work: WorkArea | None = None
+        self,
+        name: str,
+        marker_height: Callable[[int], float],
+        work: WorkArea | BinsView | None = None,
     ) -> Shot:
         return self.analyse(self.snap(name), name, marker_height, work)
 
@@ -490,10 +497,11 @@ class CameraVision:
         photo: Path,
         name: str,
         marker_height: Callable[[int], float],
-        work: WorkArea | None = None,
+        work: WorkArea | BinsView | None = None,
     ) -> Shot:
         """`work`: the tray's inside (plate frame): the rest is painted over for the model
-        (trayview.py); None: the whole photo (e.g. to look into the bins)."""
+        (trayview.py); BinsView: only the floors of the bins whose codes are in this photo;
+        None: the whole photo."""
         import dataclasses
 
         import cv2
@@ -502,7 +510,24 @@ class CameraVision:
 
         scene = self._scene(photo)
         seen = scene  # unpainted: what the page shows
-        if work is not None and self.m.camera.mask:
+        # the codes first, from the photo itself: the bins view is made from them
+        full = cv2.imread(str(photo), cv2.IMREAD_GRAYSCALE)
+        found = detect(full)
+        # the scene is the ROI (cropped from a full frame, or the photo itself)
+        cropped = full.shape[:2] != seen.image.shape[:2]
+        ox, oy = (seen.roi["x0"], seen.roi["y0"]) if cropped else (0, 0)
+        poses = [
+            marker_pose(
+                s, lambda px, mid=s.marker: self.cam_full.pixel_to_plate(px, marker_height(mid))
+            )
+            for s in found
+        ]
+        if isinstance(work, BinsView):
+            area = bins_area(poses, work.margin_mm)
+            if area is not None:
+                codes = code_quads_px(np.asarray(s.corners_px) - (ox, oy) for s in found)
+                scene = self._painted(scene, area, codes)
+        elif work is not None and self.m.camera.mask:
             scene = self._painted(scene, work)
         if self.analyzer is None:  # no model yet: the codes are still read, no parts
             result: dict[str, Any] = {}
@@ -516,23 +541,16 @@ class CameraVision:
                 self._shapes.get,
                 self.m.picker.kind.aim,
             )
-        full = cv2.imread(str(photo), cv2.IMREAD_GRAYSCALE)
-        found = detect(full)
         pre = getattr(self, "_pre", None)
         if pre is not None and pre[0] == photo and pre[2] == name:
             view, view_h, k = pre[3]
         else:
             view, view_h, k = self._view(seen, name)
         self._pre = None
-        # the view is the ROI (cropped from a full frame, or the photo itself), scaled by k
-        cropped = full.shape[:2] != seen.image.shape[:2]
-        ox, oy = (seen.roi["x0"], seen.roi["y0"]) if cropped else (0, 0)
+        # the view is the ROI, scaled by k
         markers = []
-        for s in found:
+        for s, pose in zip(found, poses, strict=True):
             cx, cy = np.asarray(s.corners_px).mean(axis=0)
-            pose = marker_pose(
-                s, lambda px, mid=s.marker: self.cam_full.pixel_to_plate(px, marker_height(mid))
-            )
             markers.append(dataclasses.replace(pose, view_px=((cx - ox) * k, (cy - oy) * k)))
         vis = view
         if self.analyzer is not None:

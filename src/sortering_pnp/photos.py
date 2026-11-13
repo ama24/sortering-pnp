@@ -222,8 +222,8 @@ class Photos:
 
     def live_jpeg(self, view: str = "live") -> bytes:
         """One frame of the live picture for the page: as the camera sees it (with the
-        calibration's board corners and covered cells while it runs), or "crop": what the model
-        will see."""
+        calibration's board corners and covered cells while it runs), "crop": what the model
+        will see of the tray, or "bins": of the bins."""
         import cv2
 
         frame = getattr(self.r.vision, "frame", lambda: None)()
@@ -236,6 +236,8 @@ class Photos:
             img = placeholder(why if hasattr(self.r.vision, "frame") else "simulator: no camera")
         elif view == "crop":
             img = self.r.crop_frame(frame)
+        elif view == "bins":
+            img = self.r.bins_frame(frame)
         else:
             img = frame.copy()
             if self.job is not None and self.job.running:

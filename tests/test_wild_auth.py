@@ -98,6 +98,7 @@ def make(machine, layout: Layout, n: int = 10, seed: int = 5, seen: Layout | Non
 
 
 def test_sorts_with_only_wild_bins_and_keeps_claims(machine):
+    machine.run.fill.take_out_at = 0.0  # any bin with something in it may go (the old rule)
     machine.run.shake.enabled = False
     lay = Layout.default()
     lay.bins = [b for b in lay.bins if b.role in ("wild", "work")]  # 13 wild bins + the plate
