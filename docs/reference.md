@@ -383,8 +383,15 @@ used otherwise). Home the printer, empty the tray, light as when sorting. Then *
 button ([calibjob.py](../src/sortering_pnp/calibjob.py)), which says on the page what to do:
 1. **Park:** the bed goes to the photo position.
 2. **Lock** (about a minute): the camera measures the light and focus once and freezes exposure,
-   gain, white balance and lens position, so every later photo looks the same. Until then the
-   live picture runs on the camera's automatic settings.
+   gain, white balance and lens position, so every later photo looks the same. All of it is
+   measured on the **centre of the picture** (the middle 40 %, where the tray is), not the whole
+   of it: a white bin at the side neither brightens nor tints the photos. The centre is made grey
+   on average (white balance), at a middle brightness, but never so bright that the brightest
+   part of the whole picture (e.g. that white bin) burns out; the focus is the sharpest centre.
+   Until then the live picture runs on the camera's automatic settings, its autofocus on the
+   centre too. **Lock** can be run again on its own. Manual values in the camera adjustments
+   still go over the locked ones: set white balance and exposure back to *auto* to use the
+   lock's.
 3. **Lens:** move the board slowly under the camera, over the whole picture, corners too, a
    little tilted now and then. A full-resolution photo is taken by itself each time the board
    holds still (4 live frames) somewhere new (another place, size or tilt); the covered cells

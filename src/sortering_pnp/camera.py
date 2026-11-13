@@ -22,11 +22,66 @@ LIVE_SIZE = (1280, 720)  # the live picture on the page (same view, scaled: 16:9
 TOLERANCE = {"ExposureTime": 0.01, "AnalogueGain": 0.02, "ColourGains": 0.01, "LensPosition": 0.02}
 
 
-def focus_metric(gray: np.ndarray, centre_fraction: float = 0.4) -> float:
+CENTRE_FRACTION = 0.4  # focus, exposure and white balance are measured on this centre part
+CENTRE_TARGET = 110.0  # the centre's median brightness (0..255) the lock aims for
+HIGHLIGHT_MAX = 235.0  # ... but the brightest 0.5 % of the whole picture stays below this
+GAIN_RANGE = (0.5, 8.0)  # colour gains are kept inside this
+EXPOSURE_RANGE_US = (50, 200_000)
+
+
+def centre(img: np.ndarray, fraction: float = CENTRE_FRACTION) -> np.ndarray:
+    """The middle `fraction` of a picture (of its width and of its height)."""
+    h, w = img.shape[:2]
+    ch, cw = max(int(h * fraction), 1), max(int(w * fraction), 1)
+    return img[(h - ch) // 2 : (h - ch) // 2 + ch, (w - cw) // 2 : (w - cw) // 2 + cw]
+
+
+def centre_window(crop_max: tuple[int, int, int, int], fraction: float = CENTRE_FRACTION) -> tuple:
+    """The centre part as an autofocus window, in ScalerCropMaximum's pixels (x, y, w, h)."""
+    x, y, w, h = (int(v) for v in crop_max)
+    cw, ch = int(w * fraction), int(h * fraction)
+    return (x + (w - cw) // 2, y + (h - ch) // 2, cw, ch)
+
+
+def centre_balance(
+    img: np.ndarray,
+    exposure_us: float,
+    colour_gains: tuple[float, float],
+    fraction: float = CENTRE_FRACTION,
+) -> tuple[int, tuple[float, float], bool]:
+    """One step of the lock's own exposure and white balance, from a frame (BGR) taken with
+    `exposure_us` and `colour_gains` (red, blue): (new exposure, new gains, steady).
+
+    White balance: the centre part (the tray) is taken as neutral on average (grey world),
+    counting only pixels neither dark nor clipped. Exposure: the centre's median goes to
+    CENTRE_TARGET, unless that would clip the brightest of the whole picture (a white bin):
+    then less. The frame is gamma-encoded, so the steps are made in linear light (power 2.2)
+    and repeated until steady."""
+    px = centre(img, fraction).reshape(-1, 3).astype(np.float64)
+    hi = px.max(axis=1)
+    ok = (px.min(axis=1) > 20) & (hi < 250)
+    r_gain, b_gain = (float(g) for g in colour_gains)
+    steady = True
+    if ok.sum() >= max(50, 0.01 * len(px)):
+        b, g, r = (np.mean(px[ok, i]) for i in range(3))
+        # gamma-encoded means: their ratio to the power 2.2 is the ratio in linear light
+        nr = float(np.clip(r_gain * (g / r) ** 2.2, *GAIN_RANGE))
+        nb = float(np.clip(b_gain * (g / b) ** 2.2, *GAIN_RANGE))
+        steady = abs(nr / r_gain - 1) < 0.02 and abs(nb / b_gain - 1) < 0.02
+        r_gain, b_gain = nr, nb
+    lum = centre(img, fraction).mean(axis=2)
+    med = max(float(np.median(lum)), 1.0)
+    top = max(float(np.percentile(img.max(axis=2), 99.5)), 1.0)
+    scale = min((CENTRE_TARGET / med) ** 2.2, (HIGHLIGHT_MAX / top) ** 2.2)
+    scale = float(np.clip(scale, 0.25, 4.0))
+    steady = steady and abs(scale - 1) < 0.06
+    exposure = int(np.clip(exposure_us * scale, *EXPOSURE_RANGE_US))
+    return exposure, (r_gain, b_gain), steady
+
+
+def focus_metric(gray: np.ndarray, centre_fraction: float = CENTRE_FRACTION) -> float:
     """Variance of the Laplacian on the centre region (higher = sharper)."""
-    h, w = gray.shape[:2]
-    ch, cw = int(h * centre_fraction), int(w * centre_fraction)
-    crop = gray[(h - ch) // 2 : (h + ch) // 2, (w - cw) // 2 : (w + cw) // 2].astype(np.float64)
+    crop = centre(gray, centre_fraction).astype(np.float64)
     lap = (
         -4 * crop[1:-1, 1:-1] + crop[:-2, 1:-1] + crop[2:, 1:-1] + crop[1:-1, :-2] + crop[1:-1, 2:]
     )
@@ -350,7 +405,16 @@ class Camera:
         c = within_limits(controls_for(self.locked_settings, self.adjust, has_af), self.limits)
         if not has_af:
             c = {k: v for k, v in c.items() if k not in ("AfMode", "LensPosition")}
+        elif c.get("AfMode") == 2:  # continuous autofocus: on the centre, not a bin's edge
+            c |= self._af_centre()
         return c
+
+    def _af_centre(self) -> dict[str, Any]:
+        """Autofocus windows on the centre part (CENTRE_FRACTION), where the camera has them."""
+        crop = (getattr(self.picam2, "camera_properties", {}) or {}).get("ScalerCropMaximum")
+        if crop is None or "AfWindows" not in self.picam2.camera_controls:
+            return {}
+        return {"AfMetering": 1, "AfWindows": [centre_window(crop)]}  # 1: AfMeteringWindows
 
     def set_adjust(self, adjust: Any) -> None:
         """New adjustments from the page, applied at once (no reopening)."""
@@ -366,7 +430,7 @@ class Camera:
         None without autofocus."""
         if "AfMode" not in self.picam2.camera_controls:
             return None
-        self.picam2.set_controls({"AfMode": 1})  # controls.AfModeEnum.Auto
+        self.picam2.set_controls({"AfMode": 1} | self._af_centre())  # AfModeEnum.Auto, centre
         self.picam2.autofocus_cycle()
         pos = self.picam2.capture_metadata().get("LensPosition")
         return None if pos is None else float(pos)
