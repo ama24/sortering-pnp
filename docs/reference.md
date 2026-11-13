@@ -117,6 +117,11 @@ the bend. It prints standing on the motor plate, with no supports.
   never when letting go. `off()` (Stop, errors, exit) only sends `TARGET=0` after the pump was
   switched on, so it never cools a heater someone is printing with. Put the heater back before
   printing again.
+- **Pump on the board's fan output** (`pump_switch: fan`): the pump goes on the part-cooling fan's
+  connector (Klipper's `[fan]`) in place of the fan. `M106 S255` grabs, `M107` lets go. No heater
+  check is involved, so there is no time limit. The output gives about 1 A on Creality boards:
+  the pump must draw less; a `[fan]` `max_power` under 1 runs it slower. `M107` is sent only
+  after an `M106` of its own, so a print's fan is never stopped.
 - **Servo angles:** each type has its own (jaws closed 20° / open 90°, magnet on 160° / off 20°,
   in [pickers.py](../src/sortering_pnp/pickers.py)); `picker.grab_angle` and
   `picker.release_angle` in `configs/machine.yaml` override them.

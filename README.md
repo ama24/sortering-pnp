@@ -356,6 +356,9 @@ Power comes straight from the printer's 24 V supply, as part of the conversion:
   let go), so there is nothing to add to printer.cfg. Klipper's heater check stops the printer
   if the output stays on longer than about 20 s (hotend) or 60 s (bed) without warming; a part
   is held only a few seconds. Put the heater back before printing again.
+- **Or the board's part-cooling fan output:** the pump goes on the fan's connector in place of
+  the fan, switched with `M106 S255` / `M107`. No time limit; the pump must draw less than the
+  output gives (about 1 A on Creality boards).
 
 The page says whether the pins are ready. A pump is a plain on/off pin and needs nothing more.
 Servos use the Pi's hardware PWM, which `install-pi.sh` turns on (reboot once after the first

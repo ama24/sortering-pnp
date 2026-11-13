@@ -15,6 +15,10 @@ Klipper's verify_heater stays on: it stops the printer if the output stays on lo
 default), so a part is never held that long; if the heater is still plugged in, it warms and
 the pump is refused above `printer.max_hotend_c`.
 
+Or on the board's part-cooling fan output (`pump_switch: fan`, Klipper's [fan]): M106 S255
+switches it on, M107 off. No heater check is involved, so a part may be held as long as needed;
+the pump must draw no more than the fan output gives (about 1 A on Creality boards).
+
 Motion waits until Klipper has finished every move (M400) before it calls grab or release.
 When the program stops, fails or ends, `off()` switches the pump off; a MOSFET module's
 pull-down also keeps it off while nothing drives the pin.
@@ -42,6 +46,7 @@ PERMS_WAIT_S = 3.0  # udev hands a newly exported channel's files to the gpio gr
 HEATERS = {"bed": "heater_bed", "hotend": "extruder"}  # picker.pump_switch -> Klipper heater
 HEATER_LAG_S = 0.4  # Klipper sets a heater's output at its next temperature reading (0.3 s)
 HEATER_ON_LIMIT_S = {"heater_bed": 60.0, "extruder": 20.0}  # verify_heater's check_gain_time
+FAN_LAG_S = 0.1  # M106 / M107 take effect at once (the moves are done: M400)
 
 
 def _write(path: Path, value: str, sleep: Callable[[float], None] = time.sleep) -> None:
@@ -113,6 +118,8 @@ class HeaterPump:
     unplugged from that output). on() asks for `target` C; off() for 0, only after an on(): so
     stopping the program never touches a heater someone is printing with."""
 
+    lag_s = HEATER_LAG_S
+
     def __init__(
         self,
         printer: Printer,
@@ -176,6 +183,44 @@ class HeaterPump:
 
     def _send(self, target: float) -> None:
         self.printer.gcode(f"SET_HEATER_TEMPERATURE HEATER={self.heater} TARGET={target:g}")
+
+
+class FanPump:
+    """A pump on the printer board's part-cooling fan output (Klipper's [fan]): M106 S255 on,
+    M107 off, only after an on(), so stopping the program never stops a print's fan."""
+
+    switch = "fan"
+    lag_s = FAN_LAG_S
+
+    def __init__(self, printer: Printer) -> None:
+        self.printer = printer
+        self._on = False
+
+    @property
+    def is_on(self) -> bool:
+        return self._on
+
+    def check(self) -> None:
+        """Klipper is ready and has a part-cooling fan ([fan])."""
+        st = self.printer.status()
+        if not st.ready:
+            raise PrinterError(f"Klipper is not ready ({st.state}): it switches the pump")
+        if st.fan_speed is None:
+            raise PrinterError("Klipper has no [fan]: choose another pump switch")
+
+    def on(self) -> None:
+        self.check()
+        self.printer.gcode("M106 S255")
+        self._on = True
+
+    def off(self) -> None:
+        if not self._on:
+            return
+        self._on = False
+        self.printer.gcode("M107")
+
+    def close(self) -> None:
+        self.off()
 
 
 def _gpiozero_output(pin: int) -> Any:
@@ -245,6 +290,10 @@ class PiPins:
                     pk.pump_heater_target,
                     self.m.printer.max_hotend_c,
                 )
+            elif t.pump and pk.pump_switch == "fan":
+                if self.printer is None:
+                    raise PrinterError("no printer to switch the pump through")
+                self._pump = FanPump(self.printer)
             elif t.pump:
                 self._pump = self._output(pk.action_pin)
             else:
@@ -268,7 +317,7 @@ class PiPins:
             return False, str(exc)
         pk = self.m.picker
         t = pk.kind
-        if isinstance(self._pump, HeaterPump):
+        if isinstance(self._pump, (HeaterPump, FanPump)):
             try:
                 if not self._pump.is_on:  # letting go is never refused
                     self._pump.check()
@@ -300,8 +349,8 @@ class PiPins:
                 self._pump.on()
             else:
                 self._pump.off()
-            if isinstance(self._pump, HeaterPump):
-                self._sleep(HEATER_LAG_S)
+            if isinstance(self._pump, (HeaterPump, FanPump)):
+                self._sleep(self._pump.lag_s)
         else:
             angle = pk.grab_angle if holding else pk.release_angle
             if angle is None:
