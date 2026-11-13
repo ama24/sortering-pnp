@@ -346,7 +346,7 @@ button.p{font-weight:600}button.big{padding:11px 18px}
     <details style="margin-top:4px"><summary>Measured square</summary><div class="row" style="margin-top:6px"><label>square<input id="calsq" type="number" step="0.01" style="width:84px">mm</label><label>thickness<input id="calth" type="number" step="0.1" value="0" style="width:72px">mm</label><button class="b s" onclick="calSettings()">Save</button></div></details></li>
    <li>Printer homed, tray empty, lights as when sorting.</li>
   </ol>
-  <div class="row"><button id="calgo" class="b p" onclick="calStart()">Calibrate</button><span id="calmsg2" class="note"></span></div>
+  <div class="row"><button id="calgo" class="b p" onclick="calStart()">Calibrate</button><button class="b s" onclick="calLock()" title="only exposure, white balance and focus, from the centre: the lens and position stay">Lock again</button><span id="calmsg2" class="note"></span></div>
   <div id="calrun" class="calrun" hidden><b id="calphase"></b><p id="caltext" style="margin:4px 0 8px"></p><div id="calbars"></div></div>
   <div class="calrun" id="calskip"><b>Skip for now</b>
    <p class="note" style="margin:4px 0 8px">Without calibration: straight down from this height, an ideal lens.</p>
@@ -995,6 +995,7 @@ function renderCal(c){CAL=c;const b=c.board,j=c.job;
  $("calphase").textContent=names[j.phase]||j.phase;$("calphase").className=j.phase==="error"?"bad":j.phase==="done"?"ok":"";$("caltext").textContent=j.message;
  $("calbars").innerHTML=["lens","solve","flat","position","done"].includes(j.phase)?`<div class="bar"><span style="width:${Math.min(100,100*j.views/j.min_views)}%"></span></div><span class="note">${j.views} of at least ${j.min_views} photos</span> <div class="bar"><span style="width:${Math.min(100,100*j.coverage/j.want_coverage)}%"></span></div><span class="note">${Math.round(j.coverage*100)} % of the picture covered (${Math.round(j.want_coverage*100)} % needed)</span>`:"";}
 async function calStart(){const j=CAL&&CAL.job;try{if(j&&j.running){renderCal(await api("api/calibration/cancel",{}));return;}flash("calmsg2","parking the bed…");renderCal(await api("api/calibration/start",{}));flash("calmsg2","");}catch(e){flash("calmsg2",e.message,1);}}
+async function calLock(){try{flash("calmsg2","parking the bed, locking the camera (about a minute)…");renderCal(await api("api/calibration/lock",{}));flash("calmsg2","camera locked");}catch(e){flash("calmsg2",e.message,1);}}
 async function calSettings(){try{renderCal(await api("api/calibration/settings",{square_mm:+$("calsq").value||null,thickness_mm:+$("calth").value||0}));flash("calmsg2","saved");}catch(e){flash("calmsg2",e.message,1);}}
 async function calHeight(){try{renderCal(await api("api/calibration/height",{height_mm:+$("calh").value}));flash("calhmsg","saved: used from now on");}catch(e){flash("calhmsg",e.message,1);}}
 async function camOrient(action){if(!confirm("Turn the picture? Camera to printer (Setup, step 6) must be redone."))return;
