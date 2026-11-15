@@ -167,6 +167,7 @@ class Runner:
         self._tool: str | None = None  # the tool Klipper said is mounted, when last asked
         self._calib_markers: list[dict[str, Any]] = []  # the codes in the last calibration photo
         self._calib_fit: dict[str, Any] | None = None  # the last Fit (Camera to printer)
+        self._fit_height_said = False  # old Camera to printer points without their height
 
     # ------------------------------------------------------------------ files
     @property
@@ -204,7 +205,57 @@ class Runner:
         return copy.deepcopy(cached[1])
 
     def calibration(self) -> BedCalibration | None:
-        return BedCalibration.load(self.transform_path)
+        cal = BedCalibration.load(self.transform_path)
+        return None if cal is None else self._follow_height(cal)
+
+    def _nominal_height(self) -> float | None:
+        """The camera's height while there is no camera calibration (Skip for now), else None."""
+        if getattr(self.vision, "calibration", None) is not None:
+            return None
+        h = getattr(self.vision, "nominal_height_mm", None)
+        return None if h is None else float(h)
+
+    def _follow_height(self, cal: BedCalibration) -> BedCalibration:
+        """Camera to printer's points keep the camera height they were taken with: after a
+        change of the height (no calibration) their plate positions are moved to the new one
+        (straight down: a code's distance from below the lens grows with height - its own
+        height) and refitted, so the fit, the layout and the drawn bins stay right. Points from
+        before the height was kept with them: said once (redo Camera to printer)."""
+        h_now = self._nominal_height()
+        cam = getattr(self.vision, "nominal", None)
+        if h_now is None or cam is None or not cal.pairs:
+            return cal
+        olds = [p.get("cam_height_mm") for p in cal.pairs]
+        if any(o is None for o in olds):
+            if not getattr(self, "_fit_height_said", False):
+                self._fit_height_said = True
+                self.say(
+                    "Camera to printer was taken before its camera height was kept: if the bins "
+                    "look shifted, redo it (Setup, Camera to printer: Clear points)"
+                )
+            return cal
+        if all(abs(float(o) - h_now) < 0.05 for o in olds):
+            return cal
+        nadir = np.asarray(cam.centre_in_plate[:2], dtype=float)
+        pairs = []
+        for p, old in zip(cal.pairs, olds, strict=True):
+            z = float(p.get("z", 0.0))
+            k = (h_now - z) / (float(old) - z)
+            plate = nadir + (np.asarray(p["plate"], dtype=float) - nadir) * k
+            pairs.append(
+                {**p, "plate": [round(float(v), 3) for v in plate], "cam_height_mm": h_now}
+            )
+        try:
+            new = BedCalibration.fit(pairs)
+        except ValueError:
+            log.warning("Camera to printer: the points do not fit at %.0f mm", h_now)
+            return cal
+        new.save(self.transform_path)
+        self.note(
+            f"Camera to printer moved to the camera height {h_now:g} mm "
+            f"(was {float(olds[0]):g}): worst error {max(new.residuals_mm):.2f} mm"
+        )
+        return new
 
     def transform(self) -> Transform2D:
         cal = self.calibration()
@@ -1913,7 +1964,15 @@ class Runner:
                     f"code {marker} first"
                 )
         self.calib_pairs = [p for p in self.calib_pairs if p["marker"] != marker]
-        pair = {"marker": marker, "plate": [round(v, 3) for v in mk.centre], "bed": tip[:2]}
+        pair: dict[str, Any] = {
+            "marker": marker,
+            "plate": [round(v, 3) for v in mk.centre],
+            "bed": tip[:2],
+            "z": round(_marker_plate_height(self.layout(), marker), 3),  # the code's height
+        }
+        h = self._nominal_height()
+        if h is not None:  # the height these plate mm were seen with (no calibration)
+            pair["cam_height_mm"] = h
         self.calib_pairs.append(pair)
         self.note(
             f"calibration point: marker {marker} plate {pair['plate']} -> printer {pair['bed']}"
