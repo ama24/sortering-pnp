@@ -529,6 +529,7 @@ class Runner:
             work = BinsView(c.bins_margin_mm) if c.bins_mask and c.source != "head" else None
         else:
             work = self._work_area(layout, T) if paint else None
+        self._plate_area(layout, T)
         if self.m.camera.source == "head":
             return self._head_shot(layout, T, area, work if isinstance(work, WorkArea) else None)
         with self._lock:
@@ -560,6 +561,19 @@ class Runner:
                         else self.vision.capture(name, heights)
                     )
         return self._finish_shot(shot, layout, T)
+
+    def _plate_area(self, layout: Layout, T: Transform2D | None) -> None:
+        """The tray floor (plate frame) for the camera's colour measurement (vision.py:
+        CameraVision.plate_area_mm); unknown without T (the calibration's working area then)."""
+        if not hasattr(self.vision, "plate_area_mm"):
+            return
+        area = None
+        if T is not None:
+            try:
+                area = T.inverse().apply(tray_rect(*layout.work_rect()))
+            except Exception as exc:  # noqa: BLE001 - only where the colours are measured
+                log.debug("no tray floor for the colours: %s", exc)
+        self.vision.plate_area_mm = area
 
     def _work_area(self, layout: Layout, T: Transform2D | None) -> WorkArea | None:
         """The tray's inside (and its corner post) in the plate frame, for painting the rest."""

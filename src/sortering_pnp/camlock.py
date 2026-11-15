@@ -2,10 +2,12 @@
 
 Used by the Calibrate tab (Lock the camera), with the bed at the photo position and the tray empty.
 (Before sortering-pnp, this was `screwrig lock`.)
-Steps: full-resolution still mode -> let AE/AWB settle (spot metering) -> freeze them -> set the
-exposure and the colour gains again from the centre part (camera.centre_balance: the tray grey on
-average, the brightest of the whole picture, e.g. a white bin, not clipped) -> manual focus sweep
-(variance of Laplacian on the centre) -> save camera_settings.json.
+Steps: full-resolution still mode -> let AE/AWB settle (centre-weighted metering) -> freeze them
+-> set the exposure from the plate area (the centre part before a camera calibration) and the
+colour gains from the grey pixels of the picture (camera.centre_balance: white bins, the walls,
+never the blue or green plate; the brightest of the whole picture not clipped) -> manual focus
+sweep (variance of Laplacian on the centre) -> the plate's colour now (`plate_colour`: every
+photo is brought back to it, camera.follow_factors) -> save camera_settings.json.
 """
 
 from __future__ import annotations
@@ -18,7 +20,16 @@ from pathlib import Path
 
 import numpy as np
 
-from .camera import CENTRE_FRACTION, FULL_RES, best_focus, centre_balance, focus_metric
+from .camera import (
+    CENTRE_FRACTION,
+    FULL_RES,
+    best_focus,
+    centre_balance,
+    focus_metric,
+    is_noir,
+    oriented,
+    plate_colour,
+)
 
 log = logging.getLogger("sortering_pnp.camlock")
 
@@ -76,8 +87,8 @@ def _lock(picam2, controls, args: argparse.Namespace) -> int:  # noqa: ANN001 - 
         "AfMode": controls.AfModeEnum.Manual,
         "LensPosition": 1000.0 / args.distance_mm,
     }
-    if "AeMeteringMode" in picam2.camera_controls:  # a first guess from the middle already
-        start["AeMeteringMode"] = controls.AeMeteringModeEnum.Spot
+    if "AeMeteringMode" in picam2.camera_controls:  # a first guess from the middle (an area)
+        start["AeMeteringMode"] = controls.AeMeteringModeEnum.CentreWeighted
     picam2.set_controls(start)
     picam2.start()
     time.sleep(args.settle)
@@ -93,13 +104,20 @@ def _lock(picam2, controls, args: argparse.Namespace) -> int:  # noqa: ANN001 - 
     picam2.set_controls(locked)
     time.sleep(1.0)
     # the camera's own AE and AWB look at the whole picture (a white bin pulls them off): the
-    # exposure and the colours are set again from the centre part (camera.centre_balance)
+    # exposure is set again from the plate area, the colours from the grey pixels
+    # (camera.centre_balance); measured in the program's own pixels (flips, quarter turn)
+    turn = (bool(getattr(args, "hflip", False)), bool(getattr(args, "vflip", False)))
+    turn += (bool(getattr(args, "turn90", False)),)
+    area = getattr(args, "area_px", None)
+    area = None if area is None else np.asarray(area, float)
     steps = 0
     while steps < BALANCE_STEPS:
         steps += 1
         picam2.capture_array("main")  # a frame still exposed with the old values
-        img = picam2.capture_array("main")
-        new_exp, gains, steady = centre_balance(img, exposure, tuple(locked["ColourGains"]))
+        img = oriented(picam2.capture_array("main"), *turn)
+        new_exp, gains, steady = centre_balance(
+            img, exposure, tuple(locked["ColourGains"]), area_px=area
+        )
         if args.exposure_us:  # forced: only the colours
             new_exp = exposure
         exposure, locked["ExposureTime"], locked["ColourGains"] = new_exp, new_exp, list(gains)
@@ -124,6 +142,10 @@ def _lock(picam2, controls, args: argparse.Namespace) -> int:  # noqa: ANN001 - 
     picam2.set_controls({"LensPosition": lens})
     time.sleep(0.5)
     md = picam2.capture_metadata()
+    plate = plate_colour(oriented(picam2.capture_array("main"), *turn), area)
+    model = str((getattr(picam2, "camera_properties", {}) or {}).get("Model", ""))
+    if is_noir(model):
+        log.warning("camera %s has no infrared filter: sunlight will tint the photos", model)
 
     settings = {
         "ExposureTime": exposure,
@@ -135,7 +157,14 @@ def _lock(picam2, controls, args: argparse.Namespace) -> int:  # noqa: ANN001 - 
         "sensor_mode": {"size": list(mode["size"]), "bit_depth": mode["bit_depth"]},
         "format": "RGB888 (BGR byte order, saved as PNG)",
         "focus_sweep": {"positions": [float(p) for p in pos], "scores": sc},
-        "centre_balance": {"fraction": CENTRE_FRACTION, "steps": steps},
+        "centre_balance": {
+            "fraction": CENTRE_FRACTION,
+            "steps": steps,
+            "area": "plate" if area is not None else "centre",
+        },
+        # the plate's colour with these settings (linear B, G, R; G = 1): photos follow it
+        "plate_colour": None if plate is None else {"bgr": plate[0].tolist(), "area": plate[1]},
+        "model": model,
         "metadata_after_lock": {
             k: (list(v) if isinstance(v, tuple) else v)
             for k, v in md.items()

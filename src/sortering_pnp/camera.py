@@ -27,6 +27,17 @@ CENTRE_TARGET = 110.0  # the centre's median brightness (0..255) the lock aims f
 HIGHLIGHT_MAX = 235.0  # ... but the brightest 0.5 % of the whole picture stays below this
 GAIN_RANGE = (0.5, 8.0)  # colour gains are kept inside this
 EXPOSURE_RANGE_US = (50, 200_000)
+GAMMA = 2.2  # the frames are gamma-encoded: colour sums are made in linear light (power 2.2)
+# a "grey" pixel: red/green and blue/green within this of 1 (natural log: 0.3 = about 35 %).
+# The TPU plate is blue or green: far outside, so it never decides the white balance.
+GREY_TOLERANCE = 0.3
+GREY_TOLERANCE_WIDE = 0.5  # tried when nothing is that grey (a strong cast at the start)
+MIN_PIXELS = 200  # fewer usable pixels than this: nothing is changed
+SAMPLE_PIXELS = 250_000  # measured on about this many pixels (every n-th row and column)
+# each photo: the plate's colour is brought back to its colour at the lock (sun, clouds), by
+# at most this factor per channel (more: not a change of light, e.g. no plate in view)
+FOLLOW_RANGE = (0.6, 1.6)
+FOLLOW_DEADBAND = 0.02  # smaller differences are left alone (no colour jitter between photos)
 
 
 def centre(img: np.ndarray, fraction: float = CENTRE_FRACTION) -> np.ndarray:
@@ -43,40 +54,177 @@ def centre_window(crop_max: tuple[int, int, int, int], fraction: float = CENTRE_
     return (x + (w - cw) // 2, y + (h - ch) // 2, cw, ch)
 
 
+def _step(img: np.ndarray) -> int:
+    h, w = img.shape[:2]
+    return max(1, int(np.sqrt(h * w / SAMPLE_PIXELS)))
+
+
+def sample(img: np.ndarray) -> np.ndarray:
+    """Every n-th row and column, about SAMPLE_PIXELS pixels (BGR, N x 3)."""
+    n = _step(img)
+    return img[::n, ::n].reshape(-1, 3)
+
+
+def area_pixels(
+    img: np.ndarray, area_px: np.ndarray | None = None, fraction: float = CENTRE_FRACTION
+) -> tuple[np.ndarray, str]:
+    """The pixels (BGR, N x 3, sampled) of the plate area `area_px` (a polygon in the picture's
+    pixels: where the parts lie), or of the centre part without one or when it is hardly in
+    the picture: (pixels, "plate" | "centre")."""
+    n = _step(img)
+    if area_px is not None and len(area_px) >= 3:
+        import cv2
+
+        small = img[::n, ::n]
+        mask = np.zeros(small.shape[:2], np.uint8)
+        pts = np.round(np.asarray(area_px, float) / n).astype(np.int32)
+        cv2.fillPoly(mask, [pts], 255)
+        if int(np.count_nonzero(mask)) >= MIN_PIXELS:
+            return small[mask > 0].reshape(-1, 3), "plate"
+    return centre(img, fraction)[::n, ::n].reshape(-1, 3), "centre"
+
+
+def linear(px: np.ndarray) -> np.ndarray:
+    """Gamma-encoded 0..255 values in linear light, 0..1."""
+    return (np.asarray(px, np.float64) / 255.0) ** GAMMA
+
+
+def _usable(px: np.ndarray) -> np.ndarray:
+    """Neither clipped in any channel nor dark."""
+    return (px.max(axis=1) < 250) & (px.mean(axis=1) > 15)
+
+
+def grey_reference(px: np.ndarray, tolerance: float = GREY_TOLERANCE) -> np.ndarray | None:
+    """The colour of the light (linear B, G, R) from the near-neutral pixels of `px` (BGR): the
+    brighter half of the unclipped pixels whose red/green and blue/green are within `tolerance`
+    (else GREY_TOLERANCE_WIDE) of grey (white bins, the tray's walls, the codes' white, metal parts). Coloured surfaces
+    (the blue or green TPU plate, a red bin) are left out instead of being made grey, as plain
+    grey world does. None: too few grey pixels (nothing to go by)."""
+    px = px[_usable(px)]
+    if len(px) < MIN_PIXELS:
+        return None
+    lin = linear(px) + 1e-6
+    lr, lb = np.log(lin[:, 2] / lin[:, 1]), np.log(lin[:, 0] / lin[:, 1])
+    near = (np.abs(lr) < tolerance) & (np.abs(lb) < tolerance)
+    if int(near.sum()) < MIN_PIXELS and tolerance < GREY_TOLERANCE_WIDE:
+        near = (np.abs(lr) < GREY_TOLERANCE_WIDE) & (np.abs(lb) < GREY_TOLERANCE_WIDE)
+    if int(near.sum()) < MIN_PIXELS:
+        return None
+    grey = lin[near]
+    lum = grey.sum(axis=1)
+    return np.median(grey[lum >= np.median(lum)], axis=0)
+
+
+def plate_colour(
+    img: np.ndarray, area_px: np.ndarray | None = None, fraction: float = CENTRE_FRACTION
+) -> tuple[np.ndarray, str] | None:
+    """The plate's colour (linear B, G, R; green = 1) and where it was measured ("plate" or
+    "centre"): the median of the area's usable pixels (the parts on it are few), or None."""
+    px, where = area_pixels(img, area_px, fraction)
+    px = px[_usable(px)]
+    if len(px) < MIN_PIXELS:
+        return None
+    b, g, r = np.median(linear(px), axis=0)
+    if g <= 0 or b <= 0 or r <= 0:
+        return None
+    return np.array([b / g, 1.0, r / g]), where
+
+
 def centre_balance(
     img: np.ndarray,
     exposure_us: float,
     colour_gains: tuple[float, float],
     fraction: float = CENTRE_FRACTION,
+    area_px: np.ndarray | None = None,
 ) -> tuple[int, tuple[float, float], bool]:
     """One step of the lock's own exposure and white balance, from a frame (BGR) taken with
     `exposure_us` and `colour_gains` (red, blue): (new exposure, new gains, steady).
 
-    White balance: the centre part (the tray) is taken as neutral on average (grey world),
-    counting only pixels neither dark nor clipped. Exposure: the centre's median goes to
-    CENTRE_TARGET, unless that would clip the brightest of the whole picture (a white bin):
-    then less. The frame is gamma-encoded, so the steps are made in linear light (power 2.2)
-    and repeated until steady."""
-    px = centre(img, fraction).reshape(-1, 3).astype(np.float64)
-    hi = px.max(axis=1)
-    ok = (px.min(axis=1) > 20) & (hi < 250)
+    White balance: from the grey pixels of the whole picture (grey_reference), never from the
+    plate's average: the plate is blue or green, and making it grey gave the red cast (all the
+    more in sunlight, when its red channel came out of the dark and was counted). No grey
+    pixels: the gains stay as they are (the camera's own AWB). Exposure: the median of the
+    plate area (`area_px`, else the centre part) goes to CENTRE_TARGET, unless that would clip
+    the brightest of the whole picture (a white bin): then less. In linear light, repeated
+    until steady."""
     r_gain, b_gain = (float(g) for g in colour_gains)
     steady = True
-    if ok.sum() >= max(50, 0.01 * len(px)):
-        b, g, r = (np.mean(px[ok, i]) for i in range(3))
-        # gamma-encoded means: their ratio to the power 2.2 is the ratio in linear light
-        nr = float(np.clip(r_gain * (g / r) ** 2.2, *GAIN_RANGE))
-        nb = float(np.clip(b_gain * (g / b) ** 2.2, *GAIN_RANGE))
+    ref = grey_reference(sample(img))
+    if ref is not None:
+        b, g, r = ref
+        nr = float(np.clip(r_gain * g / r, *GAIN_RANGE))
+        nb = float(np.clip(b_gain * g / b, *GAIN_RANGE))
         steady = abs(nr / r_gain - 1) < 0.02 and abs(nb / b_gain - 1) < 0.02
         r_gain, b_gain = nr, nb
-    lum = centre(img, fraction).mean(axis=2)
-    med = max(float(np.median(lum)), 1.0)
-    top = max(float(np.percentile(img.max(axis=2), 99.5)), 1.0)
-    scale = min((CENTRE_TARGET / med) ** 2.2, (HIGHLIGHT_MAX / top) ** 2.2)
+    px, _ = area_pixels(img, area_px, fraction)
+    med = max(float(np.median(px.mean(axis=1))), 1.0)
+    top = max(float(np.percentile(sample(img).max(axis=1), 99.5)), 1.0)
+    scale = min((CENTRE_TARGET / med) ** GAMMA, (HIGHLIGHT_MAX / top) ** GAMMA)
     scale = float(np.clip(scale, 0.25, 4.0))
     steady = steady and abs(scale - 1) < 0.06
     exposure = int(np.clip(exposure_us * scale, *EXPOSURE_RANGE_US))
     return exposure, (r_gain, b_gain), steady
+
+
+def follow_factors(
+    img: np.ndarray,
+    reference: Any,
+    area_px: np.ndarray | None = None,
+    fraction: float = CENTRE_FRACTION,
+) -> tuple[float, float] | None:
+    """Per-channel factors (blue, red; linear light) that bring the plate in `img` back to its
+    colour at the lock (`reference`: linear B, G, R with green = 1). (1, 1) for a difference
+    within FOLLOW_DEADBAND; None when the plate is not measurable or the change is larger than
+    a change of light (FOLLOW_RANGE): then the photo is left as it is."""
+    now = plate_colour(img, area_px, fraction)
+    if now is None:
+        return None
+    ref = np.asarray(reference, float)
+    kb, kr = float(ref[0] / now[0][0]), float(ref[2] / now[0][2])
+    lo, hi = FOLLOW_RANGE
+    if not (lo <= kb <= hi and lo <= kr <= hi):
+        log.info("colour follow: plate %.2f / %.2f off the lock's, left as it is", kb, kr)
+        return None
+    if abs(kb - 1) < FOLLOW_DEADBAND and abs(kr - 1) < FOLLOW_DEADBAND:
+        return 1.0, 1.0
+    return kb, kr
+
+
+def apply_factors(img: np.ndarray, blue: float, red: float) -> np.ndarray:
+    """`img` (BGR, uint8) with blue and red scaled in linear light (a lookup table per channel:
+    with a power-law gamma, k in linear light is k^(1/2.2) on the encoded values)."""
+    if blue == 1.0 and red == 1.0:
+        return img
+    v = np.arange(256, dtype=np.float64)
+    lut = np.stack([np.clip(v * f ** (1 / GAMMA), 0, 255) for f in (blue, 1.0, red)], axis=1)
+    lut = np.round(lut).astype(np.uint8)
+    try:
+        import cv2
+
+        return cv2.LUT(np.ascontiguousarray(img), lut.reshape(1, 256, 3))
+    except ImportError:  # pragma: no cover - OpenCV is there wherever photos are taken
+        return np.stack([lut[img[..., i], i] for i in range(3)], axis=-1)
+
+
+def oriented(img: np.ndarray, hflip: bool, vflip: bool, turn90: bool) -> np.ndarray:
+    """A frame of the camera without its transform, turned like the program's photos (the
+    flips, then the quarter turn): the lock measures in the same pixels as the calibration."""
+    if hflip:
+        img = img[:, ::-1]
+    if vflip:
+        img = img[::-1]
+    return turn_image(img, turn90)
+
+
+NOIR_WARNING = (
+    "camera %s has no infrared filter (NoIR): sunlight makes the photos red or pink, which no "
+    "white balance fully undoes (a standard Camera Module 3, an IR-cut filter, or no direct sun)"
+)
+
+
+def is_noir(model: str) -> bool:
+    """The sensor's name says NoIR (libcamera: imx708_noir, imx708_wide_noir)."""
+    return "noir" in model.lower()
 
 
 def focus_metric(gray: np.ndarray, centre_fraction: float = CENTRE_FRACTION) -> float:
@@ -377,6 +525,9 @@ class Camera:
         self.locked = bool(self.settings)
         self.picam2 = Picamera2()
         self.limits = getattr(self.picam2, "camera_controls", {}) or {}
+        self.model = str((getattr(self.picam2, "camera_properties", {}) or {}).get("Model", ""))
+        if is_noir(self.model):
+            log.warning(NOIR_WARNING, self.model)
         self.settings = within_limits(self.settings, self.limits)  # what it can really run at
         try:
             mode = self.settings.get("sensor_mode") or {}
