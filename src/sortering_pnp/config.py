@@ -98,6 +98,9 @@ class Camera:
     # + keeps this much of the wall's foot, - paints this much more of the floor's edge
     # (Calibrate tab: Camera cropping)
     mask_margin_mm: float = 0.0
+    # each photo: the plate's colour brought back to its colour at the lock (the sun, clouds:
+    # camera.follow_factors, in software; the camera stays locked). False: the lock's colours only
+    colour_follow: bool = True
     # looking into the bins (start-up check, Resync, after a bin change): only the floors of
     # the bins whose codes are in the photo go to the model, their codes painted too
     # (trayview.py: the bins view); False: the whole photo

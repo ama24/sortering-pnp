@@ -16,6 +16,9 @@ sessions are pages of sortering-pnp (`photos.py`: Calibrate and Photos tabs), wi
 `calib/` and the session format in `session.py`. The camera stays open (`CameraVision._camera`,
 automatic settings until locked) with a second 1280x720 stream for the live picture
 (`/api/camera/live.mjpg`, only while the Camera Calibration tab is open).
+White balance never comes from the plate's average (the TPU plate is blue or green): the lock
+uses the grey pixels (`camera.grey_reference`) and notes the plate's colour (`plate_colour`);
+every photo is brought back to it in software (`CameraVision._follow`, `camera.colour_follow`).
 Never add another program or path that sends G-code.
 
 **sortering-pnp runs on its own.** It never reads the other repositories' folders for data: files

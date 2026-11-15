@@ -383,11 +383,23 @@ used otherwise). Home the printer, empty the tray, light as when sorting. Then *
 button ([calibjob.py](../src/sortering_pnp/calibjob.py)), which says on the page what to do:
 1. **Park:** the bed goes to the photo position.
 2. **Lock** (about a minute): the camera measures the light and focus once and freezes exposure,
-   gain, white balance and lens position, so every later photo looks the same. All of it is
-   measured on the **centre of the picture** (the middle 40 %, where the tray is), not the whole
-   of it: a white bin at the side neither brightens nor tints the photos. The centre is made grey
-   on average (white balance), at a middle brightness, but never so bright that the brightest
-   part of the whole picture (e.g. that white bin) burns out; the focus is the sharpest centre.
+   gain, white balance and lens position, so every later photo looks the same. The brightness
+   is measured on the **plate area** (the calibration's working area; before a calibration the
+   middle 40 % of the picture): a middle brightness, but never so bright that the brightest part
+   of the whole picture (e.g. a white bin) burns out. The **white balance** comes from what is
+   grey in the picture (white bins, the tray's walls, the codes' white), never from the plate:
+   the TPU plate is blue or green, and making it grey on average turns everything red (the old
+   way, worst in sunlight). Nothing grey in view: the camera's own white balance is kept. The
+   lock also notes the plate's colour; the focus is the sharpest centre.
+   **Every photo** after the lock is brought back to that plate colour (in software, a factor per
+   colour in linear light; the camera itself stays locked), so sun or clouds after the lock do
+   not tint the photos and the model always sees the same colours. Small differences (under
+   2 %) are left alone; a change of more than a change of light (no plate in view) is not
+   corrected. `camera.colour_follow: false` switches it off; it is off for the head camera.
+   Lock again after this update (older locks have no plate colour). A **NoIR** camera (no
+   infrared filter; the log warns: `imx708_noir`) turns red or pink in sunlight in a way no white
+   balance fully undoes: use the standard Camera Module 3 or an IR-cut filter, or keep direct sun
+   off the tray.
    Until then the live picture runs on the camera's automatic settings, its autofocus on the
    centre too. **Lock** can be run again on its own. Manual values in the camera adjustments
    still go over the locked ones: set white balance and exposure back to *auto* to use the

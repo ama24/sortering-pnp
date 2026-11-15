@@ -35,6 +35,7 @@ camera:
   mask_margin_mm: 0            # + keeps the wall's foot, - paints more of the floor's edge (Calibrate tab)
   bins_mask: true              # looking into the bins: only the floors of the bins seen in the photo go to the model
   bins_margin_mm: 0            # bins view: + keeps more of each floor's edge, - paints more of it (Calibrate tab)
+  colour_follow: true          # each photo: the plate kept at its colour at the lock (sun, clouds); false: the lock's colours only
   hflip: true                  # the camera flips its picture left-right (both flips: turned 180 deg, a camera mounted the other way round)
   vflip: true                  # ... and top-bottom (Camera Calibration tab: Rotate 90° / Mirror)
   turn90: false                # then turned 90 deg clockwise (in software)

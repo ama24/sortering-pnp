@@ -203,6 +203,9 @@ class CameraVision:
         self._wanted = 0.0  # when the live picture was last asked for
         self._reader: threading.Thread | None = None
         self.live_error: str | None = None
+        # the tray floor (plate mm, z = 0) when the layout is known (Runner.take_shot): the
+        # colours are measured there; else the calibration's working area, else the centre
+        self.plate_area_mm: np.ndarray | None = None
 
     def reload_setup(self, strict: bool = False) -> None:
         """Vision settings, camera calibration, parts table and class list (the active model's
@@ -424,7 +427,8 @@ class CameraVision:
         with self._cam_lock:
             cam = self._camera()
             if cam is not None:
-                return cam.grab()
+                img, md = cam.grab()
+                return self._follow(cam, img), md
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "frame.png"
             cmd = self._rpicam()
@@ -435,6 +439,44 @@ class CameraVision:
         from sortering_pnp.camera import turn_image
 
         return turn_image(img, self.m.camera.turn90), {}
+
+    def plate_area_px(self) -> np.ndarray | None:
+        """Where the parts lie, in the photo's pixels: the tray floor (`plate_area_mm`, from the
+        layout) or the calibration's working area; None without a camera calibration (then
+        the centre part is used)."""
+        poly = self.plate_area_mm
+        if poly is None:
+            wa = (getattr(self, "calibration", None) or {}).get("working_area_mm") or {}
+            if not wa.get("origin") or not wa.get("size"):
+                return None
+            (x, y), (w, h) = wa["origin"], wa["size"]
+            poly = np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], float)
+        if getattr(self, "calibration", None) is None:
+            return None
+        poly = np.asarray(poly, float)
+        return np.asarray(self.cam_full.project(np.c_[poly, np.zeros(len(poly))]), float)
+
+    def _follow(self, cam: Any, img: np.ndarray) -> np.ndarray:
+        """The photo with the plate brought back to its colour at the lock (camera.follow_factors:
+        the sun or clouds changed the light since): a per-channel factor in linear light, the
+        camera itself staying locked. Unchanged without a lock's plate colour, for the head
+        camera (its photos are tiles), or with camera.colour_follow off."""
+        from sortering_pnp.camera import apply_factors, follow_factors
+
+        ref = ((getattr(cam, "locked_settings", None) or {}).get("plate_colour") or {}).get("bgr")
+        m = getattr(self, "m", None)
+        if ref is None or m is None or not m.camera.colour_follow or m.camera.source == "head":
+            return img
+        try:
+            k = follow_factors(img, ref, self.plate_area_px())
+        except Exception as exc:  # noqa: BLE001 - never lose a photo over its colours
+            log.warning("colour follow: %s", exc)
+            return img
+        if k is None:
+            return img
+        if k != (1.0, 1.0):
+            log.info("colour follow: blue x%.3f, red x%.3f", *k)
+        return apply_factors(img, *k)
 
     def lock_camera(self, out: Path, distance_mm: float) -> dict[str, Any]:
         """The camera lock (camlock.py: exposure, gain, white balance, focus sweep) written to `out`; the
@@ -449,9 +491,18 @@ class CameraVision:
             if self.cam is not None:  # one Picamera2 at a time may hold the camera
                 self.cam.close()
                 self.cam = None
+            c = self.m.camera
+            area = self.plate_area_px()
             lock.run(
                 argparse.Namespace(
-                    out=str(out), settle=3.0, distance_mm=distance_mm, exposure_us=None
+                    out=str(out),
+                    settle=3.0,
+                    distance_mm=distance_mm,
+                    exposure_us=None,
+                    hflip=c.hflip,
+                    vflip=c.vflip,
+                    turn90=c.turn90,
+                    area_px=None if area is None else area.tolist(),
                 )
             )
             settings = read_json(out)
@@ -465,7 +516,7 @@ class CameraVision:
             cam = self._camera()
             if cam is not None:
                 cam.grab()  # the stream's waiting frame was exposed earlier, maybe still moving
-            img = cam.grab()[0] if cam is not None else None
+            img = self._follow(cam, cam.grab()[0]) if cam is not None else None
         if img is not None:
             if not cv2.imwrite(str(path), img, [cv2.IMWRITE_JPEG_QUALITY, 95]):
                 raise OSError(f"could not write {path}")

@@ -106,13 +106,13 @@ def test_the_lock_uses_the_centre(tmp_path, monkeypatch):
     monkeypatch.setattr(camlock.time, "sleep", lambda s: None)
     controls = types.SimpleNamespace(
         AfModeEnum=types.SimpleNamespace(Manual=0),
-        AeMeteringModeEnum=types.SimpleNamespace(Spot=1),
+        AeMeteringModeEnum=types.SimpleNamespace(CentreWeighted=0, Spot=1),
     )
     cam = FakePicam()
     out = tmp_path / "camera_settings.json"
     args = argparse.Namespace(out=str(out), settle=0.0, distance_mm=300.0, exposure_us=None)
     assert camlock._lock(cam, controls, args) == 0  # noqa: SLF001
-    assert cam.sent[0]["AeMeteringMode"] == 1  # spot metering while AE settles
+    assert cam.sent[0]["AeMeteringMode"] == 0  # centre-weighted (an area) while AE settles
     s = json.loads(out.read_text())
     assert 1 <= s["centre_balance"]["steps"] <= 5
     _neutral_and_unclipped(shoot(s["ExposureTime"], tuple(s["ColourGains"])))
