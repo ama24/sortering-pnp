@@ -101,8 +101,22 @@ class Scene:
             self.gray = to_gray(self.image)
 
 
+NOMINAL_AREA_MM = (220.0, 220.0)  # the tray the model sees without a calibration
+NOMINAL_MARGIN_MM = 5.0
+
+
+def nominal_roi(cam: Camera, shift_mm: Sequence[float] = (0.0, 0.0)) -> dict[str, int]:
+    """The model's picture without a calibration: the tray (220 mm, +5 mm) under the nominal
+    camera, moved by shift_mm = [right, down] in the picture (plate +x is right, +y up)."""
+    right, down = float(shift_mm[0]), float(shift_mm[1])
+    return roi_for_area(cam, (right, -down), NOMINAL_AREA_MM, NOMINAL_MARGIN_MM)
+
+
 def load_scene(
-    image_path: Path, calibration: Mapping[str, Any] | None, nominal: Camera | None = None
+    image_path: Path,
+    calibration: Mapping[str, Any] | None,
+    nominal: Camera | None = None,
+    shift_mm: Sequence[float] = (0.0, 0.0),
 ) -> Scene:
     """Read a photo (full sensor frame, or already the ROI) and build the ROI camera.
 
@@ -120,7 +134,7 @@ def load_scene(
         source = "calibration"
     else:
         cam_full = nominal if nominal is not None else nominal_camera()
-        roi = roi_for_area(cam_full, (0.0, 0.0), (220.0, 220.0), 5.0)
+        roi = nominal_roi(cam_full, shift_mm)
         source = "nominal"
     h, w = img.shape[:2]
     if (w, h) == tuple(cam_full.image_size):

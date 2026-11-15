@@ -242,11 +242,30 @@ class Photos:
             img = frame.copy()
             if self.job is not None and self.job.running:
                 img = self.job.draw(img)
+            else:
+                img = self._draw_cut(img)
         ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 75])
         if not ok:
             raise OSError("could not encode the live picture")
         self._jpeg = (key, buf.tobytes())
         return self._jpeg[1]
+
+    def _draw_cut(self, img: np.ndarray) -> np.ndarray:
+        """The live picture with the rectangle the model gets (without a calibration: what
+        the Skip for now arrows move)."""
+        import cv2
+
+        roi = self.r.model_roi()
+        cam = getattr(self.r.vision, "cam_full", None)
+        if not roi or cam is None:
+            return img
+        s = img.shape[1] / float(cam.image_size[0])
+        x0, y0 = int(roi["x0"] * s), int(roi["y0"] * s)
+        x1, y1 = int((roi["x0"] + roi["w"]) * s) - 1, int((roi["y0"] + roi["h"]) * s) - 1
+        t = max(2, img.shape[1] // 400)
+        cv2.rectangle(img, (x0, y0), (x1, y1), (0, 0, 0), t + 2)
+        cv2.rectangle(img, (x0, y0), (x1, y1), (0, 220, 255), t)
+        return img
 
     def _coverage(self, w: int, h: int) -> Any:
         from sortering_pnp.camera import Coverage
@@ -345,6 +364,7 @@ class Photos:
             # without a calibration: straight down over the picture's centre, this high
             "height_mm": getattr(self.r.vision, "nominal_height_mm", None),
             "height_set": self.m.camera.height_mm is not None,
+            "crop_shift_mm": list(self.m.camera.crop_shift_mm),  # the arrows: [right, down]
             "camera": self._cam_key(),
             "board": {**self.spec().to_dict(), "size_mm": list(self.spec().size_mm)},
             "measured_square_mm": c.measured_square_mm,

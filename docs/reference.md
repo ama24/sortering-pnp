@@ -400,6 +400,12 @@ Camera to printer (Setup tab) absorbs where the camera really stands; what is le
 distortion and any tilt, so positions and lengths are less exact towards the picture's edge.
 A calibration made later replaces it at once.
 
+A camera mounted a little off the tray's middle cuts part of the tray off: move the model's
+picture with the arrows under the height (`camera.crop_shift_mm`, [right, down] mm, steps of 1,
+5 or 10 mm; **Centre** puts it back). The live picture shows the cut as a yellow frame and the
+Camera cropping card's "model" picture follows. Only the cut moves, never its size (the model's
+scale stays) nor the camera: positions and Camera to printer stay right.
+
 Before: download the tray board (7 x 6 squares of 15 mm, 105 x 90 mm: it lies flat in a 3 x 3
 tray, away from the corner post), print it at 100 % and glue it on stiff card (a caliper
 measurement of one square and the board's thickness can be entered, but the printed size is

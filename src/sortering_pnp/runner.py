@@ -631,6 +631,32 @@ class Runner:
         self.note(f"camera calibration skipped: straight down, {h:g} mm above the tray floor")
         return self.photos.state()
 
+    CROP_SHIFT_MAX_MM = 80.0
+
+    def camera_crop_shift(self, right_mm: float, down_mm: float) -> dict[str, Any]:
+        """Without a calibration: move the model's picture over the photo (Calibrate tab,
+        Skip for now: the arrows), for a camera not exactly over the tray's middle. Only the cut
+        moves; the camera, the positions and Camera to printer stay as they are."""
+        lim = self.CROP_SHIFT_MAX_MM
+        if not (abs(right_mm) <= lim and abs(down_mm) <= lim):
+            raise ValueError(f"move the picture by at most {lim:g} mm each way")
+        shift = [round(float(right_mm), 1), round(float(down_mm), 1)]
+        self.m.camera.crop_shift_mm = shift
+        self.remember_machine({"camera_crop_shift_mm": shift})
+        self.note(f"model's picture moved {shift[0]:g} mm right, {shift[1]:g} mm down")
+        return self.photos.state()
+
+    def model_roi(self) -> dict[str, int] | None:
+        """The part of the photo the model gets (full-resolution pixels): the calibration's,
+        else the nominal tray moved by camera.crop_shift_mm; None without a camera setup."""
+        from .measure.infer import nominal_roi
+
+        calib = getattr(self.vision, "calibration", None)
+        if calib and calib.get("roi"):
+            return dict(calib["roi"])
+        cam = getattr(self.vision, "nominal", None)
+        return None if cam is None else nominal_roi(cam, self.m.camera.crop_shift_mm)
+
     def camera_flip(self, hflip: bool, vflip: bool, turn90: bool | None = None) -> dict[str, Any]:
         """The picture's orientation (the camera's flips, both = turned 180 degrees, and a
         quarter turn in software), for photos and the live picture. What was fitted to the old
@@ -818,7 +844,7 @@ class Runner:
         img = paint_outside(
             frame, px(work.outline), [px(h) for h in work.holes], parse_colour(st["colour"])
         )
-        roi = (calib or {}).get("roi")
+        roi = (calib or {}).get("roi") or self.model_roi()
         if roi:  # the model gets this part of the photo (its size unchanged)
             x0, y0 = int(roi["x0"] * s), int(roi["y0"] * s)
             img = img[y0 : y0 + int(roi["h"] * s), x0 : x0 + int(roi["w"] * s)]
@@ -939,7 +965,7 @@ class Runner:
             if got is not None:
                 floors.append((m.marker, px(got.floor)))
         calib = getattr(self.vision, "calibration", None)
-        roi = (calib or {}).get("roi")
+        roi = (calib or {}).get("roi") or self.model_roi()
         if roi:  # the model gets this part of the photo (its size unchanged)
             x0, y0 = int(roi["x0"] * s), int(roi["y0"] * s)
             img = img[y0 : y0 + int(roi["h"] * s), x0 : x0 + int(roi["w"] * s)]
@@ -2018,57 +2044,68 @@ class Runner:
     )
 
     def _load_machine(self) -> None:
-        p = self.m.path(self.m.paths.machine)
+        if "mask_margin_mm" in self.apply_saved(self.m):
+            self.mask_checked = True
+
+    @classmethod
+    def apply_saved(cls, m: Machine) -> set[str]:
+        """The values set in the page (machine.json) over machine.yaml's; the keys found.
+        Called before the camera's setup is built (cli.py) as well as here: the camera's height,
+        quarter turn and lock must be in place when the vision setup reads them."""
+        p = m.path(m.paths.machine)
         if p is None or not p.is_file():
-            return
-        for k, v in (read_json(p) or {}).items():
-            if k in self.MACHINE_KEYS:
-                setattr(self.m.printer, k, v)
+            return set()
+        saved = read_json(p) or {}
+        for k, v in saved.items():
+            if k in cls.MACHINE_KEYS:
+                setattr(m.printer, k, v)
             elif k == "mask_margin_mm":
-                self.m.camera.mask_margin_mm = float(v)
-                self.mask_checked = True
+                m.camera.mask_margin_mm = float(v)
             elif k == "speed_pct":  # Device tab: Speed
-                self.m.run.speed_pct = float(v)
+                m.run.speed_pct = float(v)
             elif k == "run_mode" and v in RUN_MODES:  # Device tab: Mode
-                self.m.run.mode = str(v)
+                m.run.mode = str(v)
             elif k == "turbo_picks":
-                self.m.run.turbo_picks = max(1, int(v))
+                m.run.turbo_picks = max(1, int(v))
             elif k == "bins_margin_mm":  # Calibrate tab: Bins view
-                self.m.camera.bins_margin_mm = float(v)
+                m.camera.bins_margin_mm = float(v)
             elif k == "bins_mask":
-                self.m.camera.bins_mask = bool(v)
+                m.camera.bins_mask = bool(v)
             elif k == "mask_colour":  # Camera cropping, Calibrate tab
-                self.m.camera.mask_colour = str(v)
+                m.camera.mask_colour = str(v)
             elif k in ("camera_hflip", "camera_vflip", "camera_turn90"):  # Rotate / Mirror
-                setattr(self.m.camera, k.removeprefix("camera_"), bool(v))
+                setattr(m.camera, k.removeprefix("camera_"), bool(v))
             elif k == "camera_adjust":  # Camera Calibration tab: focus, colours, exposure
-                a = self.m.camera.adjust
+                a = m.camera.adjust
                 for ak, av in (v or {}).items():
                     if hasattr(a, ak):
                         setattr(a, ak, type(getattr(a, ak))(av))
                 a.lens_position = lens_dioptres(a.lens_position)  # an old mm value
+            elif k == "camera_crop_shift_mm":  # Calibrate tab, Skip for now: the arrows
+                m.camera.crop_shift_mm = [float(v[0]), float(v[1])]
             elif k == "camera_height_mm":  # Calibrate tab, Skip for now
-                self.m.camera.height_mm = float(v)
+                m.camera.height_mm = float(v)
             elif k == "picker_mode":  # chosen in the Setup tab
-                self.m.picker.set_type(str(v))
+                m.picker.set_type(str(v))
             elif k == "rotate_offset_deg":
-                self.m.picker.rotate_offset_deg = float(v)
+                m.picker.rotate_offset_deg = float(v)
             elif k == "size_check" and v in SIZE_CHECKS:  # Setup tab, Bins step
-                self.m.run.size_check = str(v)
+                m.run.size_check = str(v)
             elif k == "lower_to_drop":  # Setup tab, Picker step
-                self.m.picker.lower_to_drop = bool(v)
+                m.picker.lower_to_drop = bool(v)
             elif k == "pump_switch" and v in PUMP_SWITCHES:  # Setup tab, Picker step
-                self.m.picker.pump_switch = str(v)
+                m.picker.pump_switch = str(v)
             elif k == "lights" and isinstance(v, dict):  # Setup tab, Lights step
-                for name in self.LIGHT_KEYS:
+                for name in cls.LIGHT_KEYS:
                     if name in v:
-                        setattr(self.m.lights, name, type(getattr(self.m.lights, name))(v[name]))
+                        setattr(m.lights, name, type(getattr(m.lights, name))(v[name]))
             elif k == "camera_settings":  # locked in the Calibrate tab
-                self.m.camera.settings = str(v)
+                m.camera.settings = str(v)
             elif k == "calibration":
-                c = self.m.calibration
+                c = m.calibration
                 c.measured_square_mm = v.get("measured_square_mm", c.measured_square_mm)
                 c.board_thickness_mm = float(v.get("board_thickness_mm", c.board_thickness_mm))
+        return set(saved)
 
     def machine_values(self) -> dict[str, Any]:
         return {k: getattr(self.m.printer, k) for k in self.MACHINE_KEYS}
