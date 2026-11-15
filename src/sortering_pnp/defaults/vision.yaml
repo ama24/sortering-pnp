@@ -18,6 +18,7 @@ measure:
   crop_mode: scaled
   crop_margin: 1.2
   pose_conf: 0.5             # keypoint confidence needed to trust the keypoint model
+  size_check_margin: 0.25    # thread size check: within this share of the step from another size = clearly that size (run.size_check)
   measurable_tilt_deg: 15    # parts tilted more than this are not measured
   border_px: 3               # outlines this close to the photo's edge are cut: not measured
   method: auto               # auto (keypoints when confident, else edges) | keypoints | classical

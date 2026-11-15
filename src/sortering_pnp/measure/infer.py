@@ -23,7 +23,7 @@ from sortering_pnp.drawing import finite, pt
 from sortering_pnp.drawing import poly as int_poly
 from sortering_pnp.naming import UNKNOWN
 
-from .classical import classical_keypoints, to_gray
+from .classical import classical_keypoints, edge_widths, to_gray
 from .crops import crop_window
 from .geometry import ClassGeometry, Geometry, measure, nearest_size, thread_diameter_mm
 
@@ -65,6 +65,10 @@ class Settings:
     crop_mode: str = "scaled"  # must match the crops the keypoint model was trained on
     crop_margin: float = 1.2
     pose_conf: float = 0.5  # keypoint confidence needed to trust the keypoint model
+    # the thread size check: a clear mismatch when the shank's width (full-resolution edges)
+    # lies within this fraction of the step between two sizes from another size (0.25: a part
+    # called M3 measured 3.75 mm or more is an M4; nearer the middle it is not a mismatch)
+    size_check_margin: float = 0.25
     measurable_tilt_deg: float = 15.0
     border_px: int = 3  # masks touching the ROI border within this are "cut by the border"
     method: str = "auto"  # auto (A when confident, else B) | keypoints | classical
@@ -261,16 +265,42 @@ def measure_screw(
     out["measurable"] = measurable
     out["cut_by_border"] = bool(cut)
     if b is not None and b[1].shank_widths_px and geo.kind == "screw":  # standoffs: hex body
-        h_mid = geo.heights((geo.lengths or [10])[len(geo.lengths or [10]) // 2])["tip"]
-        centre = kp_b["tip"] if kp_b else np.mean(det.polygon, axis=0)
-        dia = thread_diameter_mm(b[1].shank_widths_px, scene.cam, centre, h_mid)
-        size = nearest_size(dia, METRIC_SIZES)
-        out["thread_diameter_mm"] = round(dia, 2)
-        out["size_check"] = (
-            "ok"
-            if abs(size - geo.d) < 1e-6
-            else f"mask width suggests M{size:g}, class is {geo.size}"
-        )
+        out.update(_size_check(scene, det, geo, st, b[1], gray, (mx0, my0), measurable))
+    return out
+
+
+def _size_check(
+    scene: Scene,
+    det: Detection,
+    geo: ClassGeometry,
+    st: Settings,
+    ek: Any,
+    gray: np.ndarray,
+    origin: tuple[int, int],
+    measurable: bool,
+) -> dict[str, Any]:
+    """The thread's diameter from the shank's edges at full resolution, against the class's
+    size. `size_mismatch` (the size it looks like) only when clearly another size, on a part
+    lying flat and whole: then it goes to the unsure bin (rules.py)."""
+    widths = edge_widths(gray, ek)
+    source = "edges"
+    if len(widths) < 3:
+        widths, source = ek.shank_widths_px, "mask"  # coarse: reported, never acted on
+    h_mid = geo.heights((geo.lengths or [10])[len(geo.lengths or [10]) // 2])["tip"]
+    centre = np.median(np.array([ek.keypoints["bearing"], ek.keypoints["tip"]]), axis=0)
+    dia = thread_diameter_mm(widths, scene.cam, centre + origin, h_mid)
+    out: dict[str, Any] = {"thread_diameter_mm": round(dia, 2), "thread_diameter_from": source}
+    if not np.isfinite(dia):
+        return out
+    size = nearest_size(dia, METRIC_SIZES)
+    if abs(size - geo.d) < 1e-6:
+        out["size_check"] = "ok"
+        return out
+    step = abs(size - geo.d)  # between the class's size and the one it looks like
+    clear = abs(dia - size) <= st.size_check_margin * step
+    out["size_check"] = f"width {dia:.2f} mm suggests M{size:g}, class is {geo.size}"
+    if clear and source == "edges" and measurable:
+        out["size_mismatch"] = f"M{size:g}"
     return out
 
 

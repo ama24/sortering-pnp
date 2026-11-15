@@ -323,6 +323,15 @@ Kinds of models and what they do here:
 | **pose** | measures length (stage 2, optional) | keypoints for a more precise length |
 | **classify** | re-checks classes (optional) | looks at a close-up of every part and corrects the class when it is at least `models.classifier_conf` sure |
 
+The classifier's crops are cut the way its model card's `classifier_crop` says (training-synth's
+`fixed` crops): the photo shrunk to `longest_side_px` (the stage-1 scale), a `size_px` square
+around each part, grey outside the photo, never resized. Then a part's size is in its pixels and
+the classifier may change the whole class (`labels: class`), or the type with stage 1's size
+(`labels: type`). A classifier without that block (older ones) saw every part enlarged to fill
+its picture and cannot judge sizes: it may change only the type (DIN912_M4 to DIN7984_M4, if
+stage 1 knows that class), never the size. The results keep `stage1_class` and what the
+classifier said.
+
 If the card has a recommended confidence, it is used for stage 1 (`models.use_recommended_conf`).
 
 > Only upload models you trust: `.pt` files are Python pickles and can contain code.
@@ -571,6 +580,12 @@ These rules apply to every strategy:
   group, parts with free space around them come first, then the most confident, then the
   nearest.
 - Detections below `run.min_score` go to the *unsure* bin.
+- The thread size check: on every screw lying flat and whole, the shank's width is measured
+  on the photo's own edges at full resolution (a tenth of a pixel, not the stage-1 mask, which
+  is a pixel or more off) and turned into mm. When it is clearly another size than the class
+  says (within `measure.size_check_margin`, 0.25 of the step, of the other size: a part called
+  M3 measured 3.75 mm or more), it goes to *unsure* (`run.size_check: unsure`; `report` only
+  says it). Nearer the middle it is only noted in the results (`size_check`).
 - UNKNOWN parts go to the *unknown* bin.
 - A part whose length decides its bin, but which can't be measured yet (tilted, covered), waits.
   After a few bed shakes it goes to *unsure*.

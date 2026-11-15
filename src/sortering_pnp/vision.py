@@ -143,6 +143,7 @@ def parts_from_result(
                 measurable=bool(o.get("measurable", False)),
                 unknown=bool(o.get("unknown", False)),
                 has_length=hr is not None,
+                size_seen=o.get("size_mismatch"),
                 grip_plate=g.point if g else None,
                 com_plate=g.com if g else None,
                 grip_method=g.method if g else "centre",

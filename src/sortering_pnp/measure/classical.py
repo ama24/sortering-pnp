@@ -146,6 +146,50 @@ def edge_keypoints(
     return EdgeKeypoints(kps, u, [float(w) for w in shank], head_w, notes)
 
 
+def _half_level(prof: np.ndarray, s: np.ndarray, inside: float, outside: float, near: float):
+    """Where the profile crosses half way between the inside and outside levels (a sub-pixel
+    edge that holds for any pixel phase), the crossing nearest `near`."""
+    mid = (inside + outside) / 2
+    d = prof - mid
+    idx = np.nonzero(np.signbit(d[:-1]) != np.signbit(d[1:]))[0]
+    if len(idx) == 0 or abs(inside - outside) < 0.03:
+        return None
+    xs = [s[i] + (s[i + 1] - s[i]) * d[i] / (d[i] - d[i + 1]) for i in idx]
+    return float(min(xs, key=lambda x: abs(x - near)))
+
+
+def edge_widths(gray: np.ndarray, ek: EdgeKeypoints, stations: int = 9) -> list[float]:
+    """Shank widths (px) from the image's own edges, not the mask: across the axis at
+    `stations` points between 30 and 85 % of the way from the bearing to the tip (clear of the
+    head's fillet and the tip's chamfer), each edge where the brightness is half way between
+    the shank's and the plate's. The mask comes from stage 1's shrunk picture and is a pixel or
+    more off; these are not."""
+    if not ek.shank_widths_px:
+        return []
+    u = ek.axis / max(1e-9, float(np.linalg.norm(ek.axis)))
+    v = np.array([-u[1], u[0]])
+    bear, tip = ek.keypoints["bearing"], ek.keypoints["tip"]
+    half = float(np.median(ek.shank_widths_px)) / 2
+    reach = max(2.5, 0.6 * half)  # how far each edge may be from the mask's edge
+    t = np.arange(-(half + reach), half + reach + 0.125, 0.25)
+    core = np.abs(t) <= 0.4 * half
+    out = []
+    for f in np.linspace(0.3, 0.85, stations):
+        o = bear + f * (tip - bear)
+        pts = o[None, :] + t[:, None] * v[None, :]
+        prof = bilinear(gray, pts[:, 0], pts[:, 1])
+        inside = float(np.median(prof[core]))
+        sides = []
+        for sign in (1, -1):
+            far = sign * t >= half + reach - 1.0
+            mine = sign * t >= 0
+            e = _half_level(prof[mine], t[mine], inside, float(np.median(prof[far])), sign * half)
+            sides.append(e)
+        if sides[0] is not None and sides[1] is not None and sides[0] > 0 > sides[1]:
+            out.append(sides[0] - sides[1])
+    return out
+
+
 def end_radii(geo: ClassGeometry) -> dict[str, float]:
     """Radius of the visible end faces (mm): the rim that forms the silhouette extremity."""
     if geo.family == "ISO7380":
