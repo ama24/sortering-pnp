@@ -313,7 +313,7 @@ class CameraVision:
         pre = getattr(self, "_pre", None)
         if pre is not None and pre[0] == photo:
             return pre[1]
-        return load_scene(photo, self.calibration, self.nominal)
+        return load_scene(photo, self.calibration, self.nominal, self.m.camera.crop_shift_mm)
 
     def preview(self, photo: Path, name: str) -> tuple[Path, list]:
         """The photo for the page before the model looks at it: (view file, plate mm -> view

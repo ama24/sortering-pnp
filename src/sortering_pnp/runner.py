@@ -631,6 +631,32 @@ class Runner:
         self.note(f"camera calibration skipped: straight down, {h:g} mm above the tray floor")
         return self.photos.state()
 
+    CROP_SHIFT_MAX_MM = 80.0
+
+    def camera_crop_shift(self, right_mm: float, down_mm: float) -> dict[str, Any]:
+        """Without a calibration: move the model's picture over the photo (Calibrate tab,
+        Skip for now: the arrows), for a camera not exactly over the tray's middle. Only the cut
+        moves; the camera, the positions and Camera to printer stay as they are."""
+        lim = self.CROP_SHIFT_MAX_MM
+        if not (abs(right_mm) <= lim and abs(down_mm) <= lim):
+            raise ValueError(f"move the picture by at most {lim:g} mm each way")
+        shift = [round(float(right_mm), 1), round(float(down_mm), 1)]
+        self.m.camera.crop_shift_mm = shift
+        self.remember_machine({"camera_crop_shift_mm": shift})
+        self.note(f"model's picture moved {shift[0]:g} mm right, {shift[1]:g} mm down")
+        return self.photos.state()
+
+    def model_roi(self) -> dict[str, int] | None:
+        """The part of the photo the model gets (full-resolution pixels): the calibration's,
+        else the nominal tray moved by camera.crop_shift_mm; None without a camera setup."""
+        from .measure.infer import nominal_roi
+
+        calib = getattr(self.vision, "calibration", None)
+        if calib and calib.get("roi"):
+            return dict(calib["roi"])
+        cam = getattr(self.vision, "nominal", None)
+        return None if cam is None else nominal_roi(cam, self.m.camera.crop_shift_mm)
+
     def camera_flip(self, hflip: bool, vflip: bool, turn90: bool | None = None) -> dict[str, Any]:
         """The picture's orientation (the camera's flips, both = turned 180 degrees, and a
         quarter turn in software), for photos and the live picture. What was fitted to the old
@@ -818,7 +844,7 @@ class Runner:
         img = paint_outside(
             frame, px(work.outline), [px(h) for h in work.holes], parse_colour(st["colour"])
         )
-        roi = (calib or {}).get("roi")
+        roi = (calib or {}).get("roi") or self.model_roi()
         if roi:  # the model gets this part of the photo (its size unchanged)
             x0, y0 = int(roi["x0"] * s), int(roi["y0"] * s)
             img = img[y0 : y0 + int(roi["h"] * s), x0 : x0 + int(roi["w"] * s)]
@@ -939,7 +965,7 @@ class Runner:
             if got is not None:
                 floors.append((m.marker, px(got.floor)))
         calib = getattr(self.vision, "calibration", None)
-        roi = (calib or {}).get("roi")
+        roi = (calib or {}).get("roi") or self.model_roi()
         if roi:  # the model gets this part of the photo (its size unchanged)
             x0, y0 = int(roi["x0"] * s), int(roi["y0"] * s)
             img = img[y0 : y0 + int(roi["h"] * s), x0 : x0 + int(roi["w"] * s)]
@@ -2055,6 +2081,8 @@ class Runner:
                     if hasattr(a, ak):
                         setattr(a, ak, type(getattr(a, ak))(av))
                 a.lens_position = lens_dioptres(a.lens_position)  # an old mm value
+            elif k == "camera_crop_shift_mm":  # Calibrate tab, Skip for now: the arrows
+                m.camera.crop_shift_mm = [float(v[0]), float(v[1])]
             elif k == "camera_height_mm":  # Calibrate tab, Skip for now
                 m.camera.height_mm = float(v)
             elif k == "picker_mode":  # chosen in the Setup tab

@@ -355,7 +355,10 @@ button.p{font-weight:600}button.big{padding:11px 18px}
   <div id="calrun" class="calrun" hidden><b id="calphase"></b><p id="caltext" style="margin:4px 0 8px"></p><div id="calbars"></div></div>
   <div class="calrun" id="calskip"><b>Skip for now</b>
    <p class="note" style="margin:4px 0 8px">Without calibration: straight down from this height, an ideal lens.</p>
-   <div class="row"><label>lens to tray floor<input id="calh" type="number" step="1" style="width:84px">mm</label><button class="b s" onclick="calHeight()">Save</button><span id="calhmsg" class="note"></span></div></div>
+   <div class="row"><label>lens to tray floor<input id="calh" type="number" step="1" style="width:84px">mm</label><button class="b s" onclick="calHeight()">Save</button><span id="calhmsg" class="note"></span></div>
+   <p class="note" style="margin:10px 0 4px">Centre the picture: move the yellow frame on the live picture over the tray (the model gets what is inside it).</p>
+   <div class="row"><button class="b s" title="left" onclick="calShift(-1,0)">◀</button><button class="b s" title="up" onclick="calShift(0,-1)">▲</button><button class="b s" title="down" onclick="calShift(0,1)">▼</button><button class="b s" title="right" onclick="calShift(1,0)">▶</button>
+    <label class="note">step <select id="calstep"><option>1</option><option selected>5</option><option>10</option></select> mm</label><span id="calshift" class="note"></span><button class="b s" onclick="calShift(0,0,true)">Centre</button><span id="calsmsg" class="note"></span></div></div>
   <details style="margin-top:10px"><summary class="note">How it works</summary><ol class="note" style="margin:6px 0 0">
    <li><b>Park:</b> the bed goes to the photo position.</li>
    <li><b>Lock</b> (about a minute): exposure, gain, white balance and focus are measured on the centre of the picture (the tray, not a white bin at the side) and frozen.</li>
@@ -1010,7 +1013,7 @@ function renderCal(c){CAL=c;const b=c.board,j=c.job;
  if(c.measured_square_mm&&!$("calsq").value)$("calsq").value=c.measured_square_mm;$("calth").value=c.board_thickness_mm;
  const o=c.orientation||{turn:0,mirror:false};$("orinow").textContent=`${o.turn}°${o.mirror?" · mirrored":""}`;
  $("calnow").innerHTML=c.calibrated?`<span class="ok">✓ calibrated (${esc(c.calibrated)})</span>`:c.height_set?`<span class="ok">skipped: ${c.height_mm} mm high</span>`:'<span class="bad">not calibrated</span>';
- if(c.height_mm&&document.activeElement!==$("calh"))$("calh").value=c.height_mm;$("calskip").hidden=!!c.calibrated;
+ if(c.height_mm&&document.activeElement!==$("calh"))$("calh").value=c.height_mm;$("calskip").hidden=!!c.calibrated;{const v=c.crop_shift_mm||[0,0];$("calshift").textContent=`${v[0]} mm right, ${v[1]} mm down`;}
  const running=!!(j&&j.running);$("calgo").textContent=running?"Stop":c.calibrated?"Calibrate again":"Calibrate";$("calgo").className=running?"b":"b p";
  $("calrun").hidden=!j;if(!j)return;
  const names={starting:"Starting",lock:"1 · Locking the camera",lens:"2 · Lens photos",solve:"2 · Solving the lens",flat:"3 · The board flat in the tray",position:"3 · Measuring the position",done:"Done",error:"Stopped: a problem",cancelled:"Stopped"};
@@ -1019,6 +1022,7 @@ function renderCal(c){CAL=c;const b=c.board,j=c.job;
 async function calStart(){const j=CAL&&CAL.job;try{if(j&&j.running){renderCal(await api("api/calibration/cancel",{}));return;}flash("calmsg2","parking the bed…");renderCal(await api("api/calibration/start",{}));flash("calmsg2","");}catch(e){flash("calmsg2",e.message,1);}}
 async function calLock(){try{flash("calmsg2","parking the bed, locking the camera (about a minute)…");renderCal(await api("api/calibration/lock",{}));flash("calmsg2","camera locked");}catch(e){flash("calmsg2",e.message,1);}}
 async function calSettings(){try{renderCal(await api("api/calibration/settings",{square_mm:+$("calsq").value||null,thickness_mm:+$("calth").value||0}));flash("calmsg2","saved");}catch(e){flash("calmsg2",e.message,1);}}
+async function calShift(dx,dy,reset){const s=+$("calstep").value,cur=(CAL&&CAL.crop_shift_mm)||[0,0],v=reset?[0,0]:[cur[0]+dx*s,cur[1]+dy*s];try{renderCal(await api("api/calibration/shift",{right_mm:v[0],down_mm:v[1]}));flash("calsmsg","");}catch(e){flash("calsmsg",e.message,1);}}
 async function calHeight(){try{renderCal(await api("api/calibration/height",{height_mm:+$("calh").value}));flash("calhmsg","saved: used from now on");}catch(e){flash("calhmsg",e.message,1);}}
 async function camOrient(action){if(!confirm("Turn the picture? Camera to printer (Setup, step 6) must be redone."))return;
  flash("flipmsg","turning…");try{renderCal(await api("api/camera/orient",{action}));flash("flipmsg","");}catch(e){flash("flipmsg",e.message,1);}}
