@@ -60,6 +60,8 @@ img.shot{width:100%;display:block;border-radius:var(--r2);background:var(--line2
 .camadj{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:center;margin-top:12px;font-size:13px}
 .camadj .k{color:var(--mut)}.camadj .v{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.camadj label{display:inline-flex;gap:6px;align-items:center}
 .camadj input[type=range]{width:120px;accent-color:var(--acc)}.camadj output{min-width:44px;font-variant-numeric:tabular-nums;color:var(--mut)}
+.camadj .lensrow{grid-column:1/-1;display:flex;flex-direction:column;gap:4px;min-width:0}.lensline{display:flex;align-items:center;gap:6px;width:100%}
+.camadj .lensline input[type=range]{flex:1;min-width:0;width:auto;margin:0}.lensline button.b.s{padding:5px 0;min-width:34px;flex:none}.lensline output{min-width:58px;text-align:right;color:var(--ink);font-weight:600}
 .live img,.pair img{width:100%;display:block;border-radius:var(--r2);background:#262626;min-height:120px}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.pair figure{margin:0}.pair figcaption{margin-bottom:4px}@media (max-width:860px){.pair{grid-template-columns:1fr}}
 .calrun{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:var(--r2)}.calrun .bar{height:8px;background:var(--line2);border-radius:4px;overflow:hidden;margin:6px 0 2px}.calrun .bar span{display:block;height:100%;background:var(--ok,#2e7d32)}
@@ -1025,13 +1027,31 @@ async function loadCam(){try{renderAdj(await api("api/camera"));}catch(e){flash(
 function adjSeg(key,val){return `<span class="seg sm">${["auto","manual"].map(m=>`<label><input type="radio" name="adj_${key}" ${val===m?"checked":""} onchange="camAdjust({${key}:'${m}'})">${m==="auto"?"Auto":"Manual"}</label>`).join("")}</span>`;}
 function adjSlider(key,label,val,min,max,step,fmt,off){return `<label>${label}<input type="range" min="${min}" max="${max}" step="${step}" value="${val}" ${off?"disabled":""} oninput="this.nextElementSibling.textContent=(${fmt})(+this.value)" onchange="camAdjust({${key}:+this.value})"><output>${fmt(val)}</output></label>`;}
 function renderAdj(j){ADJ=j;const a=j.adjust,n=j.now||{},box=$("camadj");if(!box)return;
- const mm=v=>v>0.05?Math.round(1000/v)+" mm":"∞",ms=v=>v>=1000?(v/1000).toFixed(v<10000?1:0)+" ms":Math.round(v)+" µs",x=v=>(+v).toFixed(2);
- const now=[n.ExposureTime?ms(n.ExposureTime):"",n.AnalogueGain?"gain "+x(n.AnalogueGain):"",n.LensPosition!=null?"focus "+mm(n.LensPosition):"",n.ColourTemperature?n.ColourTemperature+" K":""].filter(Boolean).join(" · ");
- box.innerHTML=`<span class="k">Focus</span><span class="v">${adjSeg("focus",a.focus)}${adjSlider("lens_position","distance",a.lens_position,0,15,0.05,mm,a.focus!=="manual")}<button class="b s" onclick="camFocus()">Autofocus</button></span>`+
+ const ms=adjMs,x=v=>(+v).toFixed(2);
+ box.innerHTML=`<span class="k">Focus</span><span class="v">${adjSeg("focus",a.focus)}<button class="b s" onclick="camFocus()">Autofocus</button></span>${lensRow(a.lens_position,a.focus!=="manual")}`+
   `<span class="k">White balance</span><span class="v">${adjSeg("white_balance",a.white_balance)}${adjSlider("red_gain","red",a.red_gain,0.5,8,0.05,x,a.white_balance!=="manual")}${adjSlider("blue_gain","blue",a.blue_gain,0.5,8,0.05,x,a.white_balance!=="manual")}</span>`+
   `<span class="k">Exposure</span><span class="v">${adjSeg("exposure",a.exposure)}${adjSlider("exposure_us","shutter",a.exposure_us,100,100000,100,ms,a.exposure!=="manual")}${adjSlider("gain","gain",a.gain,1,16,0.1,x,a.exposure!=="manual")}</span>`+
   `<span class="k">Image</span><span class="v">${adjSlider("brightness","brightness",a.brightness,-1,1,0.05,x)}${adjSlider("contrast","contrast",a.contrast,0,2,0.05,x)}${adjSlider("sharpness","sharpness",a.sharpness,0,4,0.1,x)}${adjSlider("saturation","saturation",a.saturation,0,2,0.05,x)}</span>`+
-  `<span class="k">Now</span><span class="v note">${esc(now||(j.locked?"locked settings":"—"))}<button class="b s" onclick="camAdjust(ADJ_DEFAULTS)">Reset</button></span>`;}
+  `<span class="k">Now</span><span class="v note"><span id="adjnow">${esc(adjNow(j))}</span><button class="b s" onclick="camAdjust(ADJ_DEFAULTS)">Reset</button></span>`;
+ lensShow(a.lens_position);}
+const adjMs=v=>v>=1000?(v/1000).toFixed(v<10000?1:0)+" ms":Math.round(v)+" µs";
+function adjNow(j){const n=j.now||{},x=v=>(+v).toFixed(2);
+ const now=[n.ExposureTime?adjMs(n.ExposureTime):"",n.AnalogueGain?"gain "+x(n.AnalogueGain):"",n.LensPosition!=null?"LensPosition "+lensFmt(n.LensPosition):"",n.ColourTemperature?n.ColourTemperature+" K":""].filter(Boolean).join(" · ");
+ return now||(j.locked?"locked settings":"—");}
+// focus: the raw LensPosition libcamera takes (dioptres = 1 / metres), on the lens driver's steps
+const lensFmt=v=>String(+(+v).toFixed(5));
+function lensRange(){const r=(ADJ&&ADJ.focus_range)||{};return {min:+(r.min!=null?r.min:0),max:+(r.max!=null?r.max:15),step:+(r.step||0.03125),source:r.source||"assumed"};}
+function lensRow(val,off){const r=lensRange(),n=Math.round((r.max-r.min)/r.step),coarse=n>40?r.step*Math.round(n/20):0,dis=off?"disabled":"";
+ const btn=(d,label)=>`<button class="b s" ${dis} title="${d<0?"−":"+"}${lensFmt(Math.abs(d))}" onclick="lensBy(${d})">${label}</button>`;
+ const ticks=n<=40?`<datalist id="lensticks">${Array.from({length:n+1},(_,i)=>`<option value="${lensFmt(r.min+i*r.step)}"></option>`).join("")}</datalist>`:"";
+ return `<div class="lensrow"><div class="lensline">${coarse?btn(-coarse,"−−"):""}${btn(-r.step,"−")}<input id="lenspos" type="range" aria-label="LensPosition" min="${r.min}" max="${r.max}" step="${r.step}" value="${val}" ${ticks?'list="lensticks"':""} ${dis} oninput="lensShow(+this.value);lensSend()">${btn(r.step,"+")}${coarse?btn(coarse,"++"):""}<output id="lensval"></output></div>${ticks}`+
+  `<span class="note">LensPosition (dioptres, 1/m) <span id="lenshint"></span> · ${lensFmt(r.min)}–${lensFmt(r.max)} in ${n} steps of ${lensFmt(r.step)}${coarse?`, −−/++ ${lensFmt(coarse)}`:""}${r.source==="assumed"?" (step assumed: the camera is not open)":""}</span></div>`;}
+function lensShow(v){const o=$("lensval"),h=$("lenshint");if(o)o.textContent=lensFmt(v);if(h)h.textContent=v>0?`≈ ${Math.round(100/v)} cm, roughly`:"≈ ∞ (far)";}
+function lensBy(d){const el=$("lenspos");if(!el||el.disabled)return;const r=lensRange();
+ const v=Math.min(r.max,Math.max(r.min,r.min+Math.round((+el.value+d-r.min)/r.step)*r.step));el.value=v;lensShow(+el.value);lensSend();}
+let LENS_T=null,LENS_SEQ=0;
+function lensSend(){clearTimeout(LENS_T);LENS_T=setTimeout(async()=>{const el=$("lenspos");if(!el)return;const seq=++LENS_SEQ;
+ try{const j=await api("api/camera/adjust",{lens_position:+el.value});if(seq!==LENS_SEQ)return;ADJ={...ADJ,...j};const nw=$("adjnow");if(nw)nw.textContent=adjNow(ADJ);flash("adjmsg","");}catch(e){flash("adjmsg",e.message,1);}},150);}
 const ADJ_DEFAULTS={focus:"auto",white_balance:"auto",exposure:"auto",brightness:0,contrast:1,sharpness:1,saturation:1};
 async function camAdjust(v){try{const j=await api("api/camera/adjust",v);renderAdj({...ADJ,...j});flash("adjmsg","");}catch(e){flash("adjmsg",e.message,1);}}
 async function camFocus(){flash("adjmsg","focusing…");try{const j=await api("api/camera/focus",{});renderAdj({...ADJ,...j});flash("adjmsg","");}catch(e){flash("adjmsg",e.message,1);}}

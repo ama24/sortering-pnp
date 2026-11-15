@@ -366,7 +366,12 @@ sortering-pnp. Models, including ones from anywhere else, go in the Models tab.
 - **Park bed:** the bed to the photo position, so the live picture shows the tray as the photos
   will.
 - **Focus** (Auto, or Manual at a lens position; **Autofocus** focuses once on the tray and keeps
-  that), **White balance** (Auto, or Manual red and blue gains), **Exposure** (Auto, or Manual
+  that). The value is libcamera's raw `LensPosition` (dioptres = 1 / metres; "≈ cm" beside it is
+  only 1 / LensPosition). Its range and smallest step come from the camera (`focus.py`: Picamera2's
+  `camera_controls` and the tuning file's `rpi.af` map; Camera Module 3: 0..15 in 480 steps of
+  1/32, the lens driver's codes 445..925); the slider snaps to them, − / + move one step,
+  −− / ++ a twentieth of the range. Old saved distances in mm (above 20) load as 1000 / mm.
+  **White balance** (Auto, or Manual red and blue gains), **Exposure** (Auto, or Manual
   shutter and gain) and **Image** (brightness, contrast, sharpness, saturation):
   `camera.adjust`, kept in `paths.machine`, applied at once to the photos and the live picture.
   Manual values go over the locked settings of a calibration's camera lock. **Now** shows what
