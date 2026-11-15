@@ -403,6 +403,11 @@ height the renders were made at (screw-synth's `nominal_camera.height_mm`).
 Camera to printer (Setup tab) absorbs where the camera really stands; what is left is the lens'
 distortion and any tilt, so positions and lengths are less exact towards the picture's edge.
 A calibration made later replaces it at once.
+Camera to printer's points keep the height they were seen with (`cam_height_mm`, and each
+code's own height `z`, in the transform file): change the height later and they are moved to
+it and refitted by themselves (the console says so), so the fit, the layout and the drawn bins
+stay right. Points taken before that was kept: redo Camera to printer once after a change of
+the height (the console says so).
 
 A camera mounted a little off the tray's middle cuts part of the tray off: move the model's
 picture with the arrows under the height (`camera.crop_shift_mm`, [right, down] mm, steps of 1,
