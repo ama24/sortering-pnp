@@ -80,6 +80,7 @@ def test_nominal_camera_height_comes_from_vision_yaml(tmp_path):
     photo = tmp_path / "frame.png"
     cv2.imwrite(str(photo), np.zeros((2592, 4608, 3), np.uint8))
     near, far = load_scene(photo, None), load_scene(photo, None, cam)
-    # higher camera: each mm on the plate covers fewer pixels, so the same area needs a smaller ROI
-    assert far.roi["w"] < near.roi["w"]
+    # the cut is screw-synth's render square whatever the height (the model's scale); the height
+    # only changes how many mm a pixel is
+    assert far.roi == near.roi == {"x0": 1024, "y0": 16, "w": 2560, "h": 2560}
     assert far.cam.T_cam_plate[2, 3] == pytest.approx(340)

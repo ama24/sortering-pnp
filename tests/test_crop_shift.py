@@ -16,13 +16,27 @@ from sortering_pnp.runner import Runner
 from sortering_pnp.transform import Transform2D
 
 
+def test_the_cut_is_the_renders_square_whatever_the_height():
+    """screw-synth renders a 2560 px square in the middle of the sensor (nominal camera): the
+    same cut, so the model sees its training scale; the height only turns pixels into mm."""
+    for h in (300.0, 325.0, 350.0):
+        assert nominal_roi(nominal_camera(height_mm=h)) == {
+            "x0": 1024,
+            "y0": 16,
+            "w": 2560,
+            "h": 2560,
+        }
+
+
 def test_the_cut_moves_right_and_down_by_the_mm_asked():
     cam = nominal_camera(height_mm=325.0)
     px_per_mm = cam.K[0, 0] / 325.0
-    a, b = nominal_roi(cam), nominal_roi(cam, (10.0, 5.0))
+    a, b = nominal_roi(cam), nominal_roi(cam, (10.0, 1.0))
     assert (b["w"], b["h"]) == (a["w"], a["h"])  # the same size: the model's scale is kept
-    assert b["x0"] - a["x0"] == pytest.approx(10 * px_per_mm, abs=32)  # right (32 px steps)
-    assert b["y0"] - a["y0"] == pytest.approx(5 * px_per_mm, abs=32)  # down
+    assert b["x0"] - a["x0"] == round(10 * px_per_mm)  # right
+    assert b["y0"] - a["y0"] == round(1 * px_per_mm)  # down
+    edge = nominal_roi(cam, (0.0, 50.0))  # only 16 px to spare up and down: kept inside
+    assert edge["y0"] + edge["h"] == 2592
     # the camera is unchanged: a plate point is still seen at the same pixel
     p = np.array([[50.0, 60.0, 0.0]])
     assert np.allclose(cam.project(p), nominal_camera(height_mm=325.0).project(p))

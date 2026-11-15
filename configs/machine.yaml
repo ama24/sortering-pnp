@@ -53,7 +53,7 @@ camera:
     sharpness: 1.0             # 0 .. 4
     saturation: 1.0            # 0 .. 2
   height_mm: null              # lens above the tray floor without a camera calibration (null: vision.yaml's)
-  crop_shift_mm: [0.0, 0.0]    # without a calibration: the model's picture moved [right, down] mm over the photo (Camera Calibration: Skip for now, the arrows)
+  crop_shift_mm: [0.0, 0.0]    # without a calibration: the model's picture (screw-synth's mid-sensor 2560 px square) moved [right, down] mm over the photo (Camera Calibration: Skip for now, the arrows)
   head:                        # only for source: head
     fov_mm: [80, 60]           # what one photo covers at the photo height, X x Y
     offset: [0, 0]             # image centre minus the tip, X Y (roughly: the photos overlap)

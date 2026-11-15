@@ -120,9 +120,10 @@ class Camera:
     # camera is taken as straight down over the picture's centre (Calibrate tab: Skip for now)
     # None: vision.yaml's nominal_camera.height_mm
     height_mm: float | None = None
-    # without a camera calibration: where the model's picture is cut from the photo, moved by
-    # [right, down] mm (Camera Calibration, Skip for now: the arrows), for a camera not mounted
-    # exactly over the tray's middle. The camera itself is unchanged: positions stay right
+    # without a camera calibration: where the model's picture (the 2560 px square in the middle
+    # of the sensor that screw-synth renders) is cut from the photo, moved by [right, down] mm
+    # (Camera Calibration, Skip for now: the arrows), for a camera not mounted exactly over the
+    # tray's middle. Its size and the camera itself never change: scale and positions stay
     crop_shift_mm: list[float] = field(default_factory=lambda: [0.0, 0.0])
 
 

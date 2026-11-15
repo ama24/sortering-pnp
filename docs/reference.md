@@ -395,14 +395,19 @@ open). The result lands in the Files tab by itself.
 **Skip for now** (same card): enter the lens' height above the tray floor
 (`camera.height_mm`, kept in `paths.machine`, over vision.yaml's `nominal_camera.height_mm`).
 Without a calibration the camera is taken as an ideal Camera Module 3 looking straight down at
-the picture's centre from that height, and the model gets the 220 x 220 mm around the centre.
+the picture's centre from that height. The model gets the 2560 x 2560 px square in the
+middle of the sensor, cut exactly as screw-synth renders its training images with its nominal
+camera (whatever the height: at 325 mm that is 246 mm of tray, shrunk to 1024 px = 4.17 px/mm,
+the scale the model learnt). The height is only used to turn pixels into mm, so it must be the
+height the renders were made at (screw-synth's `nominal_camera.height_mm`).
 Camera to printer (Setup tab) absorbs where the camera really stands; what is left is the lens'
 distortion and any tilt, so positions and lengths are less exact towards the picture's edge.
 A calibration made later replaces it at once.
 
 A camera mounted a little off the tray's middle cuts part of the tray off: move the model's
 picture with the arrows under the height (`camera.crop_shift_mm`, [right, down] mm, steps of 1,
-5 or 10 mm; **Centre** puts it back). The live picture shows the cut as a yellow frame and the
+5 or 10 mm; **Centre** puts it back). The square is almost as tall as the sensor, so it moves only
+about 1.5 mm up or down; left and right about 98 mm. The live picture shows the cut as a yellow frame and the
 Camera cropping card's "model" picture follows. Only the cut moves, never its size (the model's
 scale stays) nor the camera: positions and Camera to printer stay right.
 

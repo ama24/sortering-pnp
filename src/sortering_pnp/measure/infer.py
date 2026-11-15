@@ -18,7 +18,7 @@ from typing import Any
 import cv2
 import numpy as np
 
-from sortering_pnp.calib.geometry import Camera, nominal_camera, roi_camera_matrix, roi_for_area
+from sortering_pnp.calib.geometry import Camera, nominal_camera, roi_camera_matrix
 from sortering_pnp.drawing import finite, pt
 from sortering_pnp.drawing import poly as int_poly
 from sortering_pnp.naming import UNKNOWN
@@ -101,15 +101,27 @@ class Scene:
             self.gray = to_gray(self.image)
 
 
-NOMINAL_AREA_MM = (220.0, 220.0)  # the tray the model sees without a calibration
-NOMINAL_MARGIN_MM = 5.0
+NOMINAL_ROI_PX = 2560  # screw-synth's nominal render camera: this square, mid-sensor
 
 
-def nominal_roi(cam: Camera, shift_mm: Sequence[float] = (0.0, 0.0)) -> dict[str, int]:
-    """The model's picture without a calibration: the tray (220 mm, +5 mm) under the nominal
-    camera, moved by shift_mm = [right, down] in the picture (plate +x is right, +y up)."""
-    right, down = float(shift_mm[0]), float(shift_mm[1])
-    return roi_for_area(cam, (right, -down), NOMINAL_AREA_MM, NOMINAL_MARGIN_MM)
+def nominal_roi(
+    cam: Camera, shift_mm: Sequence[float] = (0.0, 0.0), roi_px: int = NOMINAL_ROI_PX
+) -> dict[str, int]:
+    """The model's picture without a calibration, cut exactly as screw-synth renders its
+    training images with the nominal camera (scenegen/camera.py `nominal`): a fixed roi_px
+    square (at most the sensor's height) in the middle of the sensor, whatever the height. The
+    stage-1 shrink to 1024 then gives the scale the model was trained at, as long as the camera
+    is as high as in the renders. shift_mm = [right, down] moves it over the photo (the Skip for
+    now arrows, at the tray floor), kept inside the sensor; its size never changes."""
+    w, h = cam.image_size
+    side = int(min(roi_px, w, h))
+    c = cam.project(np.array([[0.0, 0.0, 0.0]]))[0]  # how far 1 mm on the floor moves a pixel
+    px_x = cam.project(np.array([[1.0, 0.0, 0.0]]))[0] - c
+    px_y = cam.project(np.array([[0.0, -1.0, 0.0]]))[0] - c  # down in the picture = plate -y
+    du, dv = float(shift_mm[0]) * px_x + float(shift_mm[1]) * px_y
+    x0 = int(np.clip((w - side) // 2 + round(du), 0, w - side))
+    y0 = int(np.clip((h - side) // 2 + round(dv), 0, h - side))
+    return {"x0": x0, "y0": y0, "w": side, "h": side}
 
 
 def load_scene(
