@@ -18,6 +18,7 @@ from typing import Any
 import yaml
 
 from .fill import Fill
+from .focus import lens_dioptres
 from .headcam import HeadCamera
 from .photos import Calibration
 from .pickers import MODES as PICKER_MODES
@@ -69,7 +70,7 @@ class CameraAdjust:
     settings; applied to photos and the live picture (camera.controls_for)."""
 
     focus: str = "auto"  # auto (continuous, or the locked lens position) | manual
-    lens_position: float = 2.0  # dioptres (1 / metres): 2.0 = 500 mm, 3.3 = 300 mm
+    lens_position: float = 2.0  # raw LensPosition for libcamera: dioptres (1 / metres)
     white_balance: str = "auto"  # auto (or locked) | manual
     red_gain: float = 1.8
     blue_gain: float = 1.6
@@ -403,6 +404,7 @@ class Machine:
         if self.camera.source not in ("overview", "head"):
             raise ConfigError("camera.source must be overview or head")
         a = self.camera.adjust
+        a.lens_position = lens_dioptres(a.lens_position)  # an old distance in mm, once
         for key in ("focus", "white_balance", "exposure"):
             if getattr(a, key) not in ("auto", "manual"):
                 raise ConfigError(f"camera.adjust.{key} must be auto or manual")

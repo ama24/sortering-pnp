@@ -40,7 +40,7 @@ camera:
   turn90: false                # then turned 90 deg clockwise (in software)
   adjust:                      # Camera Calibration tab: focus, white balance, exposure, image
     focus: auto                # auto | manual (lens_position, dioptres: 1 / metres)
-    lens_position: 2.0
+    lens_position: 2.0         # raw LensPosition sent to libcamera (Camera Module 3: 0..15, steps of 1/32)
     white_balance: auto        # auto | manual (red_gain, blue_gain)
     red_gain: 1.8
     blue_gain: 1.6

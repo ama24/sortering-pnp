@@ -30,6 +30,8 @@ from .binswap import BinRequest, after_ok, choose_swap
 from .camera import mirrored, orientation, rotated
 from .config import HOME_CORNERS, PUMP_SWITCHES, RUN_MODES, SPEED_RANGE, Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
+from .focus import default_range as default_focus_range
+from .focus import lens_dioptres, snapped
 from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
 from .io import read_json, write_json
@@ -86,7 +88,6 @@ class State:
 
 
 ADJUST_RANGE = {  # Camera Calibration tab: what the sliders may set
-    "lens_position": (0.0, 15.0),
     "red_gain": (0.5, 8.0),
     "blue_gain": (0.5, 8.0),
     "exposure_us": (100, 200000),
@@ -669,13 +670,20 @@ class Runner:
                 if v not in ("auto", "manual"):
                     raise ValueError(f"{k}: auto or manual")
                 setattr(a, k, v)
+            elif k == "lens_position":  # raw LensPosition (dioptres), on the lens's steps
+                a.lens_position = snapped(float(v), self.focus_range())
             else:
                 lo, hi = ADJUST_RANGE[k]
                 setattr(a, k, type(old)(min(hi, max(lo, float(v)))))
         self.remember_machine({"camera_adjust": dataclasses.asdict(a)})
         apply = getattr(self.vision, "adjust_camera", None)
         now = apply() if apply is not None else {}
-        return {"adjust": dataclasses.asdict(a), "now": now}
+        return {"adjust": dataclasses.asdict(a), "now": now, "focus_range": self.focus_range()}
+
+    def focus_range(self) -> dict[str, Any]:
+        """The lens position's min / max / step / default (dioptres, focus.py)."""
+        get = getattr(self.vision, "focus_range", None)
+        return get() if get is not None else default_focus_range()
 
     def camera_focus(self) -> dict[str, Any]:
         """Autofocus once on the tray, then keep that lens position (focus: manual)."""
@@ -684,7 +692,8 @@ class Runner:
         if pos is None:
             raise ValueError("no autofocus on this camera")
         out = self.camera_adjust({"focus": "manual", "lens_position": pos})
-        self.note(f"camera focused: lens position {pos:.2f} (about {1000 / max(pos, 0.01):.0f} mm)")
+        lens = self.m.camera.adjust.lens_position
+        self.note(f"camera focused: lens position {lens:g} (dioptres)")
         return out
 
     def camera_state(self) -> dict[str, Any]:
@@ -693,6 +702,7 @@ class Runner:
         return {
             "adjust": dataclasses.asdict(c.adjust),
             "now": now,
+            "focus_range": self.focus_range(),
             "orientation": orientation(c.hflip, c.vflip, c.turn90),
             "locked": bool(c.settings),
         }
@@ -2026,6 +2036,7 @@ class Runner:
                 for ak, av in (v or {}).items():
                     if hasattr(a, ak):
                         setattr(a, ak, type(getattr(a, ak))(av))
+                a.lens_position = lens_dioptres(a.lens_position)  # an old mm value
             elif k == "camera_height_mm":  # Calibrate tab, Skip for now
                 self.m.camera.height_mm = float(v)
             elif k == "picker_mode":  # chosen in the Setup tab

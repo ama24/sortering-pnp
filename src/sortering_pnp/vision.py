@@ -197,6 +197,7 @@ class CameraVision:
         # the Pi camera: opened when first needed and kept open (photos and the live picture)
         self.cam: Any = None
         self._cam_lock = threading.RLock()  # one user of the camera at a time
+        self._focus_range: dict[str, Any] | None = None  # the lens position's range (focus.py)
         self._no_picamera = False  # Picamera2 missing: photos through rpicam-still, no live picture
         self._latest: np.ndarray | None = None  # the newest live frame
         self._latest_at = 0.0
@@ -369,6 +370,17 @@ class CameraVision:
         with self._cam_lock:
             cam = self._camera()
             return cam.focus_once() if cam is not None else None
+
+    def focus_range(self) -> dict[str, Any]:
+        """The lens position's min / max / step / default (focus.py): from the open camera,
+        else the Camera Module 3's assumed one."""
+        from sortering_pnp import focus
+
+        with self._cam_lock:
+            cam = self.cam  # not opened just for this
+            if cam is not None and getattr(self, "_focus_range", None) is None:
+                self._focus_range = focus.camera_focus_range(cam.picam2)
+        return getattr(self, "_focus_range", None) or focus.default_range()
 
     def camera_now(self) -> dict[str, Any]:
         with self._cam_lock:
