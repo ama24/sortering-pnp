@@ -12,17 +12,22 @@ Wiring (the ring's JST XH: 5V, DIN, GND; drawn in the Setup tab's Lights step):
 The Pi's 3.3 V data line drives a short lead to WS2812B at 5 V in practice; if the LEDs
 flicker or show wrong colours, put a 74AHCT125 level shifter (or one 1N4001 diode in the
 ring's 5 V lead) in between.
-SPI must be on (`dtparam=spi=on` in config.txt) and the core clock fixed on a Pi 4
-(`core_freq_min=500`), else the SPI clock and so the timing drifts: install-pi.sh adds both.
+SPI must be on (`dtparam=spi=on` in config.txt) and the core clock fixed (Pi 4:
+`core_freq_min=500`; Pi 3 / Zero 2: `core_freq_min=400`, i.e. its core_freq): the SPI clock is
+divided from the core clock as it was at boot, so when the core slows down the SPI does too, a
+"0" lasts long enough to read as a "1" and the LEDs show full white whatever colour is sent.
+install-pi.sh adds both; `SpiLeds.warning()` tells the Setup tab when the clock is not fixed.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import struct
+import subprocess
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Protocol
@@ -38,6 +43,12 @@ RESET_BYTES = 30  # > 80 us low: the LEDs take the new colours
 SPI_IOC_WR_MODE = 0x40016B01
 SPI_IOC_WR_BITS_PER_WORD = 0x40016B03
 SPI_IOC_WR_MAX_SPEED_HZ = 0x40046B04
+SPI_IOC_MESSAGE_1 = 0x40206B00  # _IOW('k', 0, struct spi_ioc_transfer[1]): 32 bytes
+# struct spi_ioc_transfer: tx_buf, rx_buf, len, speed_hz, delay_usecs, bits_per_word,
+# cs_change, tx_nbits, rx_nbits, word_delay_usecs, pad
+_XFER = struct.Struct("=QQIIHBBBBBB")
+SPIDEV_BUFSIZ = Path("/sys/module/spidev/parameters/bufsiz")
+PI_MODEL = Path("/proc/device-tree/model")
 
 RGB = tuple[int, int, int]
 
@@ -77,10 +88,50 @@ def encode(colours: list[RGB], order: str = "GRB") -> bytes:
     return bytes(RESET_BYTES) + body + bytes(RESET_BYTES)
 
 
+def transfer(address: int, length: int, speed_hz: int = SPI_HZ) -> bytes:
+    """One spi_ioc_transfer: `length` bytes from `address`, at `speed_hz`, 8 bits a word.
+    The speed goes with every transfer, so nothing else can leave the bus at another one."""
+    return _XFER.pack(address, 0, length, speed_hz, 0, 8, 0, 0, 0, 0, 0)
+
+
+def _vcgencmd(name: str) -> int | None:
+    """`vcgencmd get_config <name>` as a number (None without vcgencmd)."""
+    try:
+        out = subprocess.run(
+            ["vcgencmd", "get_config", name], capture_output=True, text=True, timeout=3
+        ).stdout
+        return int(out.strip().split("=", 1)[1])
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return None
+
+
+def clock_warning(
+    model_path: Path = PI_MODEL, get_config: Callable[[str], int | None] = _vcgencmd
+) -> str | None:
+    """Why the LEDs may show only white: the Pi's core clock (and so the SPI clock divided from
+    it) not fixed. None when it is fixed, on a Pi 5 (its SPI has its own clock) or off a Pi."""
+    try:
+        model = model_path.read_bytes().decode(errors="ignore").strip("\0 \n")
+    except OSError:
+        return None
+    if "Raspberry Pi" not in model or "Raspberry Pi 5" in model:
+        return None
+    freq, low = get_config("core_freq"), get_config("core_freq_min")
+    if freq is None or low is None or low >= freq:
+        return None
+    return (
+        f"the core clock is not fixed (core_freq_min={low}, core_freq={freq}): the SPI clock "
+        "slows down with it and the LEDs read every bit as 1, so they stay white. Add "
+        f"core_freq_min={freq} to /boot/firmware/config.txt (install-pi.sh does), then sudo reboot"
+    )
+
+
 class LedDriver(Protocol):
     def show(self, colours: list[RGB]) -> None: ...
 
     def status(self) -> tuple[bool, str]: ...
+
+    def warning(self) -> str | None: ...
 
     def close(self) -> None: ...
 
@@ -92,6 +143,7 @@ class SpiLeds:
         self.cfg = cfg
         self.path = Path(f"/dev/spidev{cfg.spi_bus}.{cfg.spi_device}")
         self._fd: int | None = None
+        self._clock: str | None | bool = False  # False: not asked yet
 
     def status(self) -> tuple[bool, str]:
         if not self.path.exists():
@@ -103,9 +155,8 @@ class SpiLeds:
     def _open(self) -> int:
         if self._fd is None:
             import fcntl
-            import struct
 
-            fd = os.open(self.path, os.O_WRONLY)
+            fd = os.open(self.path, os.O_RDWR)
             fcntl.ioctl(fd, SPI_IOC_WR_MODE, struct.pack("B", 0))
             fcntl.ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, struct.pack("B", 8))
             fcntl.ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, struct.pack("I", SPI_HZ))
@@ -113,7 +164,30 @@ class SpiLeds:
         return self._fd
 
     def show(self, colours: list[RGB]) -> None:
-        os.write(self._open(), encode(colours, self.cfg.order))
+        import ctypes
+        import fcntl
+
+        data = encode(colours, self.cfg.order)
+        buf = ctypes.create_string_buffer(data, len(data))  # kept alive through the ioctl
+        fcntl.ioctl(self._open(), SPI_IOC_MESSAGE_1, transfer(ctypes.addressof(buf), len(data)))
+
+    def warning(self) -> str | None:
+        """What would make the LEDs show wrong colours although every write works."""
+        if self._clock is False:
+            self._clock = clock_warning()  # asked once: it changes only with a reboot
+        if self._clock:
+            return str(self._clock)
+        try:
+            bufsiz = int(SPIDEV_BUFSIZ.read_text().strip())
+        except (OSError, ValueError):
+            return None
+        need = len(encode([(0, 0, 0)] * self.cfg.count))
+        if need > bufsiz:
+            return (
+                f"{self.cfg.count} LEDs need {need} bytes per write, spidev takes {bufsiz}: add "
+                f"spidev.bufsiz={need * 2} to /boot/firmware/cmdline.txt, then sudo reboot"
+            )
+        return None
 
     def close(self) -> None:
         if self._fd is not None:
@@ -127,6 +201,7 @@ class SimLeds:
     def __init__(self) -> None:
         self.frames: list[list[RGB]] = []
         self.ok, self.why = True, "simulated LEDs"
+        self.warn: str | None = None
 
     @property
     def colours(self) -> list[RGB]:
@@ -137,6 +212,9 @@ class SimLeds:
 
     def status(self) -> tuple[bool, str]:
         return self.ok, self.why
+
+    def warning(self) -> str | None:
+        return self.warn
 
     def close(self) -> None:
         pass
@@ -216,13 +294,15 @@ class Lights:
                     self._show(False)
 
     def off(self) -> None:
+        """Dark now, always written: the LEDs keep what they last got (e.g. before a restart),
+        whatever this program thinks they show."""
         with self._lock:
-            if self._lit:
-                self._show(False)
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
+            self._show(False)
 
     def close(self) -> None:
-        if self._timer is not None:
-            self._timer.cancel()
         self.off()
         self.driver.close()
 
@@ -240,6 +320,9 @@ class Lights:
             "lit": self._lit,
             "ok": ok,
             "message": why,
+            "preview_s": self.PREVIEW_S,
+            # e.g. the core clock not fixed: every write works, but the LEDs stay white
+            "warning": self.driver.warning() if c.enabled and ok else None,
         }
 
 

@@ -385,8 +385,12 @@ with nothing else to install:
 The ring's 5 V comes from a buck converter on the printer's 24 V supply (set it to 5.0 V with a
 meter first), not from the Pi. In the **Lights** step choose the colour (picker, hex or R/G/B)
 and the intensity: the LEDs follow live. **Always on** keeps them lit while sortering-pnp runs;
-off, they light only while a photo is taken. **No lights** completes the step without them. If
-the LEDs flicker or show wrong colours, put a 74AHCT125 level shifter between pin 19 and DIN.
+off, they light only while a photo is taken (a change in the step lights them for 5 s).
+**No lights** completes the step without them. If the LEDs flicker or show wrong colours, put a
+74AHCT125 level shifter between pin 19 and DIN. If they stay **white whatever you choose** (even
+OFF), the SPI timing is off because the Pi's core clock slows down: `vcgencmd get_config
+core_freq_min` must equal `vcgencmd get_config core_freq` (500 on a Pi 4); else add
+`core_freq_min=500` to `/boot/firmware/config.txt` (install-pi.sh does) and reboot.
 
 ### 2. Bins on the bed
 

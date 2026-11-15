@@ -60,10 +60,12 @@ if [ ! -f "$CFGTXT" ]; then
 fi
 say "hardware PWM for the picker's servos, SPI for the LEDs ($CFGTXT)"
 cfg_line "dtoverlay=pwm-2chan" "dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4"
-# the LEDs (WS2812B on GPIO10, SPI0 MOSI): SPI on, and the Pi 4's core clock fixed so the SPI
-# clock (and so the LEDs' timing) does not drift with the CPU's speed.
+# the LEDs (WS2812B on GPIO10, SPI0 MOSI): SPI on, and the core clock fixed at its normal speed
+# (core_freq_min = core_freq: 500 on a Pi 4, 400 on a Pi 3 / Zero 2) so the SPI clock divided
+# from it, and so the LEDs' timing, never slows down: slowed, the LEDs show only white.
 cfg_line "dtparam=spi=on" "dtparam=spi=on"
-cfg_line "core_freq_min=" "core_freq_min=500"
+CORE_FREQ=$( (vcgencmd get_config core_freq 2>/dev/null || true) | sed -n 's/^core_freq=\([0-9][0-9]*\)$/\1/p')
+cfg_line "core_freq_min=" "core_freq_min=${CORE_FREQ:-500}"
 # SPI at once too (the reboot still fixes the clock): /dev/spidev0.0 appears now
 if [ ! -e /dev/spidev0.0 ] && command -v dtparam >/dev/null; then
   sudo dtparam spi=on || true
