@@ -129,6 +129,30 @@ def with_type(cls: str, new_type: str) -> str | None:
     return f"{new_type}_{size}{suffix}"
 
 
+def with_size(cls: str, size: str) -> str | None:
+    """`cls` with its size replaced (DIN912_M3, M4 -> DIN912_M4); None without a size."""
+    m = _last_size(cls)
+    if m is None:
+        return None
+    return f"{cls[: m.start(1)]}{size}{cls[m.end(1) :]}"
+
+
+def size_fit(obj: dict[str, Any], mode: str, known: Collection[str]) -> None:
+    """run.size_check on one analysed object whose shank is clearly another size
+    (`size_mismatch`): best_fit takes it as that size when the model knows that class (the
+    mismatch is then resolved); otherwise the mismatch stays and the part goes to unsure."""
+    seen = obj.get("size_mismatch")
+    if not seen or mode != "best_fit":
+        return
+    new = with_size(str(obj["class"]), str(seen))
+    if new is None or new not in known:
+        obj["size_fit"] = f"no class {new or seen}: unsure"
+        return
+    obj["size_fit"] = f"{obj['class']} -> {new}"
+    obj["class"], obj["size"] = new, seen
+    del obj["size_mismatch"]
+
+
 def corrected_class(
     stage1: str, said: str, spec: CropSpec | None, known: Collection[str], unknown: str
 ) -> tuple[str, str]:

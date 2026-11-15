@@ -584,8 +584,11 @@ These rules apply to every strategy:
   on the photo's own edges at full resolution (a tenth of a pixel, not the stage-1 mask, which
   is a pixel or more off) and turned into mm. When it is clearly another size than the class
   says (within `measure.size_check_margin`, 0.25 of the step, of the other size: a part called
-  M3 measured 3.75 mm or more), it goes to *unsure* (`run.size_check: unsure`; `report` only
-  says it). Nearer the middle it is only noted in the results (`size_check`).
+  M3 measured 3.75 mm or more), the Setup tab's Bins step decides (`run.size_check`): **Best
+  Fit** (`best_fit`, the default) takes it as the size it measures (DIN912_M3 becomes
+  DIN912_M4, noted as `size_fit` in the results) when the model knows that class, else it goes
+  to *unsure*; **Unsure Bin** (`unsure`) always sends it to *unsure*. Nearer the middle it is
+  only noted in the results (`size_check`).
 - UNKNOWN parts go to the *unknown* bin.
 - A part whose length decides its bin, but which can't be measured yet (tilted, covered), waits.
   After a few bed shakes it goes to *unsure*.

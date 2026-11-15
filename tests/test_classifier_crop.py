@@ -11,7 +11,9 @@ from sortering_pnp.measure.classcrop import (
     CropSpec,
     corrected_class,
     legacy_crop,
+    size_fit,
     split_size,
+    with_size,
     with_type,
 )
 from sortering_pnp.naming import UNKNOWN
@@ -135,8 +137,41 @@ def test_a_shank_of_another_size_goes_to_the_unsure_bin():
     dec = destination(_part(size_seen="M4"), lay, 0.5)
     assert dec.bin is unsure and "looks M4" in dec.reason
     assert destination(_part(), lay, 0.5).bin is not unsure
-    kept = destination(_part(size_seen="M4"), lay, 0.5, size_check="report")
-    assert kept.bin is not unsure
+
+
+def test_best_fit_takes_the_measured_size_when_the_model_knows_it():
+    known = {"DIN912_M3", "DIN912_M4"}
+    o = {"class": "DIN912_M3", "size": "M3", "size_mismatch": "M4"}
+    size_fit(o, "best_fit", known)
+    assert o["class"] == "DIN912_M4" and o["size"] == "M4" and "size_mismatch" not in o
+    o = {"class": "DIN912_M3", "size": "M3", "size_mismatch": "M5"}  # no DIN912_M5: unsure
+    size_fit(o, "best_fit", known)
+    assert o["class"] == "DIN912_M3" and o["size_mismatch"] == "M5"
+    o = {"class": "DIN912_M3", "size": "M3", "size_mismatch": "M4"}
+    size_fit(o, "unsure", known)  # the Unsure Bin option: left for the unsure bin
+    assert o["class"] == "DIN912_M3" and o["size_mismatch"] == "M4"
+    assert with_size("TNUT_DROP_S6_M4", "M5") == "TNUT_DROP_S6_M5"
+
+
+def test_the_choice_is_made_in_setup_and_kept(machine):
+    import copy
+
+    from sortering_pnp.printer.sim import SimPrinter, SimVision, SimWorld
+    from sortering_pnp.runner import Runner
+    from sortering_pnp.transform import Transform2D
+
+    assert machine.run.size_check == "best_fit"  # the default
+    lay = Layout.default()
+    lay.save(machine.path(machine.paths.layout))
+    vision = SimVision(SimWorld(), lambda: lay, Transform2D.identity)
+    runner = Runner(machine, SimPrinter(machine, SimWorld()), vision)
+    with pytest.raises(ValueError):
+        runner.setup_size_check("report")
+    assert runner.setup_size_check("unsure")["size_check"] == "unsure"
+    fresh = copy.deepcopy(machine)  # after a restart
+    fresh.run.size_check = "best_fit"
+    again = Runner(fresh, SimPrinter(fresh, SimWorld()), vision)
+    assert again.m.run.size_check == "unsure"
 
 
 @pytest.mark.parametrize(

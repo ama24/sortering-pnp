@@ -83,14 +83,7 @@ class Planner:
             run = self.machine.run
             ask = run.when_no_bin == "ask"
             dec = destination(
-                p,
-                self.layout,
-                run.min_score,
-                self.claims,
-                self.full,
-                ask,
-                run.share_wild,
-                run.size_check,
+                p, self.layout, run.min_score, self.claims, self.full, ask, run.share_wild
             )
             return dec, None
         if self.strategy == "clear":

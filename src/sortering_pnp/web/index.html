@@ -880,9 +880,13 @@ function stepBody(st){const m=SU.machine||{},k=st.key,redo=st.done?` <button cla
  case "lights":return lightsBody(st,redo);
  case "camera":return cameraBody(st,redo);
  case "layout":return `<p class="note">Put the baseplate, the tray and the bins on the bed (any place, turned any way), then <b>Find bins</b>: one photo finds the grid and every bin; the biggest is the tray.</p>
-  <div class="row"><button class="b p s" onclick="stepScan()">Find bins</button> <button class="b s" onclick="go('device')">Device</button></div>`+
+  <div class="row"><button class="b p s" onclick="stepScan()">Find bins</button> <button class="b s" onclick="go('device')">Device</button></div>`+sizeCheckBody()+
   (LASTSCAN?`<p class="note" style="margin:6px 0 0">${LASTSCAN.found.length} bin(s) found${(LASTSCAN.problems||[]).length?`: <span class="bad">${LASTSCAN.problems.map(esc).join("; ")}</span>`:""}</p>`:"")+redo;
  }return "";}
+function sizeCheckBody(){const v=SU.size_check||"best_fit",opt=(k,t,d)=>`<label class="row note"><input type="radio" name="szchk" ${v===k?"checked":""} onchange="setupCall('api/setup/size_check',{mode:'${k}'},'','layout')"> <b>${t}</b>&nbsp;${d}</label>`;
+ return `<h4 style="margin:14px 0 6px;font-size:13px">A screw of another size</h4><p class="note" style="margin:0 0 4px">Every screw's thread is measured on the photo. When it is clearly another size than the model says:</p>`+
+  opt("best_fit","Best Fit","it is taken as the size it measures (e.g. DIN912_M3 becomes DIN912_M4); if the model has no such class, it goes to the unsure bin.")+
+  opt("unsure","Unsure Bin","it goes to the unsure bin, to check by hand.");}
 // ---------------------------------------------------------------- setup: lights (leds.py)
 function ledWiring(n){let s="";
  const ln=(pts,c,w=2.6)=>`<polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;

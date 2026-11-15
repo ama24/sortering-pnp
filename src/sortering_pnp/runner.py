@@ -28,7 +28,7 @@ from . import files as files_mod
 from .analysis import ModelChoice
 from .binswap import BinRequest, after_ok, choose_swap
 from .camera import mirrored, orientation, rotated
-from .config import HOME_CORNERS, PUMP_SWITCHES, RUN_MODES, SPEED_RANGE, Machine
+from .config import HOME_CORNERS, PUMP_SWITCHES, RUN_MODES, SIZE_CHECKS, SPEED_RANGE, Machine
 from .fill import BinFill, CatalogueVolumes, Packing, bin_room_mm3, part_volume_mm3
 from .grip import jaw_angle
 from .headcam import merge_markers, merge_parts, shift_part, tiles
@@ -2032,6 +2032,8 @@ class Runner:
                 self.m.picker.set_type(str(v))
             elif k == "rotate_offset_deg":
                 self.m.picker.rotate_offset_deg = float(v)
+            elif k == "size_check" and v in SIZE_CHECKS:  # Setup tab, Bins step
+                self.m.run.size_check = str(v)
             elif k == "lower_to_drop":  # Setup tab, Picker step
                 self.m.picker.lower_to_drop = bool(v)
             elif k == "pump_switch" and v in PUMP_SWITCHES:  # Setup tab, Picker step
@@ -2113,6 +2115,7 @@ class Runner:
             },
             "rotation": self.m.picker.kind.rotates,
             "lights": self.lights.state(),
+            "size_check": self.m.run.size_check,
             "picker": {
                 "mode": self.m.picker.kind.key,
                 "types": [pickers.as_dict(t) for t in pickers.PICKERS],
@@ -2224,6 +2227,17 @@ class Runner:
             "shown": li.enabled,
             "error": self.lights.error,  # e.g. no /dev/spidev0.0: the LEDs got nothing
         }
+
+    def setup_size_check(self, mode: str) -> dict[str, Any]:
+        """A screw whose shank is clearly another thread size than its class: best_fit (taken
+        as that size) or unsure (the unsure bin). Kept in machine.json."""
+        if mode not in SIZE_CHECKS:
+            raise ValueError(f"size check must be one of {SIZE_CHECKS}")
+        self.m.run.size_check = mode
+        self.remember_machine({"size_check": mode})
+        how = "taken as the size it measures" if mode == "best_fit" else "sent to the unsure bin"
+        self.note(f"a screw clearly of another size is {how}")
+        return self.setup_state()
 
     def setup_picker_drop(self, lower: bool) -> dict[str, Any]:
         """Over the bin: lower to rim + drop_mm before letting go, or let go at the travel

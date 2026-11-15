@@ -208,6 +208,7 @@ class Tool:
 
 
 RUN_MODES = ("single", "turbo")  # run.mode
+SIZE_CHECKS = ("best_fit", "unsure")  # run.size_check
 SPEED_RANGE = (50.0, 300.0)  # run.speed_pct
 PUMP_SWITCHES = ("mosfet", "bed", "hotend", "fan")  # picker.pump_switch (pins.py)
 
@@ -271,8 +272,9 @@ class Run:
     strategy: str = "sort"  # sort | clear | kit
     min_score: float = 0.5  # below: the "unsure" bin
     # a screw whose shank (measured on the photo's edges) is clearly another thread size than
-    # its class: unsure (the "unsure" bin) | report (only said in the console and the results)
-    size_check: str = "unsure"
+    # its class: best_fit (taken as that size, when the model knows the class; else unsure) |
+    # unsure (the "unsure" bin). Setup tab, Bins step; kept in machine.json
+    size_check: str = "best_fit"
     kit: dict[str, int] = field(default_factory=dict)  # kit strategy: rule -> how many
     max_failed_picks: int = 3  # the same spot fails this often: leave the part, warn
     failed_radius_mm: float = 4.0  # a part still within this of a pick: the pick failed
@@ -419,8 +421,8 @@ class Machine:
             raise ConfigError("run.turbo_picks must be 1 or more")
         if not SPEED_RANGE[0] <= self.run.speed_pct <= SPEED_RANGE[1]:
             raise ConfigError(f"run.speed_pct must be {SPEED_RANGE[0]:g}..{SPEED_RANGE[1]:g}")
-        if self.run.size_check not in ("unsure", "report"):
-            raise ConfigError("run.size_check must be unsure or report")
+        if self.run.size_check not in SIZE_CHECKS:
+            raise ConfigError(f"run.size_check must be one of {SIZE_CHECKS}")
         if self.run.when_no_bin not in ("ask", "overflow"):
             raise ConfigError("run.when_no_bin must be ask or overflow")
         if self.run.share_wild not in ("class", "family", "none"):

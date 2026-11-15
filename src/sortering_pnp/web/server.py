@@ -35,6 +35,7 @@ GET  /api/session           who is logged in; POST /api/login, /api/setup (first
 POST /api/logout;  GET /api/users, POST /api/users/add, /api/users/remove, /api/users/password
 GET  /api/setup; POST /api/setup/printer|home|goto|machine|picker|confirm|reset   the Setup tab
 POST /api/setup/picker/type {"type"}, /api/setup/picker/offset {"deg"}, /api/setup/rotate {"angle"};
+POST /api/setup/size_check {"mode": "best_fit"|"unsure"}  a screw clearly of another size
 POST /api/setup/picker/drop {"lower": bool}  lower over the bin before letting go (else: travel height)
 POST /api/setup/picker/pump {"switch": "mosfet"|"bed"|"hotend"}  what switches a pump
 POST /api/setup/lights {"colour","brightness","always_on","enabled"}  the LEDs (shown at once)
@@ -271,6 +272,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(r.setup_picker_pump(str(self._body()["switch"])))
         elif method == "POST" and path == "/api/lights/preview":
             self._json(r.lights_preview(self._body()))
+        elif method == "POST" and path == "/api/setup/size_check":
+            self._json(r.setup_size_check(str(self._body().get("mode"))))
         elif method == "POST" and path == "/api/setup/picker/drop":
             self._json(r.setup_picker_drop(bool(self._body().get("lower"))))
         elif method == "POST" and path == "/api/setup/picker/offset":

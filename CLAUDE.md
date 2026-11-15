@@ -143,7 +143,8 @@ another repository.
   classifier (classify; crops as its card's `classifier_crop` says, `measure/classcrop.py`;
   without that block it may change the type only, never the size). `analysis.py` runs them
   with the measurement in `measure/` (a screw whose shank, measured on full-resolution edges,
-  is clearly another thread size goes to unsure: `run.size_check`). Switching
+  is clearly another thread size is taken as that size, or goes to unsure: `run.size_check`,
+  Setup tab's Bins step, `classcrop.size_fit`). Switching
   reloads the vision setup (parts table and class list follow the stage-1 model), happens
   while idle and rolls back if loading fails. A `.pt` is a zip archive inside: only
   `.zip` uploads are unpacked.

@@ -162,13 +162,12 @@ def destination(
     full: Collection[int] = (),
     ask: bool = False,
     share: str = "none",
-    size_check: str = "unsure",
 ) -> Decision:
     """Where the part goes. `full`: bins too full to take more; `ask`: a new kind without a
     free wild bin waits for a bin change (else it goes to overflow); `share`: before that, a
     wild bin collecting the same class (or family) takes it."""
     claims = claims or {}
-    dec = _destination(p, layout, min_score, claims, full, ask, share, size_check)
+    dec = _destination(p, layout, min_score, claims, full, ask, share)
     if dec.bin is not None and dec.bin.marker in full:
         return Decision(None, f"bin {dec.bin.marker} is full", needs=("full", dec.bin.marker))
     return dec
@@ -182,7 +181,6 @@ def _destination(
     full: Collection[int],
     ask: bool,
     share: str = "none",
-    size_check: str = "unsure",
 ) -> Decision:
     if p.unknown:
         b = _role(layout, "unknown") or _best_rule(p, layout)[0]
@@ -191,7 +189,7 @@ def _destination(
         return _wild(p, layout, claims, full, ask, share) or _last_resort(
             layout, "no bin for unknown parts"
         )
-    if p.score < min_score or (p.size_seen and size_check == "unsure"):
+    if p.score < min_score or p.size_seen:  # size_seen: run.size_check left it unsure
         b = _role(layout, "unsure")
         if b is not None:
             if p.score < min_score:

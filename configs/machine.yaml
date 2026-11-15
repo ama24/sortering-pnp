@@ -130,7 +130,7 @@ picker:
 
 run:
   strategy: sort               # sort | clear | kit
-  size_check: unsure           # a screw clearly another thread size than its class (shank measured on the photo's edges): unsure bin | report
+  size_check: best_fit         # a screw clearly another thread size than its class (shank measured on the photo's edges): best_fit (taken as that size) | unsure (the unsure bin); Setup tab, Bins step
   min_score: 0.5               # less confident detections go to the "unsure" bin
   kit: {}                      # kit strategy, e.g. {DIN912_M3x10: 4, DIN934_M3: 4}
   max_failed_picks: 3
