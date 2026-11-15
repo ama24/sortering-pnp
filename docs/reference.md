@@ -148,12 +148,22 @@ makes the LEDs' timing (each LED bit is 3 SPI bits at 2.4 MHz).
 
 The Setup tab's Lights step draws it, like the picker's wiring.
 
-- **Set up:** `install-pi.sh` adds `dtparam=spi=on` and `core_freq_min=500` (a Pi 4's SPI clock
-  follows the core clock: fixed, the timing holds) to `/boot/firmware/config.txt` and puts you
-  in the `spi` group; reboot once. Then the Setup tab's **Lights** step (before the camera):
-  colour (picker, hex or R/G/B sliders), intensity, *Always on* (off: lit only while a photo is
-  taken, `lights.settle_s` before it). Every change shows on the LEDs at once and is kept in
-  `data/machine.json`. *No lights* completes the step on a machine without them.
+- **Set up:** `install-pi.sh` adds `dtparam=spi=on` and `core_freq_min` = the Pi's `core_freq`
+  (500 on a Pi 4, 400 on a Pi 3 / Zero 2) to `/boot/firmware/config.txt` and puts you in the
+  `spi` group; reboot once. Then the Setup tab's **Lights** step (before the camera): ON/OFF,
+  colour (picker, hex or R/G/B sliders), intensity, *On for photos only* (lit only while a photo
+  is taken, `lights.settle_s` before it). Every change, and every move of a bar, is written to
+  the LEDs at once (each change is kept in `data/machine.json` too); for photos only, a change
+  lights them for 5 s, then they go dark again. *OFF* (no lights) darkens them and completes the
+  step on a machine without them.
+- **Always white:** WS2812B that show full white whatever the colour (even OFF, which sends
+  black) read every bit as a 1: the SPI clock is too slow. The Pi divides it from the core
+  clock as it was at boot, so the core clock must not slow down. Check on the Pi:
+  `vcgencmd get_config core_freq` and `vcgencmd get_config core_freq_min` must give the same
+  number (`vcgencmd measure_clock core` the same in Hz); if not, add `core_freq_min=<core_freq>`
+  under `[all]` in `/boot/firmware/config.txt` and `sudo reboot`. The Lights step says so when
+  it sees it. A Pi 5's SPI has its own clock. More than about 450 LEDs also need a bigger
+  `spidev.bufsiz` in `cmdline.txt` (the step says so too).
 - **Level:** the Pi's 3.3 V data drives a short lead to WS2812B at 5 V in practice. If they
   flicker or show wrong colours, put a 74AHCT125 level shifter in the data line (or a 1N4001
   diode in the ring's 5 V lead, which lowers what it counts as high).
