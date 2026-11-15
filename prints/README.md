@@ -156,6 +156,16 @@ board lying in the tray, at the height the parts will lie.
   thread in the motor), with a rib on each side. PETG or PLA, standing on the motor plate, no
   supports. See
   [tool/TOOL_HOLDER.txt](tool/TOOL_HOLDER.txt).
+- **Floating tool holder** ([tool/float_plate.stl](tool/float_plate.stl),
+  [tool/float_l.stl](tool/float_l.stl)): the same motor and printer mounting, but the tool
+  rides up a miniature linear rail (JLCMC E-BMN12H, 100 mm, MGN12H sizes) when it hits the bed
+  or a pile of parts, and two 5.5 x 25.5 extension springs, hidden behind the rail's block,
+  pull it back onto a column. The plate (30 mm wide) goes on the printer with its M3 heads
+  sunk, the rail on a 3.5 mm strip so the springs fit behind the block. The L screws onto the
+  block, the motor lower down on its foot, and an overhang on top holds the springs' upper
+  screws. Two Ø2.5 x 10 dowel pins set the travel, 10 to 25 mm in 2.5 mm steps. PETG or PLA,
+  no supports (the plate standing, the L on its side). See
+  [tool/FLOAT_HOLDER.txt](tool/FLOAT_HOLDER.txt).
 - **Labels** ([labels/](labels/)): paper codes for plain bins. Print at 100 % and glue them on
   the shelf.
 
