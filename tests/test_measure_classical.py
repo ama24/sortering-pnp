@@ -97,3 +97,19 @@ def test_rim_correction_only_along_the_axis():
     assert abs(got[1] - rim_px[1]) < 1e-6  # no shift along the axis
     full = rim_corrected(cam, rim_px, axis_pt[2], 1.5, np.array([0.0, -1.0]))
     assert np.linalg.norm(full - rim_px) > 0.5  # the unprojected correction would move it
+
+
+@pytest.mark.parametrize("angle", [0.0, 27.0, 118.0])
+def test_shank_width_from_the_edges_not_the_coarse_mask(angle):
+    """Stage 1's mask comes from a shrunk picture: a pixel or so too wide. The width across the
+    shank is found on the image's own edges instead."""
+    from sortering_pnp.measure.classical import edge_widths
+
+    img, mask, _ = _screw_image(angle, shank=(60.0, 11.3))
+    coarse = cv2.dilate(mask.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    ek = edge_keypoints(img, coarse)
+    assert ek is not None
+    assert abs(float(np.median(ek.shank_widths_px)) - 11.3) > 1.0  # the mask is off
+    widths = edge_widths(img, ek)
+    assert len(widths) >= 5
+    assert float(np.median(widths)) == pytest.approx(11.3, abs=0.3)

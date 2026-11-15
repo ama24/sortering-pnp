@@ -24,6 +24,7 @@ from .analysis import Analyzer, ModelChoice
 from .config import Machine
 from .grip import Shape, axis_grip, head_grip, outline_grip, ring_grip, washer_hole_d
 from .markers import MarkerPose, detect, marker_pose
+from .measure.classcrop import size_fit
 from .models import ModelStore
 from .parts import Part
 from .trayview import BinsView, WorkArea, bins_area, code_quads_px, paint_outside, parse_colour
@@ -143,6 +144,7 @@ def parts_from_result(
                 measurable=bool(o.get("measurable", False)),
                 unknown=bool(o.get("unknown", False)),
                 has_length=hr is not None,
+                size_seen=o.get("size_mismatch"),
                 grip_plate=g.point if g else None,
                 com_plate=g.com if g else None,
                 grip_method=g.method if g else "centre",
@@ -534,6 +536,9 @@ class CameraVision:
             parts: list[Part] = []
         else:
             result = self.analyzer.analyse(scene, str(photo))
+            known = set((getattr(self.analyzer, "names", None) or {}).values())
+            for o in result.get("objects", []):
+                size_fit(o, self.m.run.size_check, known)
             parts = parts_from_result(
                 result,
                 lambda px, h: scene.cam.pixel_to_plate(px, h),

@@ -189,10 +189,12 @@ def _destination(
         return _wild(p, layout, claims, full, ask, share) or _last_resort(
             layout, "no bin for unknown parts"
         )
-    if p.score < min_score:
+    if p.score < min_score or p.size_seen:  # size_seen: run.size_check left it unsure
         b = _role(layout, "unsure")
         if b is not None:
-            return Decision(b, f"unsure ({p.score:.2f})")
+            if p.score < min_score:
+                return Decision(b, f"unsure ({p.score:.2f})")
+            return Decision(b, f"unsure: its shank looks {p.size_seen}, not {p.cls}")
     best, waiting = _best_rule(p, layout)
     if waiting:
         return Decision(None, "waiting for a length measurement", waiting=True)

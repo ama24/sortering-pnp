@@ -140,7 +140,11 @@ another repository.
 - **Models** are uploaded through the web page into a store (`models.py`, folder `paths.models`).
   Each upload gets its own folder with `sortering_pnp.json`; uploads are never overwritten. One
   model is active per role (`active.json`): stage1 (segment/obb/detect), stage2 (pose),
-  classifier (classify). `analysis.py` runs them with the measurement in `measure/`. Switching
+  classifier (classify; crops as its card's `classifier_crop` says, `measure/classcrop.py`;
+  without that block it may change the type only, never the size). `analysis.py` runs them
+  with the measurement in `measure/` (a screw whose shank, measured on full-resolution edges,
+  is clearly another thread size is taken as that size, or goes to unsure: `run.size_check`,
+  Setup tab's Bins step, `classcrop.size_fit`). Switching
   reloads the vision setup (parts table and class list follow the stage-1 model), happens
   while idle and rolls back if loading fails. A `.pt` is a zip archive inside: only
   `.zip` uploads are unpacked.

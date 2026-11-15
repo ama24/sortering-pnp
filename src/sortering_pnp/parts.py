@@ -36,6 +36,7 @@ class Part:
     grip_bed: tuple[float, float] = (0.0, 0.0)
     com_bed: tuple[float, float] = (0.0, 0.0)
     gap_mm: float = math.inf  # free space to the nearest other part (<= 0: touching)
+    size_seen: str | None = None  # the thread size its shank clearly has, when not its class's
     extra: dict = field(default_factory=dict)
 
 

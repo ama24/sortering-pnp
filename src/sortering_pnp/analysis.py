@@ -101,6 +101,19 @@ class Analyzer:
         if self.classifier is not None and self.classifier.task != "classify":
             raise ValueError(f"{choice.classifier}: the classifier must be a classify model")
         self.classifier_conf = classifier_conf
+        self.crop_spec = None  # the classifier's crops (model card), None: the old crop
+        if self.classifier is not None:
+            from sortering_pnp.io import read_json
+            from sortering_pnp.measure.classcrop import CropSpec
+            from sortering_pnp.measure.modelcard import find_card
+
+            card_path = find_card(choice.classifier)
+            self.crop_spec = CropSpec.from_card(read_json(card_path) if card_path else None)
+            if self.crop_spec is None:
+                self.warnings.append(
+                    "the classifier's model card has no classifier_crop: it cannot judge sizes, "
+                    "so it may change a part's type only"
+                )
         self.geo = geometry
         changes: dict[str, Any] = {}
         if choice.imgsz:
@@ -108,6 +121,11 @@ class Analyzer:
         if choice.conf:
             changes["conf"] = float(choice.conf)
         self.st = dataclasses.replace(settings, **changes)
+        if self.crop_spec is not None and self.crop_spec.longest_side_px != self.st.stage1_imgsz:
+            self.warnings.append(
+                f"the classifier was trained at {self.crop_spec.longest_side_px} px, stage 1 runs "
+                f"at {self.st.stage1_imgsz} px: its crops follow the classifier"
+            )
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -116,19 +134,22 @@ class Analyzer:
             "classes": len(self.names),
             "stage2": bool(self.stage2),
             "classifier": bool(self.classifier),
+            "classifier_sizes": bool(self.crop_spec and self.crop_spec.labels == "class"),
             "imgsz": self.st.stage1_imgsz,
             "conf": self.st.conf,
             "warnings": list(self.warnings),
         }
 
-    def _classify(self, scene: Any, det: Any) -> tuple[str, float]:
-        x0, y0, x1, y1 = det.box
-        m = 0.25 * max(x1 - x0, y1 - y0) + 16
-        h, w = scene.image.shape[:2]
-        crop = scene.image[
-            max(0, int(y0 - m)) : min(h, int(y1 + m)), max(0, int(x0 - m)) : min(w, int(x1 + m))
-        ]
-        r = self.classifier.predict(crop, verbose=False)[0]
+    def _classify(self, scene: Any, det: Any, small: tuple[Any, float] | None) -> tuple[str, float]:
+        """The classifier on the part's crop, cut as its model card says (`small`: the photo
+        shrunk to the card's scale, once per photo)."""
+        from sortering_pnp.measure.classcrop import legacy_crop
+
+        if self.crop_spec is not None and small is not None:
+            crop = self.crop_spec.crop(small[0], small[1], det.box)
+            r = self.classifier.predict(crop, imgsz=self.crop_spec.size_px, verbose=False)[0]
+        else:
+            r = self.classifier.predict(legacy_crop(scene.image, det.box), verbose=False)[0]
         top = int(r.probs.top1)
         return str(self.classifier.names[top]), float(r.probs.top1conf)
 
@@ -144,14 +165,24 @@ class Analyzer:
         else:
             dets = run_boxes(self.stage1, scene, self.names, self.st, self.task)
         objects = []
+        small = None
+        if self.classifier is not None and self.crop_spec is not None and dets:
+            small = self.crop_spec.shrink(scene.image)
+        ids = {v: k for k, v in self.names.items()}
         for i, det in enumerate(dets, start=1):
             obj: dict[str, Any] = {"id": i}
             if self.classifier is not None:
-                cname, cconf = self._classify(scene, det)
+                from sortering_pnp.measure.classcrop import corrected_class
+
+                cname, cconf = self._classify(scene, det, small)
                 obj["stage1_class"] = det.class_name
                 obj["classifier"] = {"class": cname, "conf": round(cconf, 3)}
                 if cconf >= self.classifier_conf and cname != det.class_name:
-                    det.class_name = cname
+                    new, why = corrected_class(det.class_name, cname, self.crop_spec, ids, UNKNOWN)
+                    obj["classifier"]["result"] = why
+                    if new != det.class_name:
+                        det.class_name = new
+                        det.class_id = ids.get(new, det.class_id)
             obj.update(
                 {
                     "class": det.class_name,
