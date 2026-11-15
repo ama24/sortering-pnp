@@ -337,7 +337,7 @@ class SimVision:
             )
         shot = Shot(name, parts, markers)
         if self.out is not None:
-            painted = [T.apply(o) for o in work.outlines] if work is not None else None
+            painted = [T.apply(o[:, :2]) for o in work.outlines] if work is not None else None
             shot.vis = self._draw(name, lay, plate, painted)  # what the model saw
             shot.view = self._draw(name, lay, plate, None, "view")  # the whole picture
             if self._px is not None:  # plate -> bed (T) -> picture pixels

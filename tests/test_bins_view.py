@@ -23,12 +23,13 @@ def test_a_floor_from_its_code_alone_is_where_the_layout_has_it(marker, rot):
     lay = Layout.default()
     b = Bin(marker=marker, x=1, y=1, w=w, d=d, rot=rot, height_u=size.height_u)
     lay.bins = [b]
-    floor, keep_out = bin_floor(marker, lay.marker_centre(b), 90.0 + rot)
+    got = bin_floor(marker, lay.marker_centre(b), 90.0 + rot)
+    floor = got.floor[:, :2]
     x0, y0, x1, y1 = floor_rect(lay, b)
     assert floor.min(axis=0) == pytest.approx((x0, y0), abs=0.1)
     assert floor.max(axis=0) == pytest.approx((x1, y1), abs=0.1)
     centre = np.asarray(lay.marker_centre(b))
-    assert keep_out.mean(axis=0) == pytest.approx(centre)  # the code's square on the code
+    assert got.code[:, :2].mean(axis=0) == pytest.approx(centre)  # the code's square on the code
 
 
 def test_no_bins_no_area_and_a_calibration_code_is_no_bin():
@@ -136,9 +137,105 @@ def test_the_real_camera_paints_all_but_the_floor_of_the_bin_whose_code_it_reads
     assert given.shape[:2] == (roi.get("h", h), roi.get("w", w))  # the ROI's size: its scale
     red = (given[..., 2] == 255) & (given[..., 0] == 0) & (given[..., 1] == 0)
     mk = shot.markers[0]
-    floor, _ = bin_floor(120, mk.centre, mk.up_deg)
-    cx, cy = floor.mean(axis=0)
-    fx, fy = (int(round(c)) for c in scene.cam.project(np.array([[cx, cy, 0.0]]))[0])
+    floor = bin_floor(120, mk.centre, mk.up_deg).floor
+    fx, fy = (int(round(c)) for c in scene.cam.project(floor.mean(axis=0)[None])[0])
     assert not red[fy, fx]  # the floor's middle: as photographed
     assert red[h // 2 - roi["y0"], w // 2 - roi["x0"]]  # the code: painted
     assert red[5, 5] and red[-5, -5]  # far outside the bin: painted
+
+
+def _lip_scene(machine):
+    """The nominal camera (above the plate's middle, 300 mm up) on a grey photo, the paint red."""
+    from sortering_pnp.calib.geometry import Camera, nominal_camera, roi_camera_matrix, roi_for_area
+    from sortering_pnp.measure.infer import Scene
+
+    full = nominal_camera()
+    roi = roi_for_area(full, (-20.0, -20.0), (240.0, 240.0), 5.0)
+    cam = Camera(roi_camera_matrix(full.K, roi), full.dist, (roi["w"], roi["h"]), full.T_cam_plate)
+    machine.camera.mask_colour = "#FF0000"
+    return Scene(np.full((roi["h"], roi["w"], 3), 128, np.uint8), cam, roi, "nominal")
+
+
+@pytest.mark.parametrize("rot", [0, 90, 180, 270])
+@pytest.mark.parametrize("marker", [100, 140, 50, 66])  # shelf 1x1, 1x2; corner 1x1, 1x2
+@pytest.mark.parametrize("where", [(110.0, 110.0), (50.0, 170.0), (170.0, 50.0)])
+def test_the_lip_and_code_are_painted_and_the_cavity_in_front_is_kept(machine, marker, rot, where):
+    """Through the real camera model, each thing at its own height: the whole shelf (its full
+    width) or the post (with its sides) and the code are painted, the floor 1.5 mm in front of
+    them is kept wherever the camera sees it (not hidden behind the lip)."""
+    from types import SimpleNamespace
+
+    from sortering_pnp.markers import MarkerPose
+    from sortering_pnp.vision import CameraVision
+
+    size = binspec.size_for_marker(marker)
+    lay = Layout.default()
+    surface = lay.surface_z()
+    code_z = lay.marker_plate_height(size.height_u)
+    rim = lay.bin_floor_mm + binspec.rim_height_mm(size.height_u) - surface
+    floor = lay.bin_floor_mm + binspec.BASE_HEIGHT_MM + binspec.FLOOR_MM - surface
+    centre = np.asarray(where)
+    c, s = np.cos(np.radians(rot)), np.sin(np.radians(rot))
+
+    def plate(bx: float, by: float) -> np.ndarray:  # bin frame (+Y the back) -> plate
+        return centre + (c * bx - s * by, s * bx + c * by)
+
+    ox, oy = binspec.marker_offset_for(marker, size.w, size.d)
+    pose = MarkerPose(marker, tuple(plate(ox, oy)), 90.0 + rot)
+    area = bins_area([pose], 0.0, lambda mid: code_z)
+    scene = _lip_scene(machine)
+    out = CameraVision._painted(SimpleNamespace(m=machine), scene, area).image
+
+    def red(bx: float, by: float, z: float) -> bool:
+        u, v = scene.cam.project(np.array([[*plate(bx, by), z]]))[0]
+        r, g, b = out[int(round(v)), int(round(u))][::-1]
+        return (r, g, b) == (255, 0, 0)
+
+    def seen(bx: float, by: float, normal: tuple[float, float]) -> bool:
+        """The camera is on the cavity's side of the lip's face (or right above)."""
+        to_cam = np.array([110.0, 110.0]) - plate(bx, by)
+        n = np.array([c * normal[0] - s * normal[1], s * normal[0] + c * normal[1]])
+        return float(to_cam @ n) >= -2.0
+
+    iw = binspec.outer_mm(size.w) / 2 - binspec.WALL_MM  # the walls' inside
+    idp = binspec.outer_mm(size.d) / 2 - binspec.WALL_MM
+    q = (binspec.MARKER_CELLS / 2 + binspec.MARKER_QUIET_CELLS) * binspec.MARKER_CELL_MM - 0.3
+    for dx, dy in ((-q, -q), (q, -q), (q, q), (-q, q), (0, 0)):  # the code with its border
+        assert red(ox + dx, oy + dy, code_z)
+    assert not red(0.0, -idp / 2, floor)  # the floor's middle: as photographed
+    if binspec.style_for_marker(marker) == "shelf":
+        front = idp - binspec.SHELF_DEPTH_MM
+        for bx in (-iw + 0.5, -iw / 2, 0.0, iw / 2, iw - 0.5):  # the whole width of the shelf
+            for by in (front + 0.5, idp - 0.5):
+                assert red(bx, by, rim), (bx, by)
+        for bx in (-iw / 2, 0.0, iw / 2):
+            if seen(bx, front - 1.5, (0.0, -1.0)):
+                assert not red(bx, front - 1.5, floor), bx  # in front of the shelf: kept
+    else:
+        p = binspec.POST_MM
+        for bx, by in ((iw - p + 0.5, idp - p + 0.5), (iw - 0.5, idp - 0.5), (iw - p + 0.5, idp)):
+            assert red(bx, by, rim), (bx, by)  # the post's top
+        mid = (rim + floor) / 2
+        assert red(iw - p / 2, idp - p + 0.2, mid) and red(iw - p + 0.2, idp - p / 2, mid)  # sides
+        if seen(iw - p / 2, idp - p - 1.5, (0.0, -1.0)):
+            assert not red(iw - p / 2, idp - p - 1.5, floor)  # in front of the post: kept
+        if seen(iw - p - 1.5, idp - p / 2, (-1.0, 0.0)):
+            assert not red(iw - p - 1.5, idp - p / 2, floor)  # beside it: kept
+
+
+def test_a_shelf_is_painted_across_the_whole_bin_a_post_only_where_it_stands():
+    shelf = bin_floor(103, (0.0, 0.0), 90.0)
+    post = bin_floor(53, (0.0, 0.0), 90.0)
+    iw = binspec.outer_mm(1) / 2 - binspec.WALL_MM
+    assert np.ptp(shelf.lip[:, 0]) >= 2 * iw  # wall to wall
+    assert np.ptp(shelf.lip[:, 1]) >= binspec.SHELF_DEPTH_MM
+    lo = shelf.lip[:, 1].min()  # the shelf's front edge: the code's centre minus half the shelf
+    assert lo == pytest.approx(-binspec.SHELF_DEPTH_MM / 2)
+    assert post.lip[:, 0].min() == pytest.approx(-binspec.POST_MM / 2)  # the post only
+    assert post.lip[:, 1].min() == pytest.approx(-binspec.POST_MM / 2)
+    for got in (shelf, post):  # the code: never past its lip into the cavity
+        assert got.code[:, 1].min() >= lo - 1e-9 and got.code[:, 0].min() >= -binspec.POST_MM / 2
+    # the rim, floor and code heights come from the size: a 6u bin's floor is 21 mm further down
+    tall = bin_floor(163, (0.0, 0.0), 90.0)
+    assert shelf.floor[0, 2] - tall.floor[0, 2] == pytest.approx(21.0)
+    assert shelf.lip[0, 2] == pytest.approx(-binspec.MARKER_INK_MM)

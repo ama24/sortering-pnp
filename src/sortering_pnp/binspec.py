@@ -24,6 +24,7 @@ SHELF_DEPTH_MM = 14.0  # marker shelf, measured from the inside of the back wall
 MARKER_CELLS = 6  # 4x4 ArUco bits plus the black border
 MARKER_CELL_MM = 1.6
 MARKER_INK_MM = 0.6  # height of the black marker cells above the rim
+MARKER_QUIET_CELLS = 1  # the light border the code needs around it (on the shelf or post)
 POST_MM = 14.0  # corner post, square, measured from the inside of the walls
 MIN_HEIGHT_U = 3  # the shelf needs the room
 STYLES = ("shelf", "corner")
