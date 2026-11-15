@@ -150,7 +150,10 @@ another repository.
   model sees. Markers are read from the unpainted photo. Looking into the bins (start-up
   check, Resync, after a bin change: `take_shot(paint="bins")`) uses the bins view
   (`BinsView`, `camera.bins_mask`): only the floors of the bins whose codes are in that photo
-  (`trayview.bins_area`, each floor from its code alone), the codes painted too.
+  (`trayview.bins_area`, each floor from its code alone: `bin_floor`), each piece projected at
+  its own height (floor at the floor, clipped by the opening at the rim; the lip painted: a shelf
+  bin's whole back shelf, a corner bin's post with its sides; the code with its quiet border
+  + `CODE_MARGIN_MM`, never past the lip into the cavity).
 - **Taking bins out:** only a bin at least `run.fill.take_out_at` full (0.5) is flagged ready
   when its kind is done (`_update_ready`) or given up for a new kind (`_ask_bins`).
 

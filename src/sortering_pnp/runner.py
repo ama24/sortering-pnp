@@ -52,7 +52,6 @@ from .trayview import (
     WorkArea,
     bin_floor,
     bins_area,
-    code_quads_px,
     paint_outside,
     parse_colour,
 )
@@ -900,24 +899,21 @@ class Runner:
             )
             for m in found
         ]
-        area = bins_area(poses, st["margin_mm"])
+        height = lambda mid: _marker_plate_height(layout, mid)  # noqa: E731
+        area = bins_area(poses, st["margin_mm"], height)
         if area is None:
             return "no bin codes in the picture"
 
         def px(poly: np.ndarray) -> np.ndarray:
-            return cam.project(np.c_[poly, np.zeros(len(poly))]) * s
+            return cam.project(poly) * s
 
-        img = paint_outside(
-            frame,
-            [px(o) for o in area.outlines],
-            [px(h) for h in area.holes] + code_quads_px(m.corners_px for m in found),
-            parse_colour(self.m.camera.mask_colour),
-        )
+        keeps, clips, holes = area.in_pixels(px)
+        img = paint_outside(frame, keeps, holes, parse_colour(self.m.camera.mask_colour), clips)
         floors = []
         for m in poses:
-            got = bin_floor(m.marker, m.centre, m.up_deg, st["margin_mm"])
+            got = bin_floor(m.marker, m.centre, m.up_deg, st["margin_mm"], height(m.marker))
             if got is not None:
-                floors.append((m.marker, px(got[0])))
+                floors.append((m.marker, px(got.floor)))
         calib = getattr(self.vision, "calibration", None)
         roi = (calib or {}).get("roi")
         if roi:  # the model gets this part of the photo (its size unchanged)

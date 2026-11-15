@@ -420,8 +420,12 @@ The codes are always read from the photo itself.
 **bins view** instead (`camera.bins_mask`, on by default): the codes are read first, and each
 bin's floor (inside its walls) is worked out from its code alone, the size from the code's
 number and the place and turn from the code itself. Only those floors go to the model; the walls,
-the gaps between bins and the codes with their shelf or post are painted over, at the same
-picture size. As it is made from the codes in that very photo, it follows the bins wherever they
+the gaps between bins, the codes and what carries them are painted over, at the same picture
+size. Each piece is placed at its own height through the camera model: the floor at the floor,
+seen through the opening at the rim (a near wall hides the floor behind it); a shelf bin's whole
+back shelf, wall to wall, at the rim; a corner bin's post only, from its top down to the floor
+(its sides too); the code with its light border and 1 mm more, never past its shelf or post. The
+open cavity in front of the shelf or beside the post is kept, so parts lying against it are seen. As it is made from the codes in that very photo, it follows the bins wherever they
 stand. **Camera Calibration tab → Bins view** shows it live beside the camera, with an edge
 setting (`camera.bins_margin_mm`: + keeps more of each floor's edge, − paints more; about 2.4 mm
 is the middle of the wall between two bins) and **Snippets**: each bin's floor cut out as the

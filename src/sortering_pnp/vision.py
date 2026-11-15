@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -26,7 +26,7 @@ from .grip import Shape, axis_grip, head_grip, outline_grip, ring_grip, washer_h
 from .markers import MarkerPose, detect, marker_pose
 from .models import ModelStore
 from .parts import Part
-from .trayview import BinsView, WorkArea, bins_area, code_quads_px, paint_outside, parse_colour
+from .trayview import BinsView, WorkArea, bins_area, paint_outside, parse_colour
 
 log = logging.getLogger("sortering_pnp.vision")
 
@@ -291,18 +291,13 @@ class CameraVision:
         H, _ = cv2.findHomography(plate[ok], px[ok])
         return path, (np.diag([k, k, 1.0]) @ H).tolist(), k
 
-    def _painted(self, scene: Any, work: WorkArea, holes_px: Sequence[np.ndarray] = ()) -> Any:
-        """The scene with all but `work` painted (and `holes_px`: scene pixels, the codes)."""
+    def _painted(self, scene: Any, work: WorkArea) -> Any:
+        """The scene with all but `work` painted (each polygon at its own height)."""
         import dataclasses
 
-        def px(poly: np.ndarray) -> np.ndarray:
-            return scene.cam.project(np.c_[poly, np.zeros(len(poly))])
-
+        keeps, clips, holes = work.in_pixels(scene.cam.project)
         img = paint_outside(
-            scene.image,
-            [px(o) for o in work.outlines],
-            [px(h) for h in work.holes] + list(holes_px),
-            parse_colour(self.m.camera.mask_colour),
+            scene.image, keeps, holes, parse_colour(self.m.camera.mask_colour), clips
         )
         return dataclasses.replace(scene, image=img, gray=None)
 
@@ -523,10 +518,9 @@ class CameraVision:
             for s in found
         ]
         if isinstance(work, BinsView):
-            area = bins_area(poses, work.margin_mm)
+            area = bins_area(poses, work.margin_mm, marker_height)
             if area is not None:
-                codes = code_quads_px(np.asarray(s.corners_px) - (ox, oy) for s in found)
-                scene = self._painted(scene, area, codes)
+                scene = self._painted(scene, area)
         elif work is not None and self.m.camera.mask:
             scene = self._painted(scene, work)
         if self.analyzer is None:  # no model yet: the codes are still read, no parts
