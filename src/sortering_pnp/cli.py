@@ -71,6 +71,7 @@ def _build(m: Machine):  # noqa: ANN202 - (runner, world)
         return Runner(m, printer, vision, store), world
     from .vision import CameraVision
 
+    Runner.apply_saved(m)  # the page's values (camera height, turn, lock) before the camera
     return Runner(m, make_printer(m), CameraVision(m, runs, store), store), None
 
 

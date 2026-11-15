@@ -2018,57 +2018,66 @@ class Runner:
     )
 
     def _load_machine(self) -> None:
-        p = self.m.path(self.m.paths.machine)
+        if "mask_margin_mm" in self.apply_saved(self.m):
+            self.mask_checked = True
+
+    @classmethod
+    def apply_saved(cls, m: Machine) -> set[str]:
+        """The values set in the page (machine.json) over machine.yaml's; the keys found.
+        Called before the camera's setup is built (cli.py) as well as here: the camera's height,
+        quarter turn and lock must be in place when the vision setup reads them."""
+        p = m.path(m.paths.machine)
         if p is None or not p.is_file():
-            return
-        for k, v in (read_json(p) or {}).items():
-            if k in self.MACHINE_KEYS:
-                setattr(self.m.printer, k, v)
+            return set()
+        saved = read_json(p) or {}
+        for k, v in saved.items():
+            if k in cls.MACHINE_KEYS:
+                setattr(m.printer, k, v)
             elif k == "mask_margin_mm":
-                self.m.camera.mask_margin_mm = float(v)
-                self.mask_checked = True
+                m.camera.mask_margin_mm = float(v)
             elif k == "speed_pct":  # Device tab: Speed
-                self.m.run.speed_pct = float(v)
+                m.run.speed_pct = float(v)
             elif k == "run_mode" and v in RUN_MODES:  # Device tab: Mode
-                self.m.run.mode = str(v)
+                m.run.mode = str(v)
             elif k == "turbo_picks":
-                self.m.run.turbo_picks = max(1, int(v))
+                m.run.turbo_picks = max(1, int(v))
             elif k == "bins_margin_mm":  # Calibrate tab: Bins view
-                self.m.camera.bins_margin_mm = float(v)
+                m.camera.bins_margin_mm = float(v)
             elif k == "bins_mask":
-                self.m.camera.bins_mask = bool(v)
+                m.camera.bins_mask = bool(v)
             elif k == "mask_colour":  # Camera cropping, Calibrate tab
-                self.m.camera.mask_colour = str(v)
+                m.camera.mask_colour = str(v)
             elif k in ("camera_hflip", "camera_vflip", "camera_turn90"):  # Rotate / Mirror
-                setattr(self.m.camera, k.removeprefix("camera_"), bool(v))
+                setattr(m.camera, k.removeprefix("camera_"), bool(v))
             elif k == "camera_adjust":  # Camera Calibration tab: focus, colours, exposure
-                a = self.m.camera.adjust
+                a = m.camera.adjust
                 for ak, av in (v or {}).items():
                     if hasattr(a, ak):
                         setattr(a, ak, type(getattr(a, ak))(av))
                 a.lens_position = lens_dioptres(a.lens_position)  # an old mm value
             elif k == "camera_height_mm":  # Calibrate tab, Skip for now
-                self.m.camera.height_mm = float(v)
+                m.camera.height_mm = float(v)
             elif k == "picker_mode":  # chosen in the Setup tab
-                self.m.picker.set_type(str(v))
+                m.picker.set_type(str(v))
             elif k == "rotate_offset_deg":
-                self.m.picker.rotate_offset_deg = float(v)
+                m.picker.rotate_offset_deg = float(v)
             elif k == "size_check" and v in SIZE_CHECKS:  # Setup tab, Bins step
-                self.m.run.size_check = str(v)
+                m.run.size_check = str(v)
             elif k == "lower_to_drop":  # Setup tab, Picker step
-                self.m.picker.lower_to_drop = bool(v)
+                m.picker.lower_to_drop = bool(v)
             elif k == "pump_switch" and v in PUMP_SWITCHES:  # Setup tab, Picker step
-                self.m.picker.pump_switch = str(v)
+                m.picker.pump_switch = str(v)
             elif k == "lights" and isinstance(v, dict):  # Setup tab, Lights step
-                for name in self.LIGHT_KEYS:
+                for name in cls.LIGHT_KEYS:
                     if name in v:
-                        setattr(self.m.lights, name, type(getattr(self.m.lights, name))(v[name]))
+                        setattr(m.lights, name, type(getattr(m.lights, name))(v[name]))
             elif k == "camera_settings":  # locked in the Calibrate tab
-                self.m.camera.settings = str(v)
+                m.camera.settings = str(v)
             elif k == "calibration":
-                c = self.m.calibration
+                c = m.calibration
                 c.measured_square_mm = v.get("measured_square_mm", c.measured_square_mm)
                 c.board_thickness_mm = float(v.get("board_thickness_mm", c.board_thickness_mm))
+        return set(saved)
 
     def machine_values(self) -> dict[str, Any]:
         return {k: getattr(self.m.printer, k) for k in self.MACHINE_KEYS}
